@@ -54,3 +54,9 @@
   opacity: 0; pointer-events: none; transition: opacity .2s, transform .2s;
 }
 .fj-flash.on { opacity: 1; transform: translate(-50%, 0); }
+
+/* The voice assistant widget sits in the bottom-right corner. When Equipment details is open it covers that corner
+   (370 px wide, see styles.css), so the widget slides left of it. A transform makes the host the widget's
+   containing block, so its fixed-position launcher moves with it. */
+elevenlabs-convai { transition: transform .2s ease; }
+.inspector-open elevenlabs-convai { transform: translateX(calc(-1 * min(370px, 95vw))); }

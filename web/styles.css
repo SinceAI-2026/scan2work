@@ -109,3 +109,7 @@ button.proposal-card .prop-meta span { display: block; overflow-wrap: anywhere; 
 #bim-search-results{display:grid;gap:3px;max-width:240px;max-height:155px;overflow:auto}
 #bim-search-results:empty{display:none}
 #bim-search-results button{text-align:left;font-size:11px;overflow-wrap:anywhere}
+
+/* Map in the top-right corner, under the view controls; the voice assistant widget has the bottom-right corner. */
+.route-map-panel{top:56px;bottom:auto;max-height:calc(100% - 140px);overflow-y:auto}
+@media(max-width:650px){.route-map-panel{top:140px;max-height:calc(100% - 230px)}}

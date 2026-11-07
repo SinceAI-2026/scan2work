@@ -3,17 +3,22 @@
 // the rest. Save to library has the server cut the object out of the scan and refine it against the walkthrough
 // frames (pipeline/asset_export.py, pipeline/object_refine.py). A saved object is drawn as that model in place of
 // its scan splats. Keys while open: V model or scan, R turntable, G ghost room, Esc back.
+// A save runs in the background on the server; the card polls GET /api/library until it is done, so a reload or a
+// closed card does not lose it, and reopening the object picks the save up again.
 import { loadGspl, createSplatObject } from "./splat-object.mjs";
 
 const LIBRARY = "./data/library/";
 const GHOST_ROOM = 0.07;
 
-async function loadSaved() {
+const POLL_MS = 2000;
+
+async function loadLibrary() {
   try {
     const res = await fetch("./api/library");
-    return new Map(res.ok ? (await res.json()).saved.map(s => [s.id, s]) : []);
+    const doc = res.ok ? await res.json() : {};
+    return { saved: new Map((doc.saved || []).map(s => [s.id, s])), saving: doc.saving || {} };
   } catch {
-    return new Map();
+    return { saved: new Map(), saving: {} };
   }
 }
 
@@ -27,10 +32,11 @@ export function createTakeApart(ctx) {
   card.hidden = true;
   card.setAttribute("aria-label", "Object taken apart");
   ctx.container.appendChild(card);
-  const api = { active: null, ghost: false, showScan: false, saved: new Map(), busy: null, error: "" };
+  const api = { active: null, ghost: false, showScan: false, saved: new Map(), saving: {}, error: "" };
   let restore = null;
   let model = null; // { id, data, obj }: the saved model of the object taken apart
   let token = 0;
+  let watching = null; // the object whose save is being polled
 
   function dropModel() {
     if (model?.obj) {
@@ -58,7 +64,8 @@ export function createTakeApart(ctx) {
     dropModel();
     model = null;
     setUniforms();
-    api.saved = await loadSaved();
+    ({ saved: api.saved, saving: api.saving } = await loadLibrary());
+    if (savingNow(asset)) watchSave(asset);
     const entry = api.saved.get(asset.id);
     if (entry) {
       try {
@@ -94,12 +101,14 @@ export function createTakeApart(ctx) {
   function render() {
     const { asset } = api.active;
     const entry = api.saved.get(asset.id);
-    const busy = api.busy === asset.id;
+    const job = savingNow(asset);
+    const busy = Boolean(job);
     const files = entry?.files || {};
     const tag = asset.tag ? `${esc(asset.tag)} · ${esc(asset.asset_id)} · ${esc(asset.condition_state)}` : "Not in the Excel pack";
-    const exact = Boolean(asset.source_region_id);
-    const facts = exact && !entry ? `<p class="apart-facts">${plural(asset.n_gaussians || 0, "source Gaussian")} · ${esc(asset.review_status || "unreviewed")}. Save exports this exact region for your team. It does not rebuild missing geometry.</p>` : entry ? describe(entry)
-      : busy ? `<p class="apart-facts">Cutting ${esc(asset.id)} out of the scan and fitting it to the walkthrough photos. This takes 1 to 3 minutes.</p>`
+    const exact = Boolean(asset.source_region_id || asset.membership_mode === "exact-source-rows");
+    const facts = entry ? describe(entry)
+      : exact ? `<p class="apart-facts">${busy ? `Exporting ${esc(asset.id)}${job?.seconds ? ` (${job.seconds} s so far)` : ""}. You can close this card; the save carries on.` : `${plural(asset.n_gaussians || 0, "source Gaussian")} · ${esc(asset.review_status || "unreviewed")}. Save exports this exact region for your team.`} Original membership is retained; missing geometry is not rebuilt.</p>`
+      : busy ? `<p class="apart-facts">Cutting ${esc(asset.id)} out of the scan and fitting it to the walkthrough photos. This takes 1 to 3 minutes${job?.seconds ? ` (${job.seconds} s so far)` : ""}. You can close this card; the save carries on.</p>`
       : `<p class="apart-facts">Showing the scan. Save to library cuts this object out and refines it against the walkthrough photos (1 to 3 minutes).</p>`;
     card.innerHTML = `
       <div class="apart-head">
@@ -128,23 +137,52 @@ export function createTakeApart(ctx) {
       </div>`;
   }
 
+  function savingNow(asset) {
+    const job = api.saving[asset.id];
+    return job && !job.error ? job : null;
+  }
+
   async function saveActive() {
     const asset = api.active.asset;
-    if (api.busy || api.saved.has(asset.id)) return;
-    api.busy = asset.id;
+    if (savingNow(asset) || api.saved.has(asset.id)) return;
     api.error = "";
+    api.saving = { ...api.saving, [asset.id]: { seconds: 0 } };
     render();
     try {
       const res = await fetch("./api/library", {
         method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: asset.id }),
       });
       const doc = await res.json();
-      if (!res.ok) api.error = doc.error || `HTTP ${res.status}`;
+      if (!res.ok) throw new Error(doc.error || `HTTP ${res.status}`);
+      api.saving = doc.saving || api.saving;
     } catch (err) {
       api.error = err.message;
+      delete api.saving[asset.id];
+      if (api.active?.asset === asset) render();
+      return;
     }
-    api.busy = null;
-    if (api.active?.asset === asset) await loadModel(asset);
+    watchSave(asset);
+  }
+
+  // Poll until the server finishes the save (or reports why it failed), then show the saved model.
+  function watchSave(asset) {
+    if (watching === asset.id) return;
+    watching = asset.id;
+    const tick = async () => {
+      const lib = await loadLibrary();
+      api.saved = lib.saved;
+      api.saving = lib.saving;
+      const job = lib.saving[asset.id];
+      if (job && !job.error) {
+        if (api.active?.asset === asset) render();
+        setTimeout(tick, POLL_MS);
+        return;
+      }
+      watching = null;
+      if (job?.error) api.error = `Save failed: ${job.error}`;
+      if (api.active?.asset === asset) await loadModel(asset);
+    };
+    setTimeout(tick, POLL_MS);
   }
 
   const toggle = act => {

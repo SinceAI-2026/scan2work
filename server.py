@@ -31,6 +31,31 @@ TWIN_DATA: dict = {}
 ASSETS_BY_ID: dict = {}
 ASSETS_BY_OBJ: dict = {}
 WORK_ORDER_DRAFTS: list = []
+
+# Library saves take up to a few minutes, so they run in a thread and the viewer polls GET /api/library. A reload
+# or a closed tab no longer loses the result. oid -> {"started": time} while running, {"error": msg} if it failed.
+SAVING: dict = {}
+SAVING_LOCK = threading.Lock()
+
+
+def _save_to_library(oid: str) -> None:
+    try:
+        asset_export.save(oid)
+        result = None
+    except Exception as err:  # reported to the viewer; ImportError when torch is missing
+        result = {"error": f"{type(err).__name__}: {err}" if not isinstance(err, (ValueError, RuntimeError, OSError)) else str(err)}
+    with SAVING_LOCK:
+        if result:
+            SAVING[oid] = result
+        else:
+            SAVING.pop(oid, None)
+
+
+def saving_status() -> dict:
+    now = time.time()
+    with SAVING_LOCK:
+        return {oid: ({"seconds": round(now - j["started"])} if "started" in j else {"error": j["error"]})
+                for oid, j in SAVING.items()}
 RETRIEVER = None
 
 INTENT_KEYWORDS = {
@@ -303,7 +328,7 @@ class TwinRequestHandler(SimpleHTTPRequestHandler):
             return self._send_json({"drafts": WORK_ORDER_DRAFTS})
 
         if path == "/api/library":
-            return self._send_json({"saved": asset_export.read_library()})
+            return self._send_json({"saved": asset_export.read_library(), "saving": saving_status()})
 
         if path == "/api/library/export.zip":
             raw = library_zip(asset_export.read_library())
@@ -358,11 +383,11 @@ class TwinRequestHandler(SimpleHTTPRequestHandler):
             oid = str(body.get("id") or "")
             if oid not in ASSETS_BY_OBJ:
                 return self._send_json({"error": f"No object {oid!r} in the twin"}, 404)
-            try:
-                item = asset_export.save(oid)
-            except (ValueError, RuntimeError, OSError) as err:
-                return self._send_json({"error": str(err)}, 422)
-            return self._send_json({"ok": True, "item": item, "saved": asset_export.read_library()})
+            with SAVING_LOCK:  # starts the save once; a second request while it runs just reports it
+                if "started" not in SAVING.get(oid, {}):
+                    SAVING[oid] = {"started": time.time()}
+                    threading.Thread(target=_save_to_library, args=(oid,), daemon=True).start()
+            return self._send_json({"ok": True, "saving": saving_status(), "saved": asset_export.read_library()}, 202)
 
         return self._send_json({"error": "Unknown endpoint"}, 404)
 
