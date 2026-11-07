@@ -14,7 +14,7 @@ import time
 import zipfile
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import parse_qs, unquote, urlparse
+from urllib.parse import parse_qs, urlparse
 
 ROOT = Path(__file__).resolve().parent
 # Keep upstream defaults for normal Wael scenes. Imported/offline manifests must
@@ -334,9 +334,10 @@ class TwinRequestHandler(SimpleHTTPRequestHandler):
             return self._send_json(read_edits())
 
         if path.startswith("/data/") and path.lower().endswith((".mp4", ".webm")):
-            media = (WEB_DIR / unquote(path).lstrip("/")).resolve()
-            if WEB_DIR.resolve() in media.parents and media.is_file():
+            media = Path(self.translate_path(path)).resolve()
+            if C.OUT_DIR.resolve() in media.parents and media.is_file():
                 return self._send_media(media)
+            return self.send_error(404, "Media not found in the active dataset")
 
         if path == "/api/field-log":  # the technician's job log, written by mcp_server.py
             return self._send_json(field_service.read_log())
