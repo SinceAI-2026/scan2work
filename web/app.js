@@ -406,7 +406,6 @@ async function loadEwaGaussianSplats(url) {
       uHasRemoved: {value:0},
       uFillDebug: {value:0},
       uSplatAxisLimit: { value: 180 },
-      uBlur: { value: 0 },   // room-parts.mjs: px² added to every footprint, the room softly blurred around a Take apart
       uCovered: {value:makeRoomTexture(new Float32Array(256 * explodeUniforms.uInstTableSize.value.y),256,   // ai3d.mjs: objects under an AI 3D model
         explodeUniforms.uInstTableSize.value.y,THREE.RedFormat)},
       uHasCovered: {value:0},
@@ -423,7 +422,7 @@ async function loadEwaGaussianSplats(url) {
       uniform vec2 uViewport;
       uniform vec2 uFocal;
 ${SHADER_DECL}      uniform float uSplatAxisLimit;
-      uniform float uBlur, uHasCovered;
+      uniform float uHasCovered;
       uniform sampler2D uCovered;
       uniform float uBaseCount, uFillCount, uHasRemoved, uFillDebug;
       uniform sampler2D uRoomFill, uRemoved;
@@ -504,15 +503,6 @@ ${SHADER_OFFSET}        if (uHasCovered > 0.5 && instId > 0.5 && texture2D(uCove
         float c_a = dot(wu, v_wu) + 0.15;
         float c_b = dot(wu, v_wv);
         float c_c = dot(wv, v_wv) + 0.15;
-        if (uBlur > 0.0) {   // a wider footprint, same coverage (opacity scaled by the area ratio)
-          float det0 = max(c_a * c_c - c_b * c_b, 1e-4);
-          c_a += uBlur; c_c += uBlur;
-          a *= sqrt(det0 / max(c_a * c_c - c_b * c_b, 1e-4));
-          if (a < 0.03) {   // small splats fade to nothing when blurred: drop them, or the fill would stall the GPU
-            gl_Position = vec4(0.0, 0.0, 2.0, 1.0);
-            return;
-          }
-        }
 
         float mid = 0.5 * (c_a + c_c);
         float disc = max(0.0001, (c_a - c_c) * (c_a - c_c) * 0.25 + c_b * c_b);

@@ -112,24 +112,26 @@ On 6 objects (7 Nov 2026), `tests.eval_refine` held out each object's best frame
 
 ## Take a pump apart in the room
 
-Select P-001 and choose **Take apart** in Equipment details (or press **T**). For P-001 the button takes its pump unit apart in the room; for every other object it keeps the take-apart described above. Away from the device, the robot walks there first. The view glides into first person at the robot and turns to the device. The unit's parts then ease apart where it stands. The room stays in view, dimmed and softly blurred, and the device's own scan splats are hidden under the model. Other frames, labels and the navigation panels are hidden until **Done** or **Esc**.
+Select M-005, the motor of the right-hand inline pump on the plinth, and choose **Take apart** in Equipment details (or press **T**). The pump casing below it (OBJ-034) does the same. For these objects the button takes the pump unit apart in the room. For every other object it keeps the take-apart described above.
 
-- Each part has a callout with its name and size in mm, and the tag and synthetic fault of the device it serves.
+Away from the pump, the robot walks there first. The view glides into first person at the robot and turns to the unit, and the unit's parts ease apart where it stands. The room stays in view behind them, dimmed and blurred (3 px), and the objects' own scan splats are hidden under the model. Other frames, labels and the navigation panels are hidden until **Done** or **Esc**.
+
+- Each part has a callout with its name and size in mm. It also shows the tag of the object that the part holds, with that object's synthetic fault.
 - The dock on the right has **Explode**, **Reassemble**, **Reset** and **Done**, a slider, the fault list, a button per part and the selected part's detail.
 - Click a part (or its callout or button) to select it. The eye eases about 30 % toward it.
-- The fault part is tinted and outlined in red. A unit mate's fault is shown in amber.
+- The fault part is tinted and outlined in red. Another object's fault in the same unit is shown in amber.
 
-Devices are matched by Excel tag. P-001 has no split model of its own, so it is shown as a stand-in with the P-005 unit model, and it carries only P-001's own issue (misalignment → lantern and coupling guard). The models are AI-generated (Higgsfield) units split into parts by geometry rules, in raw PLY coordinates of `Equipment Room.ply`. The viewer moves them into its levelled frame, `(x, 1.185 − y, −z)` as in `pipeline/ingest.py`, and centres them on the device's box. Sizes are those of scan2service's fitted unit, not of this viewer's box.
+The models are AI-generated (Higgsfield) units, split into parts by geometry rules. scan2service fitted them in raw PLY coordinates of the same `Equipment Room.ply`. The viewer only levels them, `(x, 1.185 − y, −z)` as in `pipeline/ingest.py`, so each unit stands exactly where it was fitted. Objects are matched to a unit by **position**: an object belongs to the unit when its box centre lies inside the unit's box. Tags are never used for this, because the two repos tagged the Excel devices onto the scan independently. The faults come from the matched objects' own Excel records: M-005's current imbalance is shown on the motor, and the casing has no record.
 
 ### AI 3D models in the room
 
-Every Excel device whose scan2service card shows a Higgsfield model is drawn as that model, in place: P-001 (the P-005 unit as a stand-in), P-002 to P-006, PT-003 and CV-006 to CV-011. Each model is centred on this viewer's object for the tag, and the object's own scan splats are hidden under it. Its room label gets an **AI 3D** badge. A pump and motor unit is drawn once, at the pump. The models load one by one after the splat. They follow the explode slider and room moves, leave with a removed object, and are hidden in the BIM layer and while an object is taken apart with **T**. `?ai3d=0` turns them off. The code is in `web/ai3d.mjs`.
+Every Higgsfield model of a scan2service device is drawn where it was fitted, unshifted. It sits on this viewer's objects whose box centres lie inside it. Their scan splats are hidden under the model, and their room labels get an **AI 3D** badge. A pump and motor unit is one model, drawn once. The models load one by one after the splat. They follow the explode slider and room moves of their main object, and leave with it. They are hidden in the BIM layer and while an object is taken apart with Wael's take-apart. `?ai3d=0` turns them off. The code is in `web/ai3d.mjs`.
 
 The data comes from the MVP and is git-ignored like the rest of `web/data/`:
 
 ```sh
 .venv/bin/python -m scripts.import_take_apart    # reads ~/sinceai-mvp/demo/web/public/data/s2s, writes web/data/take_apart/{index.json,parts/,ai3d/}
-node tests/test_parts_data.mjs                    # device matching, stand-in faults, placement
+node tests/test_parts_data.mjs                    # matching by position, faults from the objects' own records
 ```
 
 Take apart is ported from Mikael Lehtonen's scan2service (`web/parts.js`) via SinceAI-2026/mvp, with the UX after Rasmus Mäkinen's pump explode. The code is in `web/room-parts.mjs`, `web/parts-data.mjs`, `web/ai3d.mjs` and `web/room-parts.css`. `web/vendor/three/addons/loaders/GLTFLoader.js` is three.js r170's loader, matching the vendored three.

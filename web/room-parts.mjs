@@ -9,22 +9,67 @@
 // shade only the parts and the room never covers them).
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
-import { unitFor, shiftFor, unitDevices, faultParts, floorDistance, easeTo, spreadLabels, sizeText, codeText, RAW_FLOOR_Y } from "./parts-data.mjs";
+import { unitFor, unitDevices, faultParts, deviceIn, floorDistance, easeTo, spreadLabels, sizeText, codeText, RAW_FLOOR_Y } from "./parts-data.mjs";
 
 const DATA = "./data/take_apart/";
 const SPREAD = 1.9;     // further apart than on the card, so nothing overlaps from the eyes
 const ROOM_FADE = 0.75; // the rest of the room only mildly dimmed: the same view, not a stage
-const BLUR = 6;         // and softly blurred: px² (CSS) added to every splat's screen footprint (app.js uBlur)
+const BLUR_PX = 3;      // and softly blurred behind the parts (Gaussian sigma in CSS px, as the MVP's blur(3px))
 const NEAR_M = 1.3;     // "at the device": the robot this close to its box, on the floor
 const GLIDE_S = 1.1;    // into the technician's eyes before the parts come apart
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => `&#${c.charCodeAt(0)};`);
+
+// The room blur: the frame just drawn (room, frames, AI 3D models) copied to a texture, blurred in two passes (across at
+// half resolution, then down onto the screen), before the parts are drawn sharp on top. Three cheap full-screen passes.
+let blur = null;
+function blurRoom(r, sigmaCss) {
+  const size = r.getDrawingBufferSize(new THREE.Vector2()), w = size.x, h = size.y;
+  if (!blur) {
+    const mat = new THREE.ShaderMaterial({
+      uniforms: { tex: { value: null }, step: { value: new THREE.Vector2() } },
+      vertexShader: "varying vec2 vUv; void main() { vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }",
+      // 9 taps, 2 texels apart with linear filtering, weights of a Gaussian with sigma = 2 taps
+      fragmentShader: `uniform sampler2D tex; uniform vec2 step; varying vec2 vUv;
+        void main() {
+          vec4 c = vec4(0.0); float t = 0.0;
+          for (int i = -4; i <= 4; i++) { float k = exp(-float(i * i) / 8.0); c += k * texture2D(tex, vUv + float(i) * step); t += k; }
+          gl_FragColor = c / t;
+        }`,
+      depthTest: false, depthWrite: false,
+    });
+    const quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), mat);
+    quad.frustumCulled = false;
+    const scene = new THREE.Scene();
+    scene.add(quad);
+    blur = { mat, scene, cam: new THREE.Camera(), frame: null, half: new THREE.WebGLRenderTarget(1, 1, { depthBuffer: false }) };
+  }
+  if (!blur.frame || blur.frame.image.width !== w || blur.frame.image.height !== h) {
+    blur.frame?.dispose();
+    blur.frame = new THREE.FramebufferTexture(w, h);
+    blur.frame.minFilter = blur.frame.magFilter = THREE.LinearFilter;
+    blur.half.setSize(Math.ceil(w / 2), Math.ceil(h / 2));
+  }
+  // sigma (drawing-buffer px) = 2 taps of `step`: step = sigma / 2
+  const s = (sigmaCss * r.getPixelRatio()) / 2;
+  r.copyFramebufferToTexture(blur.frame);
+  const auto = r.autoClear;
+  r.autoClear = false;
+  blur.mat.uniforms.tex.value = blur.frame;
+  blur.mat.uniforms.step.value.set(s / w, 0);
+  r.setRenderTarget(blur.half);
+  r.render(blur.scene, blur.cam);
+  blur.mat.uniforms.tex.value = blur.half.texture;
+  blur.mat.uniforms.step.value.set(0, s / h);
+  r.setRenderTarget(null);
+  r.render(blur.scene, blur.cam);
+  r.autoClear = auto;
+}
 
 /** ctx: { scene, camera, renderer, container, state, uniforms(), look (first-person yaw/pitch), eye (m), setPreset(name),
  *  robot() -> {x, z}, walkTo(asset), closeOther(), boxMeshes, setInspector(open), onStage(asset, on) } */
 export function createRoomParts(ctx) {
   let doc = null, live = null, pending = null, opening = false;
   const ready = fetch(`${DATA}index.json`).then(r => (r.ok ? r.json() : null)).then(d => (doc = d)).catch(() => null);
-  const byTag = tag => ctx.state.roomAssets.find(a => a.tag === tag) ?? null;
   const arrivedAt = a => ctx.state.journey.phase === "arrived" && ctx.state.journey.route?.asset_id === a.asset_id;
   const near = a => { const r = ctx.robot(); return floorDistance(a, r.x, r.z) <= NEAR_M || arrivedAt(a); };
 
@@ -68,15 +113,13 @@ export function createRoomParts(ctx) {
 
   function build(asset, unit, root) {
     const { entry } = unit;
-    const devices = unitDevices(doc, unit, asset, byTag);
+    const devices = unitDevices(unit, asset, ctx.state.roomAssets); // our objects inside the unit, by position
     const faults = faultParts(entry, devices);
-    // raw PLY → this scene (pipeline/ingest.py), then the model moved onto our device
+    // raw PLY → this scene (pipeline/ingest.py); the unit stands where it was fitted, on the same scan
     const world = new THREE.Group();
     world.scale.set(1, -1, -1);
     world.position.y = RAW_FLOOR_Y;
     const holder = new THREE.Group();
-    root.updateMatrixWorld(true);
-    holder.position.fromArray(shiftFor(asset, new THREE.Box3().setFromObject(root).getCenter(new THREE.Vector3()).toArray()));
     world.add(holder);
     holder.add(root);
     const aniso = ctx.renderer.capabilities.getMaxAnisotropy();
@@ -116,7 +159,7 @@ export function createRoomParts(ctx) {
       parts.push({ ...p, dist: p.dist * SPREAD, obj, anchor: box.getCenter(new THREE.Vector3()), t: 0, fault, label: null, line: null });
     }
     const pickable = parts.filter(p => !p.context);
-    const tagOf = p => (p.fault ? `${p.fault.tag} ${codeText(p.fault.code)}` : devices.find(d => d.s2sId === p.serves)?.tag ?? "");
+    const tagOf = p => (p.fault ? `${p.fault.tag} ${codeText(p.fault.code)}` : deviceIn(p, devices)?.tag ?? "");
 
     // the card's light rig: hemisphere sky from above, a fixed key, key / fill / rim placed from the camera every frame
     const scene = new THREE.Scene();
@@ -128,17 +171,13 @@ export function createRoomParts(ctx) {
     // DOM: labels + leaders over the room, the dock at the right edge
     const ui = document.createElement("div");
     ui.className = "room-parts";
-    const card = doc.cards[unit.card];
-    const modelLine = unit.how === "standin"
-      ? `Stand-in: the ${esc(card.tag)} unit model (${esc(card.name)}), shown for ${esc(asset.tag)}`
-      : `${esc(card.tag)} unit model (${esc(card.name)})`;
     ui.innerHTML = `<svg width="100%" height="100%"></svg><div class="rp-labels"></div>
       <div class="rp-dock">
         <div class="rp-box rp-bar"><b>Take apart · ${esc(asset.tag)} <span class="rp-muted">in the room</span></b>
           <input type="range" min="0" max="100" value="0" aria-label="How far apart"><output>0 %</output>
           <div class="rp-row"><button type="button" data-a="explode">Explode</button><button type="button" data-a="assemble">Reassemble</button>
             <button type="button" data-a="reset" title="All apart again, nothing selected">Reset</button><button type="button" class="rp-done" data-a="done" title="Put it back together (Esc)">Done</button></div></div>
-        <div class="rp-box"><div class="rp-muted">${modelLine} · ${esc(entry.label)} · sizes ${esc(entry.size_label ?? "fitted to the scan")}</div>
+        <div class="rp-box"><div class="rp-muted">The unit as it stands here: ${esc(entry.label)} · sizes ${esc(entry.size_label ?? "fitted to the scan")}</div>
           ${faults.map(f => `<div class="rp-fault${f.own ? "" : " mate"}"><b>${esc(f.tag)} ${esc(codeText(f.code))}</b> (synthetic) → ${esc(parts.find(x => x.node === f.node)?.name)}</div>`).join("")}</div>
         <div class="rp-box"><div class="rp-list"></div></div>
         <div class="rp-box rp-panel" hidden></div>
@@ -176,7 +215,6 @@ export function createRoomParts(ctx) {
       u.uApart.value = on ? instance : 0;
       u.uApartRoom.value = on ? ROOM_FADE : 0;
       u.uApartSelf.value = on ? 0 : 1;
-      if (u.uBlur) u.uBlur.value = on ? BLUR * ctx.renderer.getPixelRatio() ** 2 : 0;
     };
     setRoom(true);
 
@@ -313,6 +351,8 @@ export function createRoomParts(ctx) {
     /** After the room is drawn: the parts on top (depth cleared: splats write none), then labels and leaders. */
     function draw() {
       ui.hidden = glide < GLIDE_S;
+      const k = closing ? explode : Math.min(1, glide / GLIDE_S); // in with the glide, out with the reassembly
+      if (k > 0.02) blurRoom(ctx.renderer, BLUR_PX * k);
       const r = ctx.renderer, auto = r.autoClear;
       r.autoClear = false;
       r.clearDepth();
@@ -377,7 +417,7 @@ export function createRoomParts(ctx) {
       ctx.look.pitch = THREE.MathUtils.clamp(Math.atan2(asset.center[1] - ctx.eye, Math.hypot(dx, dz)), -1.1, 1.1); // back on the device
       ctx.setInspector(inspectorWas);
     }
-    const state = () => ({ tag: asset.tag, model: entry.file, how: unit.how, explode: +explode.toFixed(2), target, selected, glide: +Math.min(glide, GLIDE_S).toFixed(2),
+    const state = () => ({ tag: asset.tag, model: entry.file, devices: devices.map(d => d.tag), explode: +explode.toFixed(2), target, selected, glide: +Math.min(glide, GLIDE_S).toFixed(2),
       pulledBack, focus: +focusK.toFixed(2), parts: pickable.length, faults: faults.map(f => `${f.tag}:${f.code}->${f.node}`),
       labels: pickable.filter(p => !p.label.hidden).map(p => p.label.innerText.replace(/\n/g, " / ")) });
     /** For checks: a part's centre on screen now (client px). */
