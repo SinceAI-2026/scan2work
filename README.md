@@ -52,6 +52,17 @@ The importer validates the source PLY hash and the ownership array before genera
 
 `VALMET_OFFLINE=1` skips credential loading and prevents backend AI calls. Service explanations use archived outputs and deterministic retrieval over the workbook. New baseline object exports preserve the original GSID ownership, including its historical box filling, without rerunning refinement. The optional upstream voice assistant and AI rebuilding workflow are separate integrations.
 
+## Explore the demo
+
+The main room keeps Wael’s navigation, inspection, editing and library workflows. The compact toolbar leaves the room visible; **Display** holds the existing frame, quality, visibility and explode controls.
+
+- Use **Aerial view** to orbit and pan freely, **Follow robot** to watch a route, or **First person** to walk. Each mode shows its controls below the toolbar.
+- **Find equipment** searches the room catalog. Selecting an item keeps the current view; use **View location**, **Navigate here**, or **Isolate item** for an explicit next action.
+- Switch between **Scan**, **Coloured**, and **BIM** without moving the camera. **Show all** reveals the complete object set, including overhead equipment; **Floor plan** opens the plan and IFC export.
+- **Review candidates** opens the separate extraction layer. Closing it returns to the room view. Candidate review does not replace the original objects or their device records.
+
+See the usability parity notes in [technical notes](docs/technical-notes.md) for runtime differences, including offline voice and the distinction between exact source exports and older refined library models.
+
 ## What the separate import preserves
 
 | Data | Imported behavior |

@@ -432,3 +432,76 @@ Unmapped copilot requests return a no-assigned-record explanation without model
 routing or quoting archived diagnoses. Work orders and the technician queue remain
 limited to mapped records. This compatibility layer does not rewrite the archive,
 rebind devices, regenerate extraction or change the original 30 workbook records.
+
+### Interactive feature parity checklist
+
+A source review compared upstream `359530b` with merged `d0eae2b`. The upstream
+main-view action IDs and functions remain present. This is a code inventory, not
+a claim of full behavioral equivalence; the following interactions should be
+checked in the browser after changes to the toolbar or panel layout.
+
+| User action | Retained entry point / expected check |
+| --- | --- |
+| Browse freely | Aerial orbit, pan and zoom; First person and Follow robot; WASD/arrow movement and drag-to-look. |
+| Choose a destination | Tour the room, Inspect faulty device, Navigate here, and clicking reachable map floor. |
+| Control the mission | Start/resume/pause, arrival report, visible route, manual takeover and M to resume the mission. |
+| Demonstrate replanning | Drop obstacle during an eligible route; retain the detour or blocked-route explanation and old-route trace. |
+| Inspect equipment | Search/filter, queue selection, evidence photos, source geometry, View location and equipment details. |
+| Change scene presentation | Scan, Coloured and BIM layers; nearby/all/off frames; walls, pipes, equipment, ceiling, render quality and explode controls. |
+| Isolate and return | Isolate region / T, orbit, turntable / R, ghost room / G, and Esc back to the previous scene view. |
+| Edit the room | Move, placement preview, cancel/place/reset, remove/restore, and the Room changes list; the designated target remains protected. |
+| Inspect video evidence | AR walkthrough playback, seeking and target excerpt, using the locally preserved overlay clip. |
+| Inspect/export BIM | Search/select on the 2D plan, navigate or view equipment, open the 3D model, and download IFC4. |
+| Reuse an object | Background Save to library, save status after closing the card, library search/class filters, supported file downloads, ZIP, and return to the room. |
+| Complete service work | Mapped-device telemetry and grounded guidance; draft work order; start checklist, safety-first checks, notes and completion. |
+| Review extra extraction | Separate candidate review, source evidence and original-object overlaps; no implicit changes to canonical objects or bindings. |
+
+Toolbar regression checks include retaining the current camera/layer when merely
+selecting a list item, preserving every collapsed control's accessible entry
+point, and offering service actions only for a mapped workbook device. An `OBJ-*`
+identifier must not be mistaken for a registered device tag. Archived library
+profiles also require the same no-borrowed-readings presentation as the main room.
+
+The active baseline deliberately differs from the upstream runtime:
+
+- External voice calls are disabled by its offline runtime flags. The voice
+  integration remains in the repository; local inspection jobs remain available.
+- New library saves preserve exact source rows, native PLY and scan GSPL. They do
+  **not** currently generate a photo-refined model PLY or GLB mesh. This is an
+  active capability difference, not an optional refinement button in the current
+  UI. Four preserved archived library entries still provide their existing model
+  or enhanced PLY/GSPL and GLB files; the viewer retains support for those files.
+- Legacy photo refinement remains as local CPU PyTorch code, not an external AI
+  service. It currently needs a missing `torch` dependency and dataset-aware
+  source/frame paths before use with the staged baseline. The active dataset has
+  334 matching frames and the original source PLY; its exact assets must remain
+  separate from any future derived preview or reconstruction.
+- Automatic idle demonstration is opt-in with `?attract=1`; normal browsing does
+  not start an unsolicited mission.
+- Exact-membership room edits retain the initial conservative floor grid. Moved
+  objects can block additional space; removing an object does not automatically
+  certify the floor beneath it or open a new shortcut. Dynamic obstacle replanning
+  remains available independently.
+
+There is no general add-new-instance action in the upstream main-room interface;
+move, remove and restore operate on its existing objects. Keeping those actions
+does not establish a new object-instantiation capability.
+
+### Usability verification on the isolated baseline copy
+
+Browser QA on port 8769 confirmed the compact toolbar has visible labels and the
+Display panel starts closed; Esc closes it and returns focus to Display. Searching
+for unmapped OBJ-004 retained the selected BIM view, and Show all exposed all 504
+objects. Its move to X=0, Z=0, base height=0 and reset both worked; remove/restore
+ended with zero removed objects. Isolation showed its 977 native Gaussians and a
+background library save completed with exports.
+
+The CV-003 route arrived after 5.5 source units; the explicit Inspect faulty device
+action cleared the search and selected Follow robot. Aerial drag-to-orbit and a
+map-click destination producing a new 4.4-unit route worked. The AR video loaded
+at 1280×720 with `readyState=4`. The plan exposed 504 objects, 87 cylinder geometries
+and four walls, and an actual IFC download completed. This round did not repeat
+full IFC schema validation. No browser errors were observed; 21 viewer tests
+passed and both patch scripts reported zero edits. The main dataset was unchanged.
+These are observed interaction checks, not a user study or proof of complete
+capability parity.

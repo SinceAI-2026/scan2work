@@ -9,17 +9,22 @@ import { mountFieldJobs, showEquipment } from "./field-jobs.mjs";
 
 const AGENT_ID = "agent_5501m6v02k69e2r8fwc0hznmfda5";
 const WIDGET_SRC = "https://unpkg.com/@elevenlabs/convai-widget-embed@0.21.4/dist/index.js";
+let registeredTags=new Set();
 
 function selectedTag() {
   const title = document.getElementById("detail-title")?.textContent || "";
   const tag = title.split("·").pop().trim();
-  return /^[A-Z]{1,4}-\d{2,4}$/.test(tag) ? tag : "none";
+  return registeredTags.has(tag) && !document.getElementById("detail-health-pill")?.hidden ? tag : "none";
 }
 
 async function mount() {
   // Offline imports must not load an external widget or start an external model session.
   let runtime;
-  try { runtime = (await fetch("./data/digital_twin.json").then(res => res.json())).runtime; }
+  try {
+    const twin=await fetch("./data/digital_twin.json").then(res=>res.json());
+    runtime=twin.runtime;
+    registeredTags=new Set(twin.assets.filter(asset=>asset.mapped).map(asset=>asset.tag));
+  }
   catch { return; }
   if (runtime?.offline || runtime?.external_models_enabled === false) {
     mountFieldJobs(selectedTag);

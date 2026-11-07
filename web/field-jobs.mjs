@@ -169,16 +169,16 @@ function mountQueue() {
     if (b) showEquipment(b.dataset.tag).catch((err) => flash(err.message));
   });
 
-  // The viewer's own search, filter and list move into the second tab as they are (same elements, same listeners).
+  // Search stays visible above both tabs; the original filter and list keep their handlers.
   const panel = document.createElement("section");
   panel.id = "equipment-panel";
   panel.className = "equipment-panel side-panel";
   panel.setAttribute("role", "tabpanel");
   panel.setAttribute("aria-labelledby", "tab-equipment");
-  for (const el of [document.querySelector(".left-sidebar .filter-group"), document.getElementById("select-visual-review"),
+  for (const el of [document.getElementById("select-visual-review"),
     document.getElementById("asset-result-count"), document.getElementById("asset-list")]) if (el) panel.appendChild(el);
 
-  const anchor = sidebar.querySelector(".mission-box");
+  const anchor = sidebar.querySelector(".filter-group") || sidebar.querySelector(".mission-box");
   anchor ? anchor.after(tabs, root, panel) : sidebar.append(tabs, root, panel);
 
   const select = (name) => {
@@ -201,6 +201,16 @@ function mountQueue() {
   let saved = "inspect";
   try { saved = localStorage.getItem(TAB_KEY) || saved; } catch { /* private window */ }
   select(saved === "equipment" ? "equipment" : "inspect");
+  const search=document.getElementById("asset-search"),filter=document.getElementById("select-visual-review");
+  let previousFilter=null;
+  search.addEventListener("input",()=>{
+    if(search.value.trim()) {
+      if(previousFilter===null){previousFilter=filter.value;filter.value="all";filter.dispatchEvent(new Event("change"));}
+      select("equipment");
+    } else if(previousFilter!==null) {
+      filter.value=previousFilter;previousFilter=null;filter.dispatchEvent(new Event("change"));
+    }
+  },true);
 }
 
 function mountJob() {

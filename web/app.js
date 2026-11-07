@@ -23,6 +23,7 @@ import { filterShows, onFilterChange } from "./view-filter.mjs";
 import { ICONS } from "./view-icons.mjs";
 import { createTakeApart } from "./take-apart.mjs";
 import { mountProposalReview } from "./proposal-review.mjs";
+import { bindRoomControls } from "./room-controls.mjs";
 import { sampleRoute, nearbyAssets, planFromPosition, reachableFloor, floorDestination, assetDestination, planRoomTour, advanceAlongRoute, segmentIsFree } from "./navigation-view.mjs";
 
 const state = {
@@ -740,9 +741,13 @@ function applyCameraPreset(preset) {
   const fab = document.getElementById("view-fab");
   if (fab) {
     document.getElementById("view-fab-icon").innerHTML = ICONS[VIEW_ICONS[preset]] || "";
-    fab.dataset.tip = VIEW_NAMES[preset] || "View";
-    fab.setAttribute("aria-label", `Change view: ${VIEW_NAMES[preset] || preset}`);
+    document.getElementById("view-fab-label").textContent=VIEW_NAMES[preset] || (preset==="apart" ? "Isolated item" : "Free view");
+    fab.setAttribute("aria-label", `Change view: ${document.getElementById("view-fab-label").textContent}`);
   }
+  document.getElementById("view-control-hint").textContent=preset==="first"
+    ? "Drag to look · WASD / arrows to walk · Shift to move faster"
+    : preset==="walk" ? "Camera follows the robot · click the map to choose a destination"
+    : "Drag to orbit · right-drag to pan · scroll to zoom";
   setViewLayer(aerial ? state.viewLayer : "scan");
 
   if (AERIAL.has(preset)) {
@@ -772,7 +777,10 @@ function setViewLayer(layer) {
   for (const el of document.querySelectorAll(".layer-aerial")) el.hidden = !aerialNow;
   setTintMask(a => filterShows(a) || a.is_target);
   if (splatMesh) splatMesh.visible = !bim;
-  document.querySelectorAll("[data-layer]").forEach(b => b.classList.toggle("active", b.dataset.layer === layer));
+  document.querySelectorAll("[data-layer]").forEach(b => {
+    b.classList.toggle("active", b.dataset.layer === layer);
+    b.setAttribute("aria-pressed",String(b.dataset.layer === layer));
+  });
   const aerial = aerialNow;
   document.getElementById("ceiling-toggle").closest("label").hidden = bim;
   const legend = document.getElementById("class-legend");
@@ -786,7 +794,9 @@ function updateLayerCount() {
   if(!el || !state.roomAssets)return;
   const visible=state.roomAssets.filter(a=>(filterShows(a)||a.is_target||a.id===state.selectedAsset?.id)
     && (state.viewLayer==="bim"||!state.ceilingCut||a.id===state.selectedAsset?.id||a.center[1]-a.size[1]/2<=CEILING_CUT_M-.15)).length;
-  el.textContent=`Filter: ${visible.toLocaleString()} of ${state.roomAssets.length.toLocaleString()} objects${state.viewLayer!=="bim"&&state.ceilingCut?" · ceiling hidden":""}`;
+  const shown=state.viewLayer==="bim"||state.boxesMode!=="off" ? visible : 0;
+  el.textContent=`${state.viewLayer==="bim" ? "Objects" : "Frames"}: ${shown.toLocaleString()} of ${state.roomAssets.length.toLocaleString()}${state.viewLayer!=="bim"&&state.ceilingCut?" · ceiling hidden":""}`;
+  document.getElementById("btn-show-all").hidden=shown===state.roomAssets.length;
 }
 
 // Coloured objects legend: every class in the room with its colour and count, most common first.
@@ -898,7 +908,7 @@ function buildAssetBoundingBoxes() {
     {
       const tagEl = document.createElement("div");
       tagEl.className = `hud-tag ${asset.condition_state} ${assetPresentation(asset).kind}`;
-      tagEl.textContent = `${asset.tag} · ${asset.label}`;
+      tagEl.textContent = `${displayAssetTag(asset)} · ${asset.label}`;
       tagEl.setAttribute("role", "button");
       tagEl.tabIndex = 0;
       tagEl.addEventListener("keydown", e => { if (e.key === "Enter") selectAsset(asset, true); });
@@ -1203,7 +1213,8 @@ function updateHudLabels() {
   const rx = robotGroup.position.x;
   const rz = robotGroup.position.z;
   const proxR = state.twin.navigation.grid_meta.proximity_radius_m || 1.65;
-  const everyLabel = isAerial();
+  // Nearby keeps the same small shortlist in every camera; dense labels are an explicit All choice.
+  const everyLabel = state.boxesMode === "all";
   const byClass = state.viewLayer !== "scan";   // Coloured objects and BIM: labels name the class, in its colour
 
   const candidates = [];
@@ -1336,7 +1347,7 @@ function renderProposalList() {
   listEl.querySelector("#show-more-regions")?.addEventListener("click", () => { state.listLimit += 100; renderProposalList(); });
   for (const card of listEl.querySelectorAll(".proposal-card")) card.addEventListener("click", () => {
     const a = state.assetsByObj.get(card.dataset.obj);
-    if (a) { selectAsset(a, true); if (!takeApart?.isOpen) viewRoomLocation(a); }
+    if (a) selectAsset(a, true);
   });
 }
 
@@ -1375,7 +1386,7 @@ function drawDetectionCrop(asset) {
     ctx.strokeRect(rx, ry, rw, rh);
 
     // Tag pill on top-left of 2D box
-    const tagTxt = `${asset.tag} · ${asset.label}`;
+    const tagTxt = `${displayAssetTag(asset)} · ${asset.label}`;
     ctx.font = "bold 12px -apple-system, sans-serif";
     const tw = ctx.measureText(tagTxt).width + 12;
     ctx.fillStyle = "#d94838";
@@ -1433,6 +1444,7 @@ function selectAsset(asset, openInspector = false) {
   document.getElementById("movable-notice").textContent = presentation.notice;
   document.getElementById("movable-notice").className = `movable-notice ${presentation.kind}`;
   document.getElementById("btn-draft-wo").hidden = uninstrumented;
+  document.getElementById("btn-take-apart").textContent=asset.source_region_id ? "Isolate region" : "Isolate item";
   renderProposalList();
 
   const navigateButton = document.getElementById("btn-navigate-selected");
@@ -1919,7 +1931,7 @@ function renderRoomEditControls() {
     row.className='room-change-row';
     const name=document.createElement('button'), time=document.createElement('time'), restore=document.createElement('button');
     name.type=restore.type='button';
-    name.textContent=item.tag;
+    name.textContent=displayAssetTag(item);
     name.title=item.label;
     name.addEventListener('click',()=>selectAsset(item,true));
     const at=new Date(edit.at);
@@ -1929,7 +1941,7 @@ function renderRoomEditControls() {
       time.textContent=at.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
     }
     restore.textContent='Restore';
-    restore.setAttribute('aria-label',`Restore ${item.tag}`);
+    restore.setAttribute('aria-label',`Restore ${displayAssetTag(item)}`);
     restore.disabled=editBusy;
     restore.addEventListener('click',()=>changeRoom('restore',item));
     row.append(name,time,restore);
@@ -1940,11 +1952,11 @@ function renderRoomEditControls() {
     row.className='room-change-row';
     const name=document.createElement('button'), reset=document.createElement('button');
     name.type=reset.type='button';
-    name.textContent=item.tag;
+    name.textContent=displayAssetTag(item);
     name.title=item.label;
     name.addEventListener('click',()=>selectAsset(item,true));
     reset.textContent='Reset position';
-    reset.setAttribute('aria-label',`Reset position of ${item.tag}`);
+    reset.setAttribute('aria-label',`Reset position of ${displayAssetTag(item)}`);
     reset.disabled=editBusy;
     reset.addEventListener('click',()=>changePlacement(item,null));
     row.append(name,reset);
@@ -2125,7 +2137,7 @@ function bindRoomEdits() {
     if (removedIds.has(asset.id)) { changeRoom('restore',asset); return; }
     pendingAsset=asset;
     dialog.returnValue='';
-    document.getElementById('room-remove-message').textContent=`Remove ${asset.tag} · ${asset.label} from this room? You can restore it from Room changes.`;
+    document.getElementById('room-remove-message').textContent=`Remove ${displayAssetTag(asset)} · ${asset.label} from this room? You can restore it from Room changes.`;
     dialog.showModal();
   });
   dialog.addEventListener('close',()=>{
@@ -2147,7 +2159,7 @@ function bindRoomEdits() {
   });
 }
 
-// Circular view button: opens a row of view icons to its right; picking one switches view and closes it.
+// Labelled camera menu; choosing a mode keeps the existing camera behaviour.
 function bindViewSwitch() {
   for (const el of document.querySelectorAll("[data-icon]")) if (ICONS[el.dataset.icon]) el.insertAdjacentHTML("afterbegin", ICONS[el.dataset.icon]);
   const fab = document.getElementById("view-fab"), menu = document.getElementById("view-menu");
@@ -2164,9 +2176,9 @@ function bindViewSwitch() {
   document.addEventListener("keydown", e => {
     if (menu.hidden) return;
     if (e.key === "Escape") { setOpen(false); fab.focus(); }
-    if (e.key === "ArrowRight" || e.key === "ArrowLeft") {   // roving focus inside the open menu
+    if (["ArrowRight","ArrowLeft","ArrowDown","ArrowUp"].includes(e.key)) {
       const items = [...menu.querySelectorAll(".view-item")], i = items.indexOf(document.activeElement);
-      if (i >= 0) { e.preventDefault(); e.stopPropagation(); items[(i + (e.key === "ArrowRight" ? 1 : items.length - 1)) % items.length].focus(); }
+      if (i >= 0) { e.preventDefault(); e.stopPropagation(); items[(i + (["ArrowRight","ArrowDown"].includes(e.key) ? 1 : items.length - 1)) % items.length].focus(); }
     }
   }, true);
 }
@@ -2300,6 +2312,14 @@ function dispatchRobotToAsset(asset) {
   } catch(error) {navigationError(error);}
 }
 
+function showMissionView({inspection=false}={}) {
+  proposalReview?.close();takeApart?.close();
+  const search=document.getElementById("asset-search");
+  if(search.value){search.value="";search.dispatchEvent(new Event("input"));}
+  if(inspection)document.getElementById("tab-inspect")?.click();
+  applyCameraPreset("walk");
+}
+
 function registerActivity() {
   attract.lastActivity=performance.now();
   if (!attract.active) return;
@@ -2326,6 +2346,15 @@ function updateAttractMode(now) {
 function bindUIEvents() {
   bindArView();
   bindRoomEdits();
+  bindRoomControls({onShowAll:()=>{
+    document.getElementById("layer-all").checked=true;
+    document.getElementById("layer-pipes").checked=true;
+    document.getElementById("layer-relevant").checked=false;
+    state.boxesMode="all";
+    document.querySelectorAll("[data-bmode]").forEach(b=>b.classList.toggle("active",b.dataset.bmode==="all"));
+    setCeilingCut(false);
+    document.getElementById("layer-all").dispatchEvent(new Event("change"));
+  }});
   bimView=createBimRoom({scene,camera});
   onFilterChange(() => setViewLayer(state.viewLayer));
   semanticPlan=bindSemanticPlan({
@@ -2381,7 +2410,10 @@ function bindUIEvents() {
   for(const id of ["btn-room-tour","btn-go-target"])document.getElementById(id).disabled=!state.navigationAvailable;
   document.getElementById("btn-go-target").disabled ||= !state.assetsById.has(state.twin.target_asset_id);
   document.getElementById("btn-room-tour").addEventListener("click",()=>{
-    try{activateRoute(planRoomTour(state.twin.navigation,robotPosition()));}catch(error){navigationError(error);}
+    try{
+      const route=planRoomTour(state.twin.navigation,robotPosition());
+      showMissionView();activateRoute(route);
+    }catch(error){navigationError(error);}
   });
   document.getElementById("route-map").addEventListener("click",e=>{
     const rect=e.currentTarget.getBoundingClientRect(),m=state.twin.navigation.grid_meta;
@@ -2442,6 +2474,7 @@ function bindUIEvents() {
       document.querySelectorAll("[data-bmode]").forEach((b) => b.classList.remove("active"));
       btn.classList.add("active");
       state.boxesMode = btn.dataset.bmode;
+      updateLayerCount();
     });
   }
 
@@ -2451,7 +2484,7 @@ function bindUIEvents() {
 
   document.getElementById("btn-go-target").addEventListener("click", () => {
     const target = state.assetsById.get(state.twin.target_asset_id);
-    if (target) dispatchRobotToAsset(target);
+    if (target) {showMissionView({inspection:true});dispatchRobotToAsset(target);}
   });
 
   document.getElementById("btn-take-apart").addEventListener("click", () => takeApart.open(state.selectedAsset));

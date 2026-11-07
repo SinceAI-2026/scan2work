@@ -12,7 +12,7 @@ const plural = (n, w) => `${n.toLocaleString()} ${w}${n === 1 ? "" : "s"}`;
 const words = s => String(s ?? "").replace(/_/g, " ");
 const pretty = s => { const w = words(s).trim(); return w.charAt(0).toUpperCase() + w.slice(1); };
 const className = e => e.class_label || pretty(e.class || "object");
-const stateOf = e => (e.movable ? "movable" : e.condition_state || "not_instrumented");
+const stateOf = e => (e.movable ? "movable" : e.mapped !== true ? "not_instrumented" : e.condition_state || "not_instrumented");
 
 function classColor(name) {
   let h = 0;
@@ -85,7 +85,7 @@ function filter() {
 function status(e) {
   if (e.movable) return "movable object · no telemetry";
   if (e.source_region_id || e.condition_state === "unknown") return "unreviewed region · scale unverified";
-  if (!e.tag) return "facility item · no device record";
+  if (e.mapped !== true || !e.tag) return "scan object · no device record";
   return `health ${e.health_score ?? "–"} · ${words(e.condition_state)}${e.issue_code && e.issue_code !== "NORMAL" ? ` · ${words(e.issue_code)}` : ""}`;
 }
 
@@ -94,7 +94,7 @@ function card(e) {
   return `<div class="card" data-id="${esc(e.id)}" data-text="${esc(cardText(e))}">
     <img src="${LIB}${e.files.thumb}" alt="" loading="lazy" ${photo ? `data-photo="./${esc(photo)}"` : ""}>
     <div class="body">
-      <div class="name"><span class="dot ${stateOf(e)}"></span>${esc(e.tag || e.label || className(e))}${e.tag ? ' <span class="badge">SYNTHETIC</span>' : ""}</div>
+      <div class="name"><span class="dot ${stateOf(e)}"></span>${esc(e.mapped && e.tag || e.label || className(e))}${e.mapped && e.tag ? ' <span class="badge">SYNTHETIC</span>' : ""}</div>
       <div class="sub">${esc(e.label || className(e))}</div>
       <div class="sub mono">${esc(e.id)} · ${e.splats.toLocaleString()} G</div>
       <div class="status">${esc(status(e))}</div>
@@ -118,7 +118,7 @@ function focus(id) {
     <h3>${esc(e.label || className(e))}</h3>
     <div class="sub">${esc(className(e))} · ${esc(e.id)}${e.is_target ? " · faulty device" : ""}</div>
     <dl>
-      ${e.tag ? `<dt>Tag</dt><dd>${esc(e.tag)} · ${esc(e.asset_id)}</dd>` : ""}
+      ${e.mapped && e.tag ? `<dt>Tag</dt><dd>${esc(e.tag)} · ${esc(e.asset_id)}</dd>` : ""}
       <dt>Status</dt><dd>${esc(status(e))}</dd>
       <dt>Gaussians</dt><dd>${e.splats.toLocaleString()}</dd>
       <dt>Size</dt><dd>${size} ${e.membership_mode === "exact-source-rows" || e.source_region_id ? "scan units (unverified)" : "m"}</dd>

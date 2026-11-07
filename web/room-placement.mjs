@@ -1,3 +1,5 @@
+import { displayAssetTag } from "./asset-presentation.mjs";
+
 const STORAGE_KEY = "field-atlas:equipment-room:placements";
 
 export function loadRoomPlacements(assets, canMove, datasetId = "") {
@@ -71,7 +73,7 @@ export function roomPlacementError(asset, assets, scan, omitted, meta) {
     return "Keep the object inside the room and above the floor.";
   }
   const neighbour = assets.find(other => other.id !== asset.id && roomBoundsOverlap(asset, other));
-  if (neighbour) return `This position overlaps ${neighbour.tag} · ${neighbour.label}.`;
+  if (neighbour) return `This position overlaps ${displayAssetTag(neighbour)} · ${neighbour.label}.`;
 
   // Test the interior, allowing contact with the floor or another supporting surface.
   const c = Math.cos(asset.yaw), s = Math.sin(asset.yaw);
