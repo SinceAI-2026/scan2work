@@ -1,349 +1,127 @@
 # Scan2Work
 
-Scan2Work is a local industrial inspection demonstrator built from `Equipment Room.ply` and the Valmet synthetic builder workbook. It shows framed equipment proposals, collision-aware robot navigation, operating evidence, and a service report for the destination asset.
+Scan2Work turns a Gaussian-splat scan of an industrial room (`Equipment Room.ply`) and the Valmet synthetic builder
+workbook into an inspection twin. Equipment is extracted and framed in 3D, bound to the workbook's device data, and a
+robot walks a collision-checked route to the faulty device, where a grounded AI diagnosis and a LOTO-first job
+checklist open. Built for the Valmet × Since AI 2026 challenge.
 
-The workbook supplies a synthetic fault scenario. The demonstration does not establish that the real filmed equipment is faulty.
+The workbook supplies a synthetic fault scenario. The demo does not establish that the filmed equipment is faulty.
 
-## Install the prepared Scan2Work demo
+[Open the browser demo](https://scan2work.app/) · [Download release 0.1.1](https://assets.scan2work.app/releases/0.1.1/index.html)
 
-The current prepared release is **0.1.1**. It contains the restored **504-object room**,
-30 synthetic workbook bindings, source photos, the AR video and exact-source
-object exports. The optional **1,933-region extraction view** is a separate
-segmentation for review; it does not replace the original objects or establish
-recognition accuracy. Release 0.1.1 includes upstream PR #3’s five split assemblies
-and 18 AI-generated model files, the Scan2Work branding, and the optional Arduino
-module from PR #9. These model files improve presentation; they are illustrative
-geometry with unverified dimensions, not additional measured reconstruction.
+## Quick start
 
-Use **Python 3.12** and a WebGL 2 browser on macOS or Linux. The installer creates
-an isolated environment and installs pinned packages. Running the prepared demo
-needs no GPU, API key, Node.js or model download. The first installation needs
-internet access for the archives and Python packages.
-
-[Open the browser demo](https://scan2work.app/) or
-[download release 0.1.1](https://assets.scan2work.app/releases/0.1.1/index.html).
-Install the complete local version with:
+**Prepared release** (Python 3.12, macOS or Linux, WebGL 2 browser; no GPU, API key or model download):
 
 ```sh
 curl -fsSLo install-scan2work.sh https://assets.scan2work.app/releases/0.1.1/install.sh
 bash install-scan2work.sh --install-dir ~/scan2work-0.1.1 --with-extraction --launch
 ```
 
-Omit `--with-extraction` for the smaller room-only installation. To install from a
-copied release folder, run its `install.py` directly:
+The room opens at `http://127.0.0.1:8766/`, the optional 1,933-region extraction review at `:8768`. Restart with
+`python3.12 ~/scan2work-0.1.1/start.py --open`, check with `--doctor`. Details:
+[installation](docs/installation.md), [hosted preview](docs/public-demo.md).
+
+**From source** (needs generated data in `web/data/`, see [Rebuild](#rebuild-the-scene-data)):
 
 ```sh
-python3.12 install.py --manifest manifest.json --install-dir ~/scan2work-0.1.1 --with-extraction --launch
+python3 -m venv .venv && .venv/bin/python -m pip install -r requirements.txt
+.venv/bin/python server.py 8765          # http://127.0.0.1:8765/  (add --lan for an Arduino on the same network)
 ```
 
-The room opens at `http://127.0.0.1:8766/`; the optional complete extraction view
-runs at `http://127.0.0.1:8768/`. Stop both with Ctrl+C. Restart and check later:
+Select **Inspect faulty device** or **Tour the room**, or pick equipment and choose **Navigate here**.
 
-```sh
-python3.12 ~/scan2work-0.1.1/start.py --open
-python3.12 ~/scan2work-0.1.1/start.py --doctor
-```
+## What it does
 
-The hosted preview keeps shared server state read-only: visitors can browse,
-navigate, inspect, view AR/BIM, download existing objects and simulate room edits
-in their own browser. The local installation also saves technician jobs, scene
-changes and new exact-source object-library exports. New exact exports preserve
-the observed Gaussian rows; they do not run photo refinement or generate a new
-GLB mesh. Separately configured voice and authoring models are outside the offline
-release. Both modes keep synthetic data and unverified physical scale explicit.
+| Feature | In short | More |
+|---|---|---|
+| Extraction | 504 framed objects in 24 classes in the release room; labels from real walkthrough photos, checked against a hand-labelled sample | [Pipeline](docs/pipeline.md) |
+| Two segmenters | Colour/geometry rules + Gemini labels (default), or SAM 2.1 + SigLIP 2/DINOv2 fully on-site | [Pipeline](docs/pipeline.md#two-segmenters) |
+| Workbook binding | All 30 Excel devices on distinct objects; status, telemetry and citations come from the workbook only | [Technical notes](docs/technical-notes.md) |
+| Navigation | A* on a 2.5D occupancy grid with robot clearance; follow, first-person (drive the robot) and aerial views | [Technical notes](docs/technical-notes.md#navigation-and-collision-model) |
+| Room layers | Scan / Coloured by class / BIM masks of the same view, explode, Show in room filters, floor plan and IFC export | [Features](docs/features.md#room-controls) |
+| AI diagnosis | Grounded triage and LOTO-first verification steps; tested blind on the 13 faulty devices | [Technical notes](docs/technical-notes.md#diagnostics-and-optional-ai) |
+| Technician jobs | **To inspect** queue, checklist with safety-first rules, notes, **Mark done** | [Features](docs/features.md#voice-assistant-elevenlabs-agent-ilkka) |
+| Voice assistant | Ilkka (ElevenLabs) shows equipment, diagnoses and works the job over MCP; opt-in | [Voice and MCP](docs/voice-mcp.md) |
+| Take apart and AI 3D | Isolate and save objects (`.ply`, 3DGS, `.glb`); five pump units explode in the room; 18 AI-generated models | [Features](docs/features.md#take-a-pump-apart-in-the-room) |
+| Arduino fault panel | A UNO Q shows the first open fault until its job is fixed; a hold with nothing left starts a simulated emergency. Tiger Data and Snowflake are used only here | [arduino/README.md](arduino/README.md) |
+| AR overlay | The twin drawn over the real walkthrough video | `python -m scripts.render_overlay` |
+| Other datasets | Modular importer and original-data preservation, `VALMET_DATA_DIR` | [Asset import](docs/asset-import-guide.md) |
 
-Releases are immutable. Install updates into a **new directory**, verify them,
-then migrate work only after checking dataset identity. Existing installations
-are never overwritten. Teammates can reuse the code under `app/` independently:
+## How the pipeline got here
 
-- [Installation and troubleshooting](docs/installation.md)
-- [Reusable modules and dependencies](docs/dependencies.md)
-- [Asset import and original-data preservation](docs/asset-import-guide.md)
-- [Hosted preview operation](docs/public-demo.md) and [R2 publishing](docs/cloudflare-r2.md)
-- [Current 0.1.1 verification](docs/release-0.1.1.md), [0.1.0 publication](docs/release-0.1.0.md), and [historical local pilot](docs/release-verification.md)
+[![Pipeline approaches, from 2D-first to 3D-first](docs/media/pipeline-approaches.gif)](docs/media/pipeline-approaches.mp4)
 
-The original development workflow and evaluation results below remain available.
-They describe the upstream generated twin and configured integrations, not a new
-evaluation of the optional 1,933 proposals or a guarantee that every authoring
-feature is enabled in the prepared offline release.
+*Sped up 3×. [Full video, 2 min](docs/media/pipeline-approaches.mp4).* 2D-first detection (253 objects, 53 duplicate
+pairs) was replaced by 3D-first segmentation (415 objects, 17 duplicate pairs); the experiments that were kept or
+dropped are in [docs/pipeline.md](docs/pipeline.md#how-we-got-here).
 
-## Strengths
+## Evaluation
 
-- **The scan becomes a labelled twin.** 504 framed objects in 24 classes come out of the Gaussian-splat scan. Every one of the 30 workbook assets is bound to its own 3D object, and the AI labels are checked against a hand-labelled sample.
-- **Labels come from real photos, not only renders.** Each object is matched to its sharpest walkthrough video frame, and 96 of 147 devices are independently confirmed by detection in those frames.
-- **The robot route is collision-checked.** It keeps a clearance of at least 0.23 m, never crosses an equipment box, and ends 0.57 m from the faulty valve CV-003. The obstacle map agrees with the path a person actually walked in the video.
-- **Every number is grounded.** Status, telemetry and citations come from the Excel pack. The scorecard checks all 2,621 cited evidence IDs, and none is unknown.
-- **The diagnosis is tested blind.** The model never sees the answer, and it still finds the right root cause from telemetry alone in 9 of 13 faulty assets, against 2 of 13 for the obvious baseline.
-- **Objects can be taken apart and kept.** Any object can be shown on its own, cut out of the scan, refined against the video frames and saved to an asset library as `.ply`, 3DGS and `.glb` files.
-- **A voice assistant works the job with the technician.** Ilkka, an ElevenLabs voice agent inside the viewer, does these things:
-  - shows equipment on screen when asked;
-  - diagnoses from live data;
-  - walks the technician through the procedure with lockout/tagout enforced;
-  - records steps and notes that appear on screen as it writes them;
-  - closes jobs, which removes them from the inspection queue.
-
-## Evaluation results
-
-Measured on 7 November 2026 on the generated twin. Each number comes from a command in this repository. The workbook data is synthetic.
+Measured on 7 November 2026 on the generated twin; each number comes from a command in this repo. The workbook data is
+synthetic.
 
 | Area | Measure | Result | Command |
-| --- | --- | --- | --- |
-| Challenge brief | Requirement checks passing | 29/29, 0 hard failures | `tests.scorecard` |
-| Extraction | Label accuracy on 39 hand-labelled objects | 85% (33/39); colour-rule baseline 13% | `tests.scorecard` |
-| Extraction | Movable objects found in the sample | 10/10 | `tests.scorecard` |
-| Extraction | Duplicate boxes (IoU > 0.5) | 5 pairs among 504 objects | `tests.scorecard` |
-| Extraction | 2D→3D lifting: fused centre inside the true box | 95% (box recovered at IoU > 0.25: 71%, median IoU 0.34) | `tests.validate_lifting` |
-| Mapping | Workbook assets bound to distinct objects | 30/30, with 0 telemetry values mismatched against Excel | `tests.scorecard` |
-| Navigation | Path samples off walkable floor | 0/454 | `tests.scorecard` |
-| Navigation | Minimum clearance (robot radius 0.15 m) | 0.234 m | `tests.scorecard` |
-| Navigation | Video camera poses on cells marked solid | 1.8% of 334 | `tests.scorecard` |
-| Navigation | Journey, swept-movement and tour suites | all pass | `node tests/*.mjs` |
-| AI diagnosis | Blind root cause, telemetry only (top-1 / top-3) | 9/13 (69%, 95% CI 42–87%) / 11/13 | `tests.eval_triage` |
-| AI diagnosis | Blind root cause with alarms and work orders | 11/13 / 12/13 | `tests.eval_triage` |
-| AI diagnosis | Baseline: most common issue for the class | 2/13 | `tests.eval_triage` |
-| AI grounding | Cited evidence IDs found in the Excel pack | 2,621 of 2,621 | `tests.scorecard` |
-| Object refinement | Colour error / SSIM against a held-out photo, 6 objects | 0.162 → 0.123 / 0.340 → 0.399 | `tests.eval_refine` |
-| Job log | Safety-first, fixed-only-when-complete and queue rules | 18/18 unit tests pass | `unittest discover -s tests` |
-| Voice assistant | Calls `show_equipment` with the right tag when asked "where is it?" | 9/9 runs | ElevenLabs agent tests |
-| Voice assistant | Full CV-003 job by voice: steps, notes, close as fixed | 5/5 runs on `gemini-3.5-flash` | ElevenLabs simulation tests |
+|---|---|---|---|
+| Brief | Requirement checks | all pass, 0 hard failures | `tests.scorecard` |
+| Extraction | Label accuracy, 39 hand-labelled objects | 85 % (colour-rule baseline 13 %) | `tests.scorecard` |
+| Extraction | 2D→3D lifting: fused centre inside the true box | 95 % | `tests.validate_lifting` |
+| Mapping | Workbook devices on distinct objects | 30/30, 0 telemetry mismatches | `tests.scorecard` |
+| Navigation | Path samples off walkable floor / minimum clearance | 0 / 0.234 m (robot radius 0.15 m) | `tests.scorecard` |
+| AI diagnosis | Blind root cause, telemetry only (top-1 / top-3) | 9/13 / 11/13 (baseline 2/13) | `tests.eval_triage` |
+| Grounding | Cited evidence IDs found in the workbook | all | `tests.scorecard` |
+| Refinement | Colour error / SSIM vs a held-out photo, 6 objects | 0.162 → 0.123 / 0.340 → 0.399 | `tests.eval_refine` |
+| Voice | Full CV-003 job by voice | 5/5 simulated runs | ElevenLabs tests |
 
-Limits:
-- The navigation checks are kinematic and grid-based. They do not simulate robot dynamics or moving obstacles.
-- With alarms included, the diagnosis is close to trivial, because in this synthetic pack alarm descriptions name the issue code. The telemetry-only row is the honest test.
-- Refinement gains least on objects the video saw from few angles. Pump P-001 got slightly worse on SSIM (see below).
-- The voice-agent runs are ElevenLabs text simulations, not recorded phone calls.
+Limits: navigation checks are kinematic and grid-based; with alarms included the diagnosis is near trivial (alarm
+texts name the issue), so the telemetry-only row is the honest one; voice runs are text simulations.
 
-[Technical notes](docs/technical-notes.md) describe the methods behind each number.
+## Repository
 
-## Prerequisites
+| Path | What |
+|---|---|
+| `pipeline/` | The extraction → binding → navigation → diagnostics pipeline (`python -m pipeline.run`) |
+| `local_models/` | Optional on-site segmenter (SAM 2.1, SigLIP 2, DINOv2, OWLv2) and its committed results |
+| `server.py`, `web/` | REST API and the Three.js viewer (no build step) |
+| `mcp_server.py` | MCP tools for the voice assistant |
+| `live/`, `arduino/` | Arduino fault panel: server side (Tiger Data, Snowflake) and the UNO Q app |
+| `distribution/`, `scripts/` | Release packaging and helper scripts |
+| `tests/` | Scorecard, evaluations and unit tests |
 
-| Need | Version used | For |
-| --- | --- | --- |
-| Python | 3.9 or newer (tested on 3.9.6) | pipeline, `server.py`, tests |
-| Python packages | `requirements.txt` | the core packages, plus PyTorch (2.8 tested) for **Save to library** refinement |
-| Node.js | tested on 24 | the JavaScript test suites; Playwright only for `scripts.render_crops` |
-| ffmpeg | tested on 8.0 | extracting walkthrough frames for a rebuild |
-| A modern browser with WebGL 2 | — | the viewer (Three.js is bundled, no build step) |
-| Challenge files | — | `Equipment Room.ply`, the walkthrough video and the builder workbook, for a rebuild only |
-| API keys (optional) | — | `OPENAI_API_KEY`, `GEMINI_API_KEY`, `HF_TOKEN` in `secrets.env`. They are not needed while `web/data/decisions_cache.json` covers the answers. |
-| ElevenLabs account and a public HTTPS tunnel (optional) | ngrok 3 tested | the voice assistant |
+## Verify
 
 ```sh
-python3 -m venv .venv
-.venv/bin/python -m pip install -r requirements.txt
+.venv/bin/python -m unittest discover -s tests       # unit tests (the object-library test needs PyTorch)
+.venv/bin/python -m tests.scorecard                  # every requirement of the brief, with numbers
+node tests/test_navigation_view.mjs && node tests/test_journey.mjs && node tests/test_render_quality.mjs
 ```
 
-## Run the viewer
+## Rebuild the scene data
 
-From the `valmet-twin` directory, with generated data in `web/data/` (see [Rebuild scene data](#rebuild-scene-data) on a fresh clone):
+Generated data is not in git. A fresh clone builds it in about 5 minutes; cached answers in
+`web/data/decisions_cache.json` make it reproducible without API keys.
 
-```sh
-.venv/bin/python server.py 8765
-```
-
-Open [the local viewer](http://127.0.0.1:8765/). Wait for the scene and map to load, then select **Inspect faulty device** or **Tour the room**. You can also click clear floor on the map or select equipment and choose **Navigate here**.
-
-A successful equipment arrival opens the destination's service report, evidence, and inspection steps. Floor destinations and room tours complete without opening an unrelated equipment report. Selecting equipment during a journey changes the inspector, not the journey destination.
-
-After a generated-data rebuild, restart the server and reload the browser so both use the same artifact.
-
-### Room controls
-
-The compact toolbar keeps camera modes and **Scan / Coloured / BIM** visible. **Display** holds quality, frame visibility, object filters, explode and ceiling controls. **Floor plan** opens the plan and IFC export directly.
-
-**Find equipment** searches the room catalog without hiding behind a tab. Selecting a list item keeps the current camera and layer; **View location**, **Navigate here** and **Isolate item** are explicit actions. Starting **Inspect faulty device** or **Tour the room** follows the robot. **Nearby** limits label clutter; **Show all** reveals filtered objects and overhead equipment.
-
-### Optional external asset data
-
-The original `web/data` setup remains the default. The [asset import guide](docs/asset-import-guide.md) describes the modular importer, original-data preservation adapter, separate candidate-review overlay, and `VALMET_DATA_DIR` for serving another dataset. Generated scans and videos are not included in this PR. Set `VALMET_OFFLINE=1` to run without backend model calls; imported datasets also declare their offline runtime policy.
-
-The evaluation results above describe the original generated twin. They are not accuracy results for imported candidates. Exact-source exports preserve native rows; the original dataset retains its photo-refinement workflow. The [compatibility notes](docs/technical-notes.md) distinguish these modes.
-
-## Take objects apart and keep them
-
-Select equipment and choose **Isolate item** in Equipment details, or press **T**. The object stays in place and the rest of the room fades. **R** toggles the turntable, **G** shows a faint ghost of the room, and **Esc** returns.
-
-**Save to library** cuts the object out of the scan and refines it against the walkthrough frames that see it. This takes 1 to 3 minutes on the CPU and calls no AI model. The separation follows Scan2Service's asset export, on this twin's per-splat object ids. The refinement (`pipeline/object_refine.py`) is 3DGS training restricted to one object, in three steps:
-
-1. It starts from the object's scan splats and the faint splats of the same surface that the viewer drops.
-2. It splits them into children of about 5 mm.
-3. It fits them to up to 16 cropped frames, with a per-frame camera and exposure correction.
-
-Once saved, the object is drawn as the refined model, and **V** switches back to the scan. Each saved object gets `web/data/library/<id>/`:
-
-- `<id>.ply` holds the object's rows of `Equipment Room.ply` with every property.
-- `<id>_model.ply` is the refined model as a standard 3DGS file.
-- `<id>.glb` is an alpha-shape mesh, and `thumb.jpg` is a thumbnail.
-
-The [asset library](http://127.0.0.1:8765/library.html) lists the saved objects by class, with each model on a turntable. It offers the downloads, **Remove**, and **Download saved (.zip)**. Its routes are `GET/POST /api/library`, `DELETE /api/library/<id>` and `GET /api/library/export.zip`.
-
-```sh
-.venv/bin/python -m pipeline.asset_export OBJ-206            # save the faulty valve CV-003 from the shell
-.venv/bin/python -m pipeline.asset_export --remove OBJ-206
-.venv/bin/python -m tests.eval_refine                       # scan vs refined, scored on a held-out frame
-```
-
-On 6 objects (7 Nov 2026), `tests.eval_refine` held out each object's best frame and its neighbours. Against that photo, mean colour error fell from 0.162 to 0.123, and SSIM rose from 0.340 to 0.399. Objects the walkthrough saw from few angles gain least: pump P-001 (OBJ-008) went from 0.128 to 0.124 error, and its SSIM fell from 0.275 to 0.262.
-
-## Take a pump apart in the room
-
-Select a pump or motor that stands inside one of the five split units and choose **Take apart** in Equipment details (or press **T**). For these objects the button takes the unit apart in the room. For every other object it keeps the take-apart described above.
-
-| Unit (scan2service) | This viewer's objects inside it |
-| --- | --- |
-| Inline pump 2, `B019p+A069_r2` | M-005 and the pump casing below it (OBJ-034) |
-| Inline pump 1, `B013+B013m` | M-004 |
-| Red circulator, `B156+B156m_r2` | M-006 |
-| Grundfos circulator, `B149+B149m` | P-001 |
-| Red circulator, `A101+G071` | P-005 and OBJ-434 |
-
-Away from the pump, the robot walks there first. The view glides into first person at the robot and turns to the unit, and the unit's parts ease apart where it stands. The room stays in view behind them, dimmed and blurred (3 px), and the objects' own scan splats are hidden under the model. Other frames, labels and the navigation panels are hidden until **Done** or **Esc**.
-
-- Each part has a callout with its name and an unverified model size in mm. Only objects with a current workbook binding show a device tag and synthetic fault; unmatched regions show their scene label without borrowed telemetry.
-- The dock on the right has **Explode**, **Reassemble**, **Reset** and **Done**, a slider, the fault list, a button per part and the selected part's detail.
-- Click a part (or its callout or button) to select it. The eye eases about 30 % toward it.
-- The fault part is tinted and outlined in red. Another object's fault in the same unit is shown in amber.
-
-The models are AI-generated (Higgsfield) units, split into parts by geometry rules. scan2service fitted them in raw PLY coordinates of the same `Equipment Room.ply`. The viewer only levels them, `(x, 1.185 − y, −z)` as in `pipeline/ingest.py`, so each unit stands exactly where it was fitted. Objects are matched to a unit by **position**: an object belongs to the unit when its box centre lies inside the unit's box. Tags are never used for this, because the two repos tagged the Excel devices onto the scan independently. The faults come from the matched objects' own Excel records, on the part whose fault codes hold the issue, preferring the part the object stands in. For example, M-005's current imbalance is shown on the motor and P-005's fouling on the pump housing. An issue that no part of the model carries is still listed in the dock, if a current workbook binding has an issue that the split geometry cannot represent.
-
-### AI 3D models in the room
-
-Every Higgsfield unit that scan2service shows in its room is drawn where it was fitted, unshifted: 15 models from its own index (`equip_v1/assets_export/hf3d/index.json`), including the big vessel, cabinet and trolley, plus 3 newer ones from the MVP's `index_new.json`: the Grundfos twin pump unit (on P-002 here) and the valves A257 (on CV-007) and A352 (on M-002). The `_r2` redo is used where there is one. Units that scan2service hides, or whose silhouette fit against the photos is below 0.5, are skipped, and the import lists them with the reason. Each model sits on this viewer's objects whose box centres lie inside it. A small model with none sits on the smallest box that holds its centre. A model with no object of this viewer under it is skipped, so the scan never shows through a model (B165 and B169 here; `window.__ai3d.skipped()` lists them). The room models carry 1024 px copies of their textures, written by the import, while the split units for Take apart keep the full 2048 px. That is about 70 MB of video memory for the 13 room models instead of about 290 MB. Their scan splats are hidden under the model, and their room labels get an **AI 3D** badge. A pump and motor unit is one model, drawn once. The models load one by one after the splat. They follow the scene explode slider. Removing, rotating or moving any associated object falls back to the source scan, so the illustrative assembly cannot hide or resurrect edited objects. They are hidden in the BIM layer and while an object is taken apart with Wael's take-apart. `?ai3d=0` turns them off. The code is in `web/ai3d.mjs`.
-
-The assets ship in the repo under `web/data/take_apart/`, so no import step is needed: `index.json`, the split units in `parts/` (2048 px textures) and the room models in `ai3d/` (1024 px copies), about 44 MB in 24 files. The rest of `web/data/` stays git-ignored. `scripts/import_take_apart.py` only regenerates them, from the MVP's s2s parts index, scan2service's hf3d index and the MVP's `index_new.json`:
-
-```sh
-.venv/bin/python -m scripts.import_take_apart    # regenerates web/data/take_apart/{index.json,parts/,ai3d/}
-node tests/test_parts_data.mjs                    # matching by position, faults from the objects' own records
-```
-
-Take apart is ported from Mikael Lehtonen's scan2service (`web/parts.js`) via SinceAI-2026/mvp, with the UX after Rasmus Mäkinen's pump explode. The code is in `web/room-parts.mjs`, `web/parts-data.mjs`, `web/ai3d.mjs` and `web/room-parts.css`. `web/vendor/three/addons/loaders/GLTFLoader.js` is three.js r170's loader, matching the vendored three.
-
-## Voice assistant (ElevenLabs agent Ilkka)
-
-The [public MCP and widget setup](docs/voice-mcp.md) describes the current
-branch’s authenticated endpoint, independent voice opt-in, and the settings
-Wael needs to apply in ElevenLabs. The immutable 0.1.1 installer remains offline.
-
-Select **Call Ilkka for support** at the bottom of the viewer. Ilkka runs on `gemini-3.5-flash`, answers in short radio-style replies, and is told which equipment is selected in the viewer, so "what's wrong with this one?" needs no tag.
-
-**On screen** (`web/voice-assistant.mjs`, `web/field-jobs.mjs`):
-- **Show me where it is.** Ilkka's client tool `show_equipment` selects the equipment and moves the camera to it. It then names the equipment's registered area.
-- **Inspection queue.** The left sidebar lists equipment that still needs inspection, worst first, with step progress and note counts. Clicking a row shows that equipment. Jobs closed as fixed move to **Done**.
-- **Technician job.** Equipment details shows the checklist, the technician's notes (including the ones Ilkka records), a note field and **Mark done**. The panel follows the same rules as the assistant and refreshes every 3 seconds, so Ilkka's work appears as it happens.
-
-**MCP tools.** `mcp_server.py` gives the agent ten tools (`pipeline/field_service.py`):
-- **Reading the plant:** `find_equipment`, `get_equipment_status`, `list_open_problems`, `get_procedure` and `search_service_knowledge` read the twin's Excel-sourced data. Tags work as spoken: CV-003, cv 3 or ASSET-003.
-- **The job log:** `start_job`, `complete_check`, `add_note`, `close_job` and `get_job` keep the technician's job in `web/data/field_log.json`. Both servers share it under a file lock.
-- **Job rules:**
-  - A job's checklist is the asset's verification procedure.
-  - The safety step (permit, lockout/tagout) must be confirmed before any step after it.
-  - A job closes as fixed only when every step is confirmed, and fixed equipment leaves the inspection queue.
-
-The viewer's routes are `GET /api/field-jobs` (queue, jobs and notes), `POST /api/field-jobs` (`start_job`, `complete_check`, `add_note` or `close_job` from the panel) and `GET /api/field-jobs/find?equipment=cv 3`.
-
-```sh
-FIELD_ATLAS_MCP_TOKEN=<secret> .venv/bin/python mcp_server.py 8767   # serves only POST /mcp
-ngrok http 8767                                                      # public HTTPS URL for ElevenLabs
-.venv/bin/python -m scripts.build_vale_kb                            # the agent's knowledge base, web/data/vale_kb/*.md
-```
-
-ElevenLabs calls MCP servers from its cloud, so the agent needs a public HTTPS tunnel to port 8767. ngrok works; ElevenLabs could not reach a Cloudflare quick tunnel in testing. Requests through a tunnel must carry `Authorization: Bearer <FIELD_ATLAS_MCP_TOKEN>`. Store the token in ElevenLabs as a workspace secret, with no trailing newline. For this voice integration, point the tunnel at `mcp_server.py` only; the normal writable `server.py` routes have no authentication. The separate [public preview mode](docs/public-demo.md) disables shared writes and uses an isolated prepared dataset. Voice is off by default; the [explicit voice configuration](docs/voice-mcp.md) enables the widget separately after its agent and public MCP connection are verified.
-
-## Verify changes
-
-```sh
-.venv/bin/python -m unittest discover -s tests -v
-node tests/test_navigation_view.mjs
-node tests/test_journey.mjs
-node tests/test_render_quality.mjs
-```
-
-The checks cover blocked paths, corner contact, movement continuity, re-dispatch, journey transitions, and map coordinate alignment. They validate against the derived collision map. They do not prove complete physical obstacle coverage or object-recognition accuracy.
-
-Use the browser to verify that arrival reveals the correct report and that closing it does not make it reopen on the next frame.
-
-## Check the results
-
-```sh
-.venv/bin/python -m tests.scorecard          # every requirement of the brief, with measured numbers
-.venv/bin/python -m tests.validate_lifting   # 2D->3D lifting geometry, no AI model
-.venv/bin/python -m tests.eval_triage        # blind AI-diagnosis evaluation (answers hidden)
-.venv/bin/python -m tests.ab_photos          # label accuracy: real video photos vs splat renders
-.venv/bin/python -m tests.eval_refine        # object refinement vs a held-out photo
-.venv/bin/python -m scripts.render_overlay   # AR clip: the twin drawn over the real walkthrough video
-```
-
-`tests.scorecard`, `tests.validate_lifting` and `tests.eval_refine` call no AI service. `tests.eval_triage` and `tests.ab_photos` read cached answers and call the API only for answers that are missing.
-
-## Prepare the submission
-
-- [Demo sequence](docs/demo-sequence.md) gives a recording plan below five minutes.
-- [Seven-slide outline](docs/slides-outline.md) covers the extraction, navigation, metadata, and service workflow.
-- [Technical notes](docs/technical-notes.md) describe the components, generated model status, verification commands, and current limits.
-
-The slide outline and recording sequence are preparation documents. A final deck and a recorded demo still need to be produced.
-
-## Arduino fault panel with Tiger Data and Snowflake (optional)
-
-An Arduino UNO Q shows the first broken item in the twin (the top of "To inspect") until its job is closed as fixed, then turns green. It works on whatever data the server runs on. It reaches the server over HTTP(S), so it works with a deployed server as well as a laptop. Tiger Data (the board's heartbeats) and Snowflake (its event log) are used only here, in `live/`. The rest of the app never imports them and runs the same without them. Setup and demo script: [arduino/README.md](arduino/README.md).
-
-## Two pipelines: heuristic + Gemini, or local open models
-
-The objects can come from two segmenters. The Excel mapping, navigation, diagnostics and viewer that follow are the same for both. Choose with `VALMET_SEGMENTER`:
-
-| | `heuristic` (default) | `local` |
-| --- | --- | --- |
-| Segmentation | Colour and geometry rules with DBSCAN (`pipeline/perception.py`) | SAM 2.1 masks on the walkthrough video, stitched into 3D objects by view consensus (`local_models/`) |
-| Naming | Gemini 3.8 Flash on real photos, or the OpenAI Decisions API, or their cached answers | SigLIP 2 zero-shot, DINOv2, OWLv2 and a linear probe |
-| Needs an API key or internet | Yes, for a fresh labelling run (the cache replays earlier answers) | No API key for segmentation. Initial Hugging Face model downloads need internet; cached weights run locally (CUDA, Apple GPU or CPU) |
-| Plant images leave the machine | Yes, when labelling | No |
-| Objects in the current build | 467 | 485 (415 segmented, 70 pipe cylinders) |
-| Label accuracy on the 39-object sample | 85% | 31% |
-
-Why both:
-- **Local is the deployable path.** Plant footage stays on site, and segmentation, boxes and types need no labels, so it runs on a new room as it is.
-- **Gemini shows what a stronger hosted model adds**, measured on the same scorecard.
-
-Read the accuracy row with care. The 39-object sample (`tests/gold_labels.json`) was drawn from the heuristic segmenter's own clusters and labelled by eye from splat renders, so it favours that segmenter. For six of the 39 sample points, the local segmenter has no object at that position. Most of the local names come from the probe trained on an AI reviewer's labels (`label_source: local:claude-review`), standing in for an expert's.
-
-Run the twin on the local objects (results committed in `local_models/data/pipeline/`):
-
-```sh
-VALMET_SEGMENTER=local bash scripts/check.sh
-```
-
-Point `VALMET_LOCAL_OBJECTS` at another run's `objects.json` and `objects.npz` folder to use it. To re-run the segmentation itself, follow [local_models/README.md](local_models/README.md). It needs the PyTorch stack in `local_models/requirements.txt`, an initial model download and a full source checkout: `local_models/` and model weights are not included in the prepared code archive. `VALMET_SEGMENTER=local` changes segmentation; the surrounding rebuild still includes diagnostics/retrieval and can invoke configured services. It is not the offline prepared-demo launch command.
-
-## Rebuild scene data
-
-Generated data is not in git. A fresh clone builds it in about 5 minutes. The cached AI answers in `web/data/decisions_cache.json` make the rebuild reproducible and free of API calls.
-
-1. Place the challenge files next to this repository (paths in `pipeline/config.py`):
-
-   ```text
-   ../Equipment Room.ply                                    (the valid scan, 1,676,481 Gaussians)
-   ../Valmet_SinceAI2026 _1_/Industrial Boiler Room (1).mp4 (walkthrough video)
-   ../Valmet_SinceAI2026 _1_/Valmet_SinceAI_2026_..._Builder_Pack (1) (2) (1).xlsx
-   ```
-
-2. Extract the walkthrough frames. Their camera poses are in `web/data/walk_poses.json` (COLMAP alignment by Linards).
+1. Put the challenge files next to the repo (paths in `pipeline/config.py`): `../Equipment Room.ply`, and in
+   `../Valmet_SinceAI2026 _1_/` the walkthrough video and the builder workbook.
+2. Extract the walkthrough frames (their COLMAP poses are in `web/data/walk_poses.json`):
 
    ```sh
    mkdir -p web/data/walk_frames
    ffmpeg -i "../Valmet_SinceAI2026 _1_/Industrial Boiler Room (1).mp4" -vf "fps=3,scale=1280:-2" -q:v 3 web/data/walk_frames/f_%04d.jpg
    ```
 
-3. Install and build. API keys are optional when the cache is present. If you have them, put them in `secrets.env`, which is git-ignored and never committed: `OPENAI_API_KEY`, `GEMINI_API_KEY`, `HF_TOKEN`.
+3. Build and score: `bash scripts/check.sh` (expect 0 hard failures). Optional keys go in the git-ignored
+   `secrets.env`: `OPENAI_API_KEY`, `GEMINI_API_KEY`, `HF_TOKEN`. `VALMET_SEGMENTER=local` builds on the local
+   segmenter's objects instead.
 
-   ```sh
-   python3 -m venv .venv && .venv/bin/python -m pip install -r requirements.txt
-   bash scripts/check.sh                       # build + scorecard (expect 0 hard failures)
-   .venv/bin/python -m scripts.render_overlay  # optional AR clip
-   ```
+A rebuild replaces generated viewer data and can call configured AI services; check generated metadata before claiming
+a model ran ([generated artifact status](docs/technical-notes.md#generated-artifact-status)).
 
-   The splat-render crops used for labelling come from `python -m scripts.render_crops` (needs Node + Playwright). Without them the cached labels still apply.
+## Docs
 
-A rebuild replaces generated viewer data and can invoke configured AI services. Coordinate it with detection and AI work. The viewer can display cached results, while model callers retain their documented fallbacks.
-
-Check generated metadata before claiming that a model ran. The inspection command and the distinction between model results and accuracy are in [Technical notes](docs/technical-notes.md#generated-artifact-status).
+- [Technical note (brief)](docs/technical-note.md) · [Pipeline](docs/pipeline.md) · [Features in detail](docs/features.md) · [Technical notes (full)](docs/technical-notes.md)
+- [Installation](docs/installation.md) · [Dependencies](docs/dependencies.md) · [Hosted preview](docs/public-demo.md) · [R2 publishing](docs/cloudflare-r2.md)
+- [Voice and MCP](docs/voice-mcp.md) · [Arduino fault panel](arduino/README.md) · [Local segmenter](local_models/README.md)
+- [Asset import](docs/asset-import-guide.md) · [Original-data audit](docs/original-data-audit.md)
+- Releases: [0.1.1](docs/release-0.1.1.md), [0.1.0](docs/release-0.1.0.md), [packaging audit](docs/packaging-audit.md)
+- Submission prep: [demo sequence](docs/demo-sequence.md), [slides outline](docs/slides-outline.md)
