@@ -1,5 +1,6 @@
 // AI 3D in the room (scan2service's room view): every Higgsfield model of a scan2service device is drawn where it was
-// fitted (raw PLY of the same scan, so no shift), on this viewer's objects whose box centres lie inside it: their scan
+// fitted (raw PLY of the same scan, so no shift), on this viewer's objects whose box centres lie inside it (or, for a
+// small model, the smallest of our boxes that holds the model's centre): their scan
 // splats are hidden under it and their room labels get an "AI 3D" badge. Matched by POSITION, never by tag (the two
 // repos tagged the Excel devices onto the scan independently). A pump + motor unit is one model, drawn once.
 // Loaded one by one after the splat; ?ai3d=0 turns it off. The models use their own lit glTF materials under this
@@ -44,7 +45,13 @@ export function createAi3d(ctx) {
         node.add(flip);
         node.updateMatrixWorld(true);
         box.setFromObject(node);
-        const owners = ctx.state.twin.assets.filter(a => box.containsPoint(c.fromArray(a.center)));
+        // our objects whose centres lie inside the model; a small model inside one of our boxes belongs to that box
+        let owners = ctx.state.twin.assets.filter(a => box.containsPoint(c.fromArray(a.center)));
+        if (!owners.length) {
+          box.getCenter(c);
+          owners = ctx.state.twin.assets.filter(a => [0, 1, 2].every(k => c.getComponent(k) >= a.aabb_min[k] && c.getComponent(k) <= a.aabb_max[k]))
+            .sort((a, b) => a.size[0] * a.size[1] * a.size[2] - b.size[0] * b.size[1] * b.size[2]).slice(0, 1);
+        }
         const main = owners.find(a => a.mapped) ?? owners[0] ?? null;
         node.userData = { name, label: e.label, owners: owners.map(a => a.tag || a.id) };
         root.add(node);

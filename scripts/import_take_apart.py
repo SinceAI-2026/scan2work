@@ -11,7 +11,7 @@ box), never by tag (the two repos tagged the Excel devices onto the scan indepen
 its raw box here, from the GLB's own POSITION bounds.
 
 - models: split units for Take apart (UNITS lists the ones checked in this viewer).
-- ai3d: every Higgsfield model (ai_multiview) of a scan2service device card, once per file.
+- ai3d: every Higgsfield unit scan2service shows in its room (its own hf3d index), once per file, minus poor fits.
 
     .venv/bin/python -m scripts.import_take_apart [path/to/s2s]
 """
@@ -27,7 +27,9 @@ ROOT = Path(__file__).resolve().parents[1]
 SRC = Path(sys.argv[1]) if len(sys.argv) > 1 else Path.home() / "sinceai-mvp/demo/web/public/data/s2s"
 OUT = ROOT / "web" / "data" / "take_apart"
 UNITS = {"B019p+A069_r2.glb"}  # inline pump 2 (motor + casing): this viewer's M-005 and the casing below it
-AI_KINDS = ("ai_multiview", "ai_trellis")
+# AI 3D: scan2service's own Higgsfield index (read only), every unit it fitted in place
+HF3D = Path.home() / "sinceai-2026/data/private/out/equip_v1/assets_export/hf3d"
+MIN_IOU = 0.5  # silhouette fit against the real photos; below it the shape is not trusted
 
 
 def glb_boxes(path: Path) -> dict:
@@ -53,6 +55,33 @@ def glb_boxes(path: Path) -> dict:
     return out
 
 
+def pick_ai3d(index: dict) -> tuple[dict, dict]:
+    """The units scan2service shows (its objects' units: a pump + motor once, the _r2 redo where there is one), minus
+    hidden ones and poor silhouette fits. Returns ({file name: entry}, {unit: why skipped})."""
+    units, skipped = index["units"], {}
+    for name, why in {**index.get("skipped", {}), **index.get("hidden", {})}.items():
+        skipped[name] = why
+    for name in units:
+        redo = f"{name}_r2"
+        if redo in units and name not in skipped:
+            skipped[name] = f"superseded by {redo}"
+    out = {}
+    for name in sorted({o["unit"] for o in index["objects"].values()}):
+        u = units[name]
+        if name in index.get("hidden", {}):
+            continue
+        if (u.get("silhouette_iou") or 0) < MIN_IOU:
+            skipped[name] = f"silhouette IoU {u.get('silhouette_iou')} < {MIN_IOU}"
+            continue
+        file = Path(u["file"]).name
+        out[file] = {"file": f"ai3d/{file}", "unit": name, "ids": u.get("parts", []), "label": u.get("label"),
+                     "silhouette_iou": u.get("silhouette_iou"), "src": file}
+    for name, u in units.items():  # redos the index has but does not show (hidden or below the bar)
+        if name not in skipped and Path(u["file"]).name not in out and name not in {o["unit"] for o in index["objects"].values()}:
+            skipped[name] = "not shown by scan2service" + (f" (IoU {u.get('silhouette_iou')})" if u.get("silhouette_iou") else "")
+    return out, skipped
+
+
 def main():
     cards = json.loads((SRC / "cards.json").read_text())
     parts_index = json.loads((SRC / "assets/hf3d/parts/index.json").read_text())
@@ -67,22 +96,15 @@ def main():
         boxes = glb_boxes(OUT / "parts" / name)
         parts = [{**p, "box": boxes[p["node"]]} for p in entry["parts"] if p["node"] in boxes]
         models[name] = {**entry, "file": f"parts/{name}", "box": boxes["*"], "parts": parts}
-    prefix = cards.get("url_prefix_replaced", "data/assets/")
-    ai3d = {}
-    for cid, c in sorted(cards["cards"].items()):
-        view = next((v for v in c.get("views_3d", []) if v.get("kind") in AI_KINDS and v.get("url")), None)
-        if not view or not c.get("tag"):  # devices only (an Excel tag in scan2service), not tanks or loose items
-            continue
-        name = Path(view["url"]).name
-        if name in ai3d:
-            ai3d[name]["cards"].append(cid)
-            continue
-        shutil.copyfile(SRC / "assets" / view["url"][len(prefix):], OUT / "ai3d" / name)
-        ai3d[name] = {"file": f"ai3d/{name}", "cards": [cid], "label": view.get("label")}  # boxes: the viewer, on load
+    ai3d, skipped = pick_ai3d(json.loads((HF3D / "index.json").read_text()))
+    for e in ai3d.values():
+        shutil.copyfile(HF3D / e.pop("src"), OUT / e["file"])
     doc = {"version": 3, "source": "SinceAI-2026/mvp demo/web/public/data/s2s (scan2service, raw PLY coordinates)",
            "frame": cards.get("frame"), "models": models, "ai3d": ai3d}
     (OUT / "index.json").write_text(json.dumps(doc, indent=1))
-    print(f"wrote {OUT.relative_to(ROOT)}/index.json: Take apart {', '.join(models)}; {len(ai3d)} AI 3D models")
+    print(f"wrote {OUT.relative_to(ROOT)}/index.json: Take apart {', '.join(models)}; AI 3D {', '.join(ai3d)}")
+    for name, why in skipped.items():
+        print(f"  skipped {name}: {why}")
 
 
 if __name__ == "__main__":

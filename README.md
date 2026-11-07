@@ -137,12 +137,12 @@ The models are AI-generated (Higgsfield) units, split into parts by geometry rul
 
 ### AI 3D models in the room
 
-Every Higgsfield model of a scan2service device is drawn where it was fitted, unshifted. It sits on this viewer's objects whose box centres lie inside it. Their scan splats are hidden under the model, and their room labels get an **AI 3D** badge. A pump and motor unit is one model, drawn once. The models load one by one after the splat. They follow the explode slider and room moves of their main object, and leave with it. They are hidden in the BIM layer and while an object is taken apart with Wael's take-apart. `?ai3d=0` turns them off. The code is in `web/ai3d.mjs`.
+Every Higgsfield unit that scan2service shows in its room is drawn where it was fitted, unshifted: 15 models from its own index (`equip_v1/assets_export/hf3d/index.json`), including the big vessel, cabinet and trolley. The `_r2` redo is used where there is one. Units that scan2service hides, or whose silhouette fit against the photos is below 0.5, are skipped, and the import lists them with the reason. Each model sits on this viewer's objects whose box centres lie inside it. A small model with none sits on the smallest box that holds its centre. Their scan splats are hidden under the model, and their room labels get an **AI 3D** badge. A pump and motor unit is one model, drawn once. The models load one by one after the splat. They follow the explode slider and room moves of their main object, and leave with it. They are hidden in the BIM layer and while an object is taken apart with Wael's take-apart. `?ai3d=0` turns them off. The code is in `web/ai3d.mjs`.
 
 The data comes from the MVP and is git-ignored like the rest of `web/data/`:
 
 ```sh
-.venv/bin/python -m scripts.import_take_apart    # reads ~/sinceai-mvp/demo/web/public/data/s2s, writes web/data/take_apart/{index.json,parts/,ai3d/}
+.venv/bin/python -m scripts.import_take_apart    # reads the MVP's s2s parts and scan2service's hf3d index, writes web/data/take_apart/{index.json,parts/,ai3d/}
 node tests/test_parts_data.mjs                    # matching by position, faults from the objects' own records
 ```
 
