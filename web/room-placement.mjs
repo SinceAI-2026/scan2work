@@ -106,3 +106,33 @@ export function copyPlacedSplats(scan, indices, asset, instance) {
   }
   return data;
 }
+
+// Duplicates: [copy id, source id] pairs. Each copy's position is a placement under its own id.
+const COPIES_KEY = "field-atlas:equipment-room:copies";
+const copiesKey = datasetId => datasetId ? `${COPIES_KEY}:${encodeURIComponent(datasetId)}` : COPIES_KEY;
+
+export function loadRoomCopies(datasetId = "") {
+  try {
+    const saved = JSON.parse(localStorage.getItem(copiesKey(datasetId))) || [];
+    return saved.filter(pair => Array.isArray(pair) && pair.length === 2 && pair.every(v => typeof v === "string"));
+  } catch {
+    return [];
+  }
+}
+
+export function saveRoomCopies(copies, datasetId = "") {
+  localStorage.setItem(copiesKey(datasetId), JSON.stringify([...copies].map(([id, copy]) => [id, copy.copy_of])));
+}
+
+// A copy shows the source's scan, not its workbook record: every status on screen must come from the Excel pack.
+export function roomCopyAsset(source, id) {
+  const {tag, asset_id, telemetry, alarms, maintenance_history, diagnostics, ...rest} = source;
+  return {...rest, id, copy_of: source.id, label: `${source.label} (copy)`, mapped: false, is_target: false,
+    condition_state: source.movable ? "movable" : "not_instrumented"};
+}
+
+export function nextCopyId(sourceId, taken) {
+  let n = 1;
+  while (taken.has(`${sourceId}-copy${n}`)) n++;
+  return `${sourceId}-copy${n}`;
+}
