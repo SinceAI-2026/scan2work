@@ -90,3 +90,7 @@
 .ar-view{margin:auto;width:min(1040px,92vw);max-height:90vh;padding:16px;border:1px solid #607565;border-radius:10px;background:#172622;color:#f1f8ed}
 .ar-view::backdrop{background:#101a16bb}.ar-view-header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}.ar-view-header h2{font-size:16px}.ar-view video{display:block;width:100%;max-height:76vh;background:#111}
 .arrival-safety{padding:8px 10px;border-left:3px solid #a5712a;border-radius:4px;background:#f6edda;color:#654717;font-size:11px;line-height:1.45}
+
+/* Map in the top-right corner, under the view controls; the voice assistant widget has the bottom-right corner. */
+.route-map-panel{top:56px;bottom:auto;max-height:calc(100% - 140px);overflow-y:auto}
+@media(max-width:650px){.route-map-panel{top:140px;max-height:calc(100% - 230px)}}
