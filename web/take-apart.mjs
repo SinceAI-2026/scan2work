@@ -260,7 +260,7 @@ export function createTakeApart(ctx) {
       minPolarAngle: restore.minPolar, maxPolarAngle: restore.maxPolar });
     ctx.camera.position.copy(restore.position);
     c.target.copy(restore.target);
-    ctx.setPreset(restore.preset === "apart" ? "overview" : restore.preset);
+    ctx.setPreset(restore.preset === "apart" ? "aerial" : restore.preset);
     c.update();
   }
 

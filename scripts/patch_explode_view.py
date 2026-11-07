@@ -31,8 +31,7 @@ EDITS = [
     # 4. frames + tags follow the explosion; controls in the Display panel
     ("  renderJourneyControls(nav);",
      "  applyExplode(boxMeshes, splatMaterial);\n  renderJourneyControls(nav);"),
-    ("const topPos = new THREE.Vector3(a.center[0], a.center[1] + a.size[1] / 2 + 0.03, a.center[2]);",
-     "const topPos = new THREE.Vector3(a.center[0], a.center[1] + a.size[1] / 2 + 0.03, a.center[2]).add(explodeOffset(a));"),
+    # (labels following the explosion is built into app.js's updateHudLabels now)
     ("  buildAssetBoundingBoxes();\n",
      "  buildAssetBoundingBoxes();\n  mountExplodeControls();\n"),
     # 5. movable objects: violet frames

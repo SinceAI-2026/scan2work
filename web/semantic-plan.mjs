@@ -204,6 +204,9 @@ export function bindSemanticPlan({snapshot, inspect, navigate, viewModel}) {
 
   document.getElementById("btn-semantic-plan").addEventListener("click",()=>{
     current=snapshot();
+    // Opened from the Aerial view: start from its Show in room choices (pipes = overhead objects).
+    showAll.checked=!!document.getElementById("layer-all")?.checked;
+    showOverhead.checked=!!document.getElementById("layer-pipes")?.checked;
     selected=current.assets.find(asset=>asset.id===current.selected?.id) || current.assets.find(asset=>asset.is_target);
     dialog.showModal();
     draw();

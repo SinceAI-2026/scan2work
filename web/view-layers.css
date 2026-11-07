@@ -1,0 +1,8 @@
+/* Class colours on labels and the class legend (Coloured objects and BIM layers). */
+.hud-tag.detected.detected{color:#fff;background:#1d2b33e6;border-color:var(--class-colour,#fff7);border-left:4px solid var(--class-colour,#fff7)}
+/* Objects with no pack record are not faults: neutral tag instead of the default red. */
+.hud-tag.not_instrumented{background:#4a5560e6}
+.class-legend{display:flex;flex-wrap:wrap;gap:4px 12px;margin-top:8px;max-width:600px;padding:8px 10px;border:1px solid #fff3;border-radius:10px;background:#14211bdd;color:#e7efe3;font-size:11px;line-height:16px;pointer-events:auto}
+.class-legend[hidden]{display:none}
+.class-legend span{display:flex;align-items:center;gap:6px;white-space:nowrap}
+.class-legend i{display:inline-block;width:9px;height:9px;border-radius:2px}
