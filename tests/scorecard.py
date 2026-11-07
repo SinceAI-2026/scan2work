@@ -59,7 +59,8 @@ check("1 extraction", "unclassified labels < 10%", unclassified / len(assets) < 
 classes = Counter(a["class"] for a in assets)
 check("1 extraction", "class diversity >= 8", len(classes) >= 8, f"{len(classes)} classes: {dict(classes.most_common(6))}")
 src = Counter(a.get("label_source", "?") for a in eq)
-check("1 extraction", "AI-verified labels on equipment", src.get("decisions_api", 0) + src.get("gemini", 0) > 0.5 * len(eq),
+model_labelled = src.get("decisions_api", 0) + src.get("gemini", 0) + sum(n for k, n in src.items() if k.startswith("local:"))
+check("1 extraction", "AI-verified labels on equipment", model_labelled > 0.5 * len(eq),
       f"{dict(src)}", hard=False)
 
 # label accuracy against the hand-labelled sample (tests/gold_labels.json)
@@ -67,7 +68,11 @@ from pathlib import Path as _P
 from pipeline.semantic_labels import CLASSES as _CL
 _gold = json.loads((_P(__file__).parent / "gold_labels.json").read_text())["items"]
 _EQUIV = {"horizontal_pipe": {"horizontal_pipe", "overhead_pipe"}}
+SEGMENTER = TWIN["scene"].get("segmenter", "heuristic")
 def _pred(g):
+    if SEGMENTER != "heuristic":   # another segmenter's ids mean nothing here: the object at the sample's centre
+        inside = [a for a in assets if all(lo - 0.03 <= c <= hi + 0.03 for c, lo, hi in zip(g["center"], a["aabb_min"], a["aabb_max"]))]
+        return min(inside, key=lambda a: np.prod(a["size"])) if inside else None
     for a in assets:
         if a["id"] == g["id"] or g["id"] in a.get("merged_from", []) or g["id"] in a.get("merged_fragments", []):
             return a
@@ -83,7 +88,7 @@ for g in judged:
     rule_hit += g["rule_label"] in ok_set
 acc = hit / len(judged)
 check("1 extraction", "label accuracy on hand-labelled sample >= 70%", acc >= 0.70,
-      f"{acc:.0%} ({hit}/{len(judged)}); colour-rule baseline {rule_hit / len(judged):.0%}", hard=False)
+      f"{acc:.0%} ({hit}/{len(judged)}, {SEGMENTER} segmenter); colour-rule baseline {rule_hit / len(judged):.0%}", hard=False)
 mov_gold = [g for g in judged if g["movable"]]
 mov_hit = sum(bool((_pred(g) or {}).get("movable")) for g in mov_gold)
 check("1 extraction", "movable objects detected in sample", mov_hit == len(mov_gold), f"{mov_hit}/{len(mov_gold)}", hard=False)

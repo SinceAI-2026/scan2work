@@ -19,7 +19,7 @@ from collections import Counter
 import numpy as np
 
 from . import config as C
-from . import ingest, perception, knowledge, navigation, diagnostics, semantic_labels, retrieval, decisions_client, detect_lift, walk_photos, pipes, floorplan
+from . import ingest, perception, knowledge, navigation, diagnostics, semantic_labels, retrieval, decisions_client, detect_lift, walk_photos, pipes, floorplan, local_objects
 
 
 def fill_object_membership(splat: dict, assets: list[dict], base_idx: np.ndarray, margin: float = 0.02) -> np.ndarray:
@@ -218,10 +218,15 @@ def main():
     splat = ingest.level_scene(raw)
 
     print("[2/6] Running 3D semantic perception & PCA OBB framing...")
-    perc = perception.extract_assets(splat)
-    label_stats = semantic_labels.relabel_assets(splat, perc)
-    label_stats.update(semantic_labels.merge_and_clean(splat, perc))
-    label_stats["detection"] = detect_lift.run(splat, perc, semantic_labels.CLASSES, semantic_labels._protected)
+    perc = perception.extract_assets(splat)             # also the walls, floor and obstacles navigation needs
+    if C.SEGMENTER == "local":                          # objects from the open-model pipeline (local_models/)
+        local = local_objects.load(splat)
+        perc["assets"], perc["splat_asset_idx"] = local["assets"], local["splat_asset_idx"]
+        label_stats = {"source": "local_models", "local": local["stats"]}
+    else:                                               # colour/geometry clusters, named by Gemini / Decisions
+        label_stats = semantic_labels.relabel_assets(splat, perc)
+        label_stats.update(semantic_labels.merge_and_clean(splat, perc))
+        label_stats["detection"] = detect_lift.run(splat, perc, semantic_labels.CLASSES, semantic_labels._protected)
     label_stats["target"] = semantic_labels.consolidate_target(perc)
     label_stats["pipes"] = pipes.integrate(splat, perc, pipe_segments, semantic_labels._protected)
     label_stats["real_photos"] = walk_photos.build(splat, perc["assets"], semantic_labels.label_key)
@@ -268,6 +273,7 @@ def main():
             "ingestion_stats": splat["stats"],
             "coordinate_frame": splat["frame"],
             "perception_stats": perc["stats"],
+            "segmenter": C.SEGMENTER,
             "walls": perc["walls"],
             "splat_binary": bin_meta,
             "class_breakdown": class_counts,

@@ -217,6 +217,33 @@ Use the browser to verify that arrival reveals the correct report and that closi
 
 The slide outline and recording sequence are preparation documents. A final deck and a recorded demo still need to be produced.
 
+## Two pipelines: heuristic + Gemini, or local open models
+
+The objects can come from two segmenters. The Excel mapping, navigation, diagnostics and viewer that follow are the same for both. Choose with `VALMET_SEGMENTER`:
+
+| | `heuristic` (default) | `local` |
+| --- | --- | --- |
+| Segmentation | Colour and geometry rules with DBSCAN (`pipeline/perception.py`) | SAM 2.1 masks on the walkthrough video, stitched into 3D objects by view consensus (`local_models/`) |
+| Naming | Gemini 3.8 Flash on real photos, or the OpenAI Decisions API, or their cached answers | SigLIP 2 zero-shot, DINOv2, OWLv2 and a linear probe |
+| Needs an API key or internet | Yes, for a fresh labelling run (the cache replays earlier answers) | No. Open weights from Hugging Face, run on this machine (CUDA, Apple GPU or CPU) |
+| Plant images leave the machine | Yes, when labelling | No |
+| Objects in the current build | 467 | 485 (415 segmented, 70 pipe cylinders) |
+| Label accuracy on the 39-object sample | 85% | 31% |
+
+Why both:
+- **Local is the deployable path.** Plant footage stays on site, and segmentation, boxes and types need no labels, so it runs on a new room as it is.
+- **Gemini shows what a stronger hosted model adds**, measured on the same scorecard.
+
+Read the accuracy row with care. The 39-object sample (`tests/gold_labels.json`) was drawn from the heuristic segmenter's own clusters and labelled by eye from splat renders, so it favours that segmenter. For six of the 39 sample points, the local segmenter has no object at that position. Most of the local names come from the probe trained on an AI reviewer's labels (`label_source: local:claude-review`), standing in for an expert's.
+
+Run the twin on the local objects (results committed in `local_models/data/pipeline/`):
+
+```sh
+VALMET_SEGMENTER=local bash scripts/check.sh
+```
+
+Point `VALMET_LOCAL_OBJECTS` at another run's `objects.json` and `objects.npz` folder to use it. To re-run the segmentation itself, follow [local_models/README.md](local_models/README.md). It needs the PyTorch stack in `local_models/requirements.txt`.
+
 ## Rebuild scene data
 
 Generated data is not in git. A fresh clone builds it in about 5 minutes. The cached AI answers in `web/data/decisions_cache.json` make the rebuild reproducible and free of API calls.
