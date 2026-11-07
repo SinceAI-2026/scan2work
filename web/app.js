@@ -68,7 +68,7 @@ const VIEW_NAMES = {walk:"Follow robot", first:"First person", aerial:"Aerial vi
 const VIEW_ICONS = {walk:"follow", first:"first", aerial:"aerial"};
 const firstLook = {yaw:0, pitch:0, at:-1e9};   // first person: drag-to-look offsets from the walking direction
 const CEILING_CUT_M = 1.7;   // above the tallest pump or valve top, below the overhead pipe runs
-const ROBOT_EYE_M = 1.45;    // robot head and first-person camera height, a little under a standing person's eyes
+const ROBOT_EYE_M = 1.3;     // robot head and first-person camera height
 // Free view frames every object; Aerial view frames what its "Show in room" boxes pick (view-filter.mjs).
 let bimView;
 
@@ -935,13 +935,13 @@ function buildRobotAvatar() {
   baseMesh.position.y = 0.06;
   robotGroup.add(baseMesh);
 
-  // Close to human height (about 1.6 m to the top of the sensor), so its camera sees the room the way a
-  // technician does. The room's ceiling slab starts at 1.97 m.
+  // About 1.45 m to the top of the sensor: shorter than a person, tall enough to see over most equipment.
+  // The room's ceiling slab starts at 1.97 m.
   const mast = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.03, 0.045, 1.3, 16),
+    new THREE.CylinderGeometry(0.03, 0.045, 1.15, 16),
     new THREE.MeshStandardMaterial({ color: 0x475569, metalness: 0.4, roughness: 0.4 })
   );
-  mast.position.y = 0.76;
+  mast.position.y = 0.685;
   robotGroup.add(mast);
 
   const head = new THREE.Mesh(
@@ -2217,6 +2217,12 @@ function keyboardWalk(dt) {
     manual.yaw = cameraYaw();
     sideways = side - turn;
     turn = 0;
+  } else if (state.cameraPreset === "walk") {
+    // Follow robot: the camera sits behind the robot, so W/S move along the robot's heading (where the camera
+    // looks) and A/D turn it like the arrows. Before, A/D strafed against a heading fixed when walking began
+    // while the camera swung behind the robot, so W ended up pointing a fixed map direction.
+    turn -= side;
+    sideways = 0;
   }
   manual.yaw += turn * 1.8 * dt;
   const x = Math.sin(manual.yaw), z = Math.cos(manual.yaw);
@@ -2225,7 +2231,9 @@ function keyboardWalk(dt) {
   const end = manualStep(state.twin.navigation, equipmentObstacles, start,
     (x * forward - z * sideways) * step, (z * forward + x * sideways) * step);
   const dx = end.x - start.x, dz = end.z - start.z;
-  const yaw = state.cameraPreset === "first" ? manual.yaw :
+  // First person and Follow robot: the robot faces its heading (walking back does not turn it around).
+  // Aerial view: it faces where it moves.
+  const yaw = state.cameraPreset !== "aerial" ? manual.yaw :
     dx || dz ? Math.atan2(dx, dz) : robotGroup.rotation.y;
   return {...end, yaw, distance:0};
 }
@@ -2259,7 +2267,7 @@ function updateWalkCamera(nav, dt = 0, route = null) {
 }
 
 // Third person: one rig for every case (route, keyboard, standing still, arrived). The camera trails the
-// robot's smoothed heading at 1.6 m and 1.75 m up. A wall behind shortens the distance, never below 0.6 m:
+// robot's smoothed heading at 1.6 m and 1.6 m up. A wall behind shortens the distance, never below 0.6 m:
 // the old rig halved it down to zero and then jumped on top of the robot. Position and heading both ease,
 // so corners and wall checks never make the camera jump.
 const followRig = { yaw: undefined, pos: new THREE.Vector3(), target: new THREE.Vector3(), snap: true };
@@ -2273,10 +2281,10 @@ function updateFollowCamera(nav, dt, route) {
   while (distance > 0.6 && !segmentIsFree(state.twin.navigation, start, [nav.x - dx * distance, 0, nav.z - dz * distance])) distance -= 0.1;
   // Over the right shoulder (0.3 m to the side), so the robot's mast does not block the middle of the view.
   const rx = -dz * 0.3, rz = dx * 0.3;
-  const goalPos = new THREE.Vector3(nav.x - dx * distance + rx, 1.75, nav.z - dz * distance + rz);
+  const goalPos = new THREE.Vector3(nav.x - dx * distance + rx, 1.6, nav.z - dz * distance + rz);
   const arrivedAt = state.journey.phase === "arrived" && route?.asset_id ? roomAsset(state.assetsById.get(route.asset_id)) : null;
   const goalTarget = arrivedAt ? new THREE.Vector3().fromArray(arrivedAt.center)
-    : new THREE.Vector3(nav.x + dx * 0.6 + rx, 1.1, nav.z + dz * 0.6 + rz);
+    : new THREE.Vector3(nav.x + dx * 0.6 + rx, 1.0, nav.z + dz * 0.6 + rz);
   followRig.pos.lerp(goalPos, ease(6));
   followRig.target.lerp(goalTarget, ease(6));
   followRig.snap = false;
