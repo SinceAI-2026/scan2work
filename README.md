@@ -84,9 +84,21 @@ A successful equipment arrival opens the destination's service report, evidence,
 
 After a generated-data rebuild, restart the server and reload the browser so both use the same artifact.
 
+### Room controls
+
+The compact toolbar keeps camera modes and **Scan / Coloured / BIM** visible. **Display** holds quality, frame visibility, object filters, explode and ceiling controls. **Floor plan** opens the plan and IFC export directly.
+
+**Find equipment** searches the room catalog without hiding behind a tab. Selecting a list item keeps the current camera and layer; **View location**, **Navigate here** and **Isolate item** are explicit actions. Starting **Inspect faulty device** or **Tour the room** follows the robot. **Nearby** limits label clutter; **Show all** reveals filtered objects and overhead equipment.
+
+### Optional external asset data
+
+The original `web/data` setup remains the default. The [asset import guide](docs/asset-import-guide.md) describes the modular importer, original-data preservation adapter, separate candidate-review overlay, and `VALMET_DATA_DIR` for serving another dataset. Generated scans and videos are not included in this PR. Set `VALMET_OFFLINE=1` to run without backend model calls; imported datasets also declare their offline runtime policy.
+
+The evaluation results above describe the original generated twin. They are not accuracy results for imported candidates. Exact-source exports preserve native rows; the original dataset retains its photo-refinement workflow. The [compatibility notes](docs/technical-notes.md) distinguish these modes.
+
 ## Take objects apart and keep them
 
-Select equipment and choose **Take apart** in Equipment details, or press **T**. The object stays in place and the rest of the room fades. **R** toggles the turntable, **G** shows a faint ghost of the room, and **Esc** returns.
+Select equipment and choose **Isolate item** in Equipment details, or press **T**. The object stays in place and the rest of the room fades. **R** toggles the turntable, **G** shows a faint ghost of the room, and **Esc** returns.
 
 **Save to library** cuts the object out of the scan and refines it against the walkthrough frames that see it. This takes 1 to 3 minutes on the CPU and calls no AI model. The separation follows Scan2Service's asset export, on this twin's per-splat object ids. The refinement (`pipeline/object_refine.py`) is 3DGS training restricted to one object, in three steps:
 

@@ -1,14 +1,16 @@
 """Central configuration for the Valmet Industrial Twin pipeline."""
 from pathlib import Path
+import os
 
 ROOT = Path(__file__).resolve().parents[1]
 
 from .vault import load_secrets  # noqa: E402
-SECRETS_FOUND = load_secrets(ROOT)  # fills OPENAI_API_KEY from env / Keychain / secrets.env
+OFFLINE = os.environ.get("VALMET_OFFLINE", "0") == "1"
+SECRETS_FOUND = {} if OFFLINE else load_secrets(ROOT)
 DATA_DIR = ROOT.parent / "Valmet_SinceAI2026 _1_"
 PLY_PATH = ROOT.parent / "Equipment Room.ply"
 XLSX_PATH = DATA_DIR / "Valmet_SinceAI_2026_Synthetic_Industrial_Metaverse_Builder_Pack (1) (2) (1).xlsx"
-OUT_DIR = ROOT / "web" / "data"
+OUT_DIR = Path(os.environ.get("VALMET_DATA_DIR", ROOT / "web" / "data")).expanduser().resolve()
 
 # --- Ingestion -------------------------------------------------------------
 COORD_LIMIT_M = 60.0          # anything beyond is a corrupted record

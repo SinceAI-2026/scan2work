@@ -22,17 +22,18 @@
   <div id="arrival-announcement" class="visually-hidden" role="status" aria-live="polite"></div>
   <header class="topbar">
     <div class="topbar-left"><span class="diamond-logo">◆</span><strong class="brand-name">Field Atlas</strong><span class="room-name">Equipment Room</span><span id="room-object-count" class="room-object-count"></span></div>
-    <div class="topbar-right"><a class="btn-export topbar-link" href="library.html">Asset library</a><button id="btn-inspector" class="btn-export" aria-expanded="false">Equipment details</button></div>
+    <div class="topbar-right"><button id="btn-review-proposals" class="btn-export" aria-expanded="false" hidden>Review candidates</button><a class="btn-export topbar-link" href="library.html">Asset library</a><button id="btn-inspector" class="btn-export" aria-expanded="false">Equipment details</button></div>
   </header>
   <main class="workspace">
     <aside class="sidebar left-sidebar">
-      <div class="sidebar-header"><h1>Explore the room</h1><p id="sidebar-stats-text" class="sidebar-stats">Loading room…</p></div>
+      <div class="sidebar-header"><h1>Explore the room</h1><p id="sidebar-stats-text" class="sidebar-stats">Loading room…</p><p id="dataset-note" class="dataset-note" role="status"></p></div>
       <div class="mission-box">
         <button class="btn-walk primary" id="btn-room-tour" disabled>Tour the room</button>
         <button class="btn-walk" id="btn-go-target" disabled>Inspect faulty device</button>
       </div>
       <div class="filter-group"><label for="asset-search" class="field-label">Find equipment</label><input id="asset-search" class="clean-input" placeholder="Search tag or equipment…" type="search" /></div>
-      <select id="select-visual-review" class="clean-select" aria-label="Equipment filter"><option value="mapped">Registered equipment</option><option value="alerts">Needs attention</option><option value="all">All detected objects</option></select>
+      <select id="select-visual-review" class="clean-select" aria-label="Equipment filter"><option value="all">All extracted regions</option><option value="mapped">Excel-linked equipment</option><option value="alerts">Needs attention</option><option value="baseline">Linards baseline regions</option><option value="new">New candidate regions</option><option value="floor">Floor patches</option></select>
+      <p id="asset-result-count" class="asset-result-count" aria-live="polite"></p>
       <div class="proposal-list" id="asset-list"></div>
       <details class="room-changes" id="room-changes"><summary>Room changes <span id="room-change-count"></span></summary>
         <p id="room-edit-status" role="status" hidden></p><div id="room-edit-list"></div>
@@ -42,46 +43,54 @@
     <section class="viewport-col">
       <div id="canvas-container" class="canvas-container">
         <div class="viewport-Controls-overlay">
-          <div class="vp-row view-row">
+          <div class="room-toolbar" role="toolbar" aria-label="Room controls">
             <div class="view-switch" id="view-switch">
-              <button class="view-fab" id="view-fab" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="view-menu" aria-label="Change view: Follow robot" data-tip="Follow robot"><span class="view-icon" id="view-fab-icon" data-icon="follow"></span></button>
-              <div class="view-menu" id="view-menu" role="menu" aria-label="Views" hidden>
-                <button class="view-item active" type="button" role="menuitemradio" data-cam="walk" data-icon="follow" data-tip="Follow robot" aria-label="Follow robot"></button>
-                <button class="view-item" type="button" role="menuitemradio" data-cam="first" data-icon="first" data-tip="First person: the robot's camera. Drag to look, WASD or arrows to walk" aria-label="First person"></button>
-                <button class="view-item" type="button" role="menuitemradio" data-cam="aerial" data-icon="aerial" data-tip="Aerial view" aria-label="Aerial view"></button>
+              <button class="view-fab" id="view-fab" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="view-menu" aria-label="Change view: Follow robot"><span class="view-icon" id="view-fab-icon" data-icon="follow"></span><span id="view-fab-label">Follow robot</span><span aria-hidden="true">⌄</span></button>
+              <div class="view-menu" id="view-menu" role="menu" aria-label="Camera" hidden>
+                <button class="view-item" type="button" role="menuitemradio" data-cam="aerial" data-icon="aerial" aria-label="Aerial view">Aerial view <small>Orbit freely around the room</small></button>
+                <button class="view-item active" type="button" role="menuitemradio" data-cam="walk" data-icon="follow" aria-label="Follow robot">Follow robot <small>Watch the inspection route</small></button>
+                <button class="view-item" type="button" role="menuitemradio" data-cam="first" data-icon="first" aria-label="First person">First person <small>Look and walk through the room</small></button>
               </div>
             </div>
-            <button class="vp-btn" id="btn-ar-view" hidden>AR view</button>
-            <button class="vp-btn autoplay-chip" id="autoplay-chip" hidden>AUTOPLAY, click to take over</button>
-            <button class="vp-btn manual-walk-chip" id="btn-manual-walk" hidden>Manual walk · M = resume mission</button>
-          </div>
-          <div class="view-tools" id="layer-options">
-          <section class="layer-panel" aria-label="Room view">
-            <div class="layer-seg layer-aerial" role="radiogroup" aria-label="Layer">
-              <button type="button" role="radio" class="active" data-layer="scan" data-tip="The scan, frames coloured by status"><span class="view-icon" data-icon="scan"></span>Scan</button>
-              <button type="button" role="radio" data-layer="detected" data-tip="Objects coloured by class"><span class="view-icon" data-icon="detected"></span>Coloured</button>
-              <button type="button" role="radio" data-layer="bim" data-tip="BIM model"><span class="view-icon" data-icon="bim"></span>BIM</button>
+            <div class="layer-seg layer-aerial" role="group" aria-label="Room appearance">
+              <button type="button" class="active" data-layer="scan" aria-pressed="true" title="Original scan"><span class="view-icon" data-icon="scan"></span>Scan</button>
+              <button type="button" data-layer="detected" aria-pressed="false" title="Objects coloured by class"><span class="view-icon" data-icon="detected"></span>Coloured</button>
+              <button type="button" data-layer="bim" aria-pressed="false" title="BIM geometry"><span class="view-icon" data-icon="bim"></span>BIM</button>
             </div>
+            <button type="button" class="layer-link" id="btn-semantic-plan" disabled title="Open floor plan and export IFC"><span class="view-icon" data-icon="plan2d"></span>Floor plan</button>
+            <div class="display-switch" id="display-switch">
+              <button type="button" class="layer-link" id="btn-display" aria-expanded="false" aria-controls="layer-options"><span class="view-icon" data-icon="display"></span>Display</button>
+              <section class="layer-panel" id="layer-options" aria-label="Display options" hidden>
+                <div class="display-heading"><strong>Display options</strong><button type="button" id="btn-close-display" aria-label="Close display options">×</button></div>
             <div class="layer-group layer-display" role="group" aria-labelledby="layer-display-heading">
               <span class="layer-heading" id="layer-display-heading">Display</span>
               <label class="layer-row">Render quality<select id="select-splat-mode" class="layer-select"><option value="high">High detail</option><option value="balanced">Balanced</option></select></label>
               <div class="layer-row">Frames<div class="layer-mini-seg" role="group" aria-label="Equipment frames"><button type="button" class="active" id="btn-boxes-mode" data-bmode="proximity">Nearby</button><button type="button" id="btn-all-boxes" data-bmode="all">All</button><button type="button" id="btn-no-boxes" data-bmode="off">Off</button></div></div>
-              <label class="room-fill-toggle"><input type="checkbox" id="room-fill-debug"> Tint synthetic fill</label>
+              <label id="btn-room-fill-label" class="room-fill-toggle"><input type="checkbox" id="room-fill-debug"> Tint synthetic fill</label>
             </div>
             <div class="layer-group layer-aerial" role="group" aria-labelledby="layer-show-heading">
               <span class="layer-heading" id="layer-show-heading">Show in room</span>
               <label><input type="checkbox" id="layer-walls"> Walls</label>
-              <label><input type="checkbox" id="layer-pipes"> Pipes</label>
+              <label><input type="checkbox" id="layer-pipes"> Pipes and overhead objects</label>
               <label><input type="checkbox" id="layer-all"> All equipment</label>
-              <label><input type="checkbox" id="layer-relevant" checked> Relevant equipment</label>
+              <label><input type="checkbox" id="layer-relevant" checked> Large / registered equipment</label>
             </div>
             <div class="layer-group layer-aerial">
               <label class="layer-explode"><span class="view-icon" data-icon="explode"></span>Explode<input id="explode-range" type="range" min="0" max="1" step="0.01" value="0" aria-label="Explode objects"></label>
               <label class="layer-ceiling"><input id="ceiling-toggle" type="checkbox"> Hide ceiling</label>
             </div>
-            <button type="button" class="layer-link layer-aerial" id="btn-semantic-plan" disabled><span class="view-icon" data-icon="plan2d"></span>2D drawing and IFC</button>
-          </section>
-            <div class="class-legend" id="class-legend" hidden aria-label="Object classes"></div>
+                <div class="class-legend" id="class-legend" hidden aria-label="Object classes"></div>
+              </section>
+            </div>
+            <button class="vp-btn" id="btn-ar-view" hidden>AR view</button>
+          </div>
+          <div class="room-view-summary">
+            <span id="view-control-hint">Drag to orbit · right-drag to pan · scroll to zoom</span>
+            <span class="room-filter-summary layer-aerial"><span id="room-layer-count" class="layer-counts" aria-live="polite"></span><button type="button" id="btn-show-all" hidden>Show all</button></span>
+          </div>
+          <div class="vp-row room-activity-controls">
+            <button class="vp-btn autoplay-chip" id="autoplay-chip" hidden>AUTOPLAY, click to take over</button>
+            <button class="vp-btn manual-walk-chip" id="btn-manual-walk" hidden>Manual walk · M = resume mission</button>
           </div>
         </div>
         <div id="hud-overlay" class="hud-overlay"></div>
@@ -130,7 +139,7 @@
         </figure>
         <p id="detail-match-note" hidden></p>
         <div class="action-bar-inline">
-          <button class="btn-outline-full" id="btn-navigate-selected">Navigate here</button><button class="btn-outline-full" id="btn-take-apart" title="Show this object alone (T)">Take apart</button><button class="btn-outline-full" id="btn-draft-wo">Draft work order</button>
+          <button class="btn-outline-full" id="btn-navigate-selected">Navigate here</button><button class="btn-outline-full" id="btn-take-apart" title="Hide the room and show this region alone (T)">Isolate region</button><button class="btn-outline-full" id="btn-draft-wo">Draft work order</button>
         </div>
 
         <p id="movable-notice" class="movable-notice" hidden>Movable object (not instrumented)</p>
@@ -222,6 +231,7 @@
     <div class="semantic-plan-layout">
       <svg id="semantic-plan-drawing" aria-label="Plan of the equipment room"></svg>
       <aside class="semantic-plan-tools">
+        <p id="semantic-plan-counts" class="layer-counts" aria-live="polite"></p>
         <label for="semantic-plan-search">Find equipment on the plan</label>
         <input id="semantic-plan-search" type="search" placeholder="Tag, name, or ID">
         <div id="semantic-plan-results"></div>
@@ -230,15 +240,20 @@
           <button class="btn-outline-full" id="semantic-plan-inspect" disabled>View equipment</button>
           <button class="btn-outline-full" id="semantic-plan-navigate" disabled>Navigate to equipment</button>
         </div>
-        <label><input type="checkbox" id="semantic-plan-all"> Show all floor objects</label>
-        <label><input type="checkbox" id="semantic-plan-overhead"> Show overhead objects</label>
+        <label><input type="checkbox" id="semantic-plan-all"> Include small regions</label>
+        <label><input type="checkbox" id="semantic-plan-overhead"> Include overhead regions</label>
+        <label><input type="checkbox" id="semantic-plan-floor" checked> Observed floor / floor patches</label>
+        <label><input type="checkbox" id="semantic-plan-pipes" checked> Fitted pipe geometry</label>
+        <p id="semantic-plan-context" class="layer-counts"></p>
         <ul class="semantic-plan-legend" aria-label="Plan legend">
           <li><i style="background:#b9d6f4"></i>Valves</li><li><i style="background:#a7ded2"></i>Pumps and motors</li>
           <li><i style="background:#f3ce9d"></i>Tanks and vessels</li><li><i style="background:#d7c8ef"></i>Instruments</li>
           <li><i style="background:#d2dbdf"></i>Fixtures and structure</li><li><i style="background:#eee5f4"></i>Movable objects</li>
-          <li><i style="background:#dcebe5"></i>Reachable floor</li><li><i style="background:#247384"></i>Robot and route</li>
+          <li data-unreviewed-legend><i style="background:#d9e2e4"></i>Unreviewed envelopes</li><li data-floor-legend><i style="background:#e2dfca"></i>Observed floor samples</li>
+          <li><i style="background:#dcebe5"></i>Walkable simulation grid</li><li><i style="background:#247384"></i>Robot and route</li>
         </ul>
-        <p>IFC uses fitted pipes and vessel bodies, equipment envelopes, and approximate walls and slab.</p>
+        <p id="semantic-plan-evidence-note">Observed floor is scan evidence, not a claim that every floor point is walkable. Grey envelopes have unverified labels and boundaries.</p>
+        <p id="semantic-plan-export-note">Approximate IFC includes region envelopes, unreviewed pipe fits, and assumed walls/slab. Floor sample counts are included as evidence, not a reconstructed surface.</p>
       </aside>
     </div>
   </dialog>

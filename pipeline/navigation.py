@@ -336,7 +336,7 @@ def attach_proximity_timeline(waypoints: list[dict], assets: list[dict], radius:
                 "mapped": a["mapped"],
                 "distance_m": round(d, 2),
             })
-        nearby.sort(key=lambda n: (0 if n["is_target"] else (1 if n["condition_state"] != "healthy" else (2 if n["mapped"] else 3)), n["distance_m"]))
+        nearby.sort(key=lambda n: (0 if n["is_target"] else (1 if n["mapped"] and n["condition_state"] != "healthy" else (2 if n["mapped"] else 3)), n["distance_m"]))
         wp["nearby_assets"] = nearby
         wp["nearby_count"] = len(idxs)
     return waypoints

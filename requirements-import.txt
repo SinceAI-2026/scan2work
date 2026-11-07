@@ -1,0 +1,7 @@
+# Offline import, viewer server and exact object library export.
+numpy
+scipy
+scikit-learn
+pandas
+openpyxl
+pillow

@@ -19,16 +19,17 @@ async function serverEdits(action) {
   return result.removed;
 }
 
-export function roomEditStore(canEdit) {
+export function roomEditStore(canEdit, datasetId = "") {
+  const storageKey = datasetId ? `${STORAGE_KEY}:${encodeURIComponent(datasetId)}` : STORAGE_KEY;
   let cache = {};
-  try { cache = JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}; } catch {}
+  try { cache = JSON.parse(localStorage.getItem(storageKey)) || {}; } catch {}
   const valid = list => Array.isArray(list) ? list.filter(edit=>canEdit(edit?.id)) : [];
   let removed = valid(cache.removed);
   let pending = valid(cache.pending);
   let offline = false;
   const snapshot = () => ({removed,offline});
   const save = () => {
-    try { localStorage.setItem(STORAGE_KEY,JSON.stringify({removed,pending})); } catch {}
+    try { localStorage.setItem(storageKey,JSON.stringify({removed,pending})); } catch {}
   };
   async function sync() {
     let server = await serverEdits();

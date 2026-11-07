@@ -101,6 +101,12 @@ const nav = twin.navigation, m = nav.grid_meta;
 let checked = 0;
 // Re-dispatch from the middle of each real route; check every interpolated segment.
 for (const destination of Object.values(nav.routes_by_asset)) {
+  if (destination.status === 'unavailable') {
+    assert.equal(destination.validated, false);
+    assert.equal(destination.waypoints.length, 0);
+    assert.ok(destination.reason, 'Unavailable destinations must explain the missing floor-supported path.');
+    continue;
+  }
   const start = sampleRoute(destination, destination.duration_s / 2);
   const planned = planFromPosition(nav,start,destination);
   assert.equal(planned.waypoints[0].position[0],start.x);
@@ -116,7 +122,7 @@ for (const destination of Object.values(nav.routes_by_asset)) {
   checked++;
 }
 const roomStart=sampleRoute(nav.primary_route,0);
-const destinations=Object.values(nav.routes_by_asset);
+const destinations=Object.values(nav.routes_by_asset).filter(route=>route.waypoints.length && route.validated);
 const playbackDestinations=[0,Math.floor(destinations.length/3),Math.floor(destinations.length*2/3),destinations.length-1]
   .map(index=>planFromPosition(nav,roomStart,destinations[index]))
   .filter(planned=>planned.duration_s>.2);
