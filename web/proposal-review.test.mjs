@@ -1,11 +1,23 @@
 import {test} from "node:test";
 import assert from "node:assert/strict";
 import {scenePolicy} from "./imported-assets.mjs";
-import {validateProposalCatalog,findProposals,proposalVisibilityText} from "./proposal-review-data.mjs";
+import {validateProposalCatalog,findProposals,proposalVisibilityText,proposalFullViewUrl} from "./proposal-review-data.mjs";
 import {loadRoomPlacements,saveRoomPlacements} from "./room-placement.mjs";
 
 const region={id:"candidate-1",label:"Pipe fragment",class:"unclassified",center:[1,1,1],size:[.1,1,.1],yaw:0,
   visible_source_rows:25,total_source_rows:40,original_matches:[{id:"OBJ-206",tag:"CV-003",shared_rows:12}]};
+
+test("absent optional extraction does not produce a guessed localhost link",()=>{
+  for(const value of [null,undefined,"","   ",false])assert.equal(proposalFullViewUrl(value,"candidate-1","http://localhost:9000/"),null);
+  for(const value of ["javascript:alert(1)","data:text/plain,test","file:///tmp/model"])
+    assert.equal(proposalFullViewUrl(value,"candidate-1","http://localhost:9000/"),null);
+});
+test("installed extraction uses its configured port or relative path and encodes selection",()=>{
+  assert.equal(proposalFullViewUrl("http://127.0.0.1:9200/","candidate / 1","http://localhost:9000/").href,
+    "http://127.0.0.1:9200/#apart=candidate%20%2F%201");
+  assert.equal(proposalFullViewUrl("../extraction/","candidate-1","https://example.test/demo/").href,
+    "https://example.test/extraction/#apart=candidate-1");
+});
 
 test("baseline semantics and exact source membership are independent",()=>{
   const baseline={scene:{dataset_kind:"wael-original-baseline",membership_mode:"exact-source-rows"},assets:[{id:"OBJ-206",class:"control_valve"}]};

@@ -21,3 +21,14 @@ export function findProposals(regions,query) {
 export function proposalVisibilityText(region) {
   return `${region.visible_source_rows.toLocaleString()} / ${region.total_source_rows.toLocaleString()} source Gaussians visible in this room render`;
 }
+
+// The optional full dataset is installed separately; never guess a localhost port.
+export function proposalFullViewUrl(configuredUrl,regionId,baseUrl) {
+  if(typeof configuredUrl!=="string" || !configuredUrl.trim())return null;
+  try {
+    const url=new URL(configuredUrl,baseUrl);
+    if(!["http:","https:"].includes(url.protocol))return null;
+    url.hash=`apart=${encodeURIComponent(regionId)}`;
+    return url;
+  }catch{return null;}
+}

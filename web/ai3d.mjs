@@ -5,19 +5,22 @@
 // repos tagged the Excel devices onto the scan independently). A pump + motor unit is one model, drawn once.
 // Loaded one by one after the splat; ?ai3d=0 turns it off. The models use their own lit glTF materials under this
 // scene's lights. Hidden while Wael's Take apart is open and in the BIM layer; they follow the explode slider and room
-// moves of their main object, and leave with it.
+// explode view. Edited or removed assemblies fall back to their exact scan objects.
 // Take apart ported from Mikael Lehtonen's scan2service (web/parts.js) via SinceAI-2026/mvp; UX after Rasmus Mäkinen's
 // pump explode. AI 3D after scan2service's room view and the MVP's src/s2s/room.ts.
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { explodeOffset } from "./explode.mjs";
 import { RAW_FLOOR_Y } from "./parts-data.mjs";
+import { displayAssetTag } from "./asset-presentation.mjs";
+import { canShowGeneratedModel, generatedCoverage } from "./generated-model-policy.mjs";
 
 const DATA = "./data/take_apart/";
 
 /** ctx: { scene, renderer, state, uniforms(), hudElements, roomAsset(a), removed(id), otherOpen(), ready (index promise) } */
 export function createAi3d(ctx) {
   const drawn = new Map(); // model file -> { node, owners (our objects inside it), main (the one it follows) }
+  let covered = new Set();
   const skipped = {};      // model file -> why it is not drawn
   const held = new Set();  // object ids whose model steps aside (the in-room Take apart stands there)
   const root = new THREE.Group();
@@ -50,7 +53,7 @@ export function createAi3d(ctx) {
         let owners = ctx.state.twin.assets.filter(a => box.containsPoint(c.fromArray(a.center)));
         if (!owners.length) {
           box.getCenter(c);
-          owners = ctx.state.twin.assets.filter(a => [0, 1, 2].every(k => c.getComponent(k) >= a.aabb_min[k] && c.getComponent(k) <= a.aabb_max[k]))
+          owners = ctx.state.twin.assets.filter(a => [0, 1, 2].every(k => c.getComponent(k) >= (a.aabb_min ?? a.bbox_min)?.[k] && c.getComponent(k) <= (a.aabb_max ?? a.bbox_max)?.[k]))
             .sort((a, b) => a.size[0] * a.size[1] * a.size[2] - b.size[0] * b.size[1] * b.size[2]).slice(0, 1);
         }
         if (!owners.length) { // nothing of ours there: the scan would show through the model
@@ -59,14 +62,9 @@ export function createAi3d(ctx) {
           continue;
         }
         const main = owners.find(a => a.mapped) ?? owners[0];
-        node.userData = { name, label: e.label, owners: owners.map(a => a.tag || a.id) };
+        node.userData = { name, label: e.label, owners: owners.map(displayAssetTag) };
         root.add(node);
         drawn.set(name, { node, owners, main });
-        for (const a of owners) {
-          cover(a, true);
-          const el = ctx.hudElements.get(a.id);
-          if (el) { el.classList.add("ai3d"); el._size = null; }
-        }
       } catch (err) {
         skipped[name] = `not loaded: ${err.message}`;
       }
@@ -89,10 +87,18 @@ export function createAi3d(ctx) {
     const u = ctx.uniforms();
     if (u?.uHasCovered) u.uHasCovered.value = show && drawn.size ? 1 : 0;
     for (const { node, owners, main } of drawn.values()) {
-      node.visible = !owners.some(a => held.has(a.id)) && !ctx.removed(main.id);
+      node.visible = canShowGeneratedModel(owners, { held, removed: ctx.removed, roomAsset: ctx.roomAsset });
       const live = ctx.roomAsset(main);
       node.position.set(live.center[0] - main.center[0], live.center[1] - main.center[1], live.center[2] - main.center[2]).add(explodeOffset(live));
     }
+    const next = generatedCoverage([...drawn.values()].map(m => ({ owners: m.owners, visible: m.node.visible })), show);
+    for (const id of new Set([...covered, ...next])) {
+      if (covered.has(id) === next.has(id)) continue;
+      cover({ id }, next.has(id));
+      const el = ctx.hudElements.get(id);
+      if (el) { el.classList.toggle("ai3d", next.has(id)); el._size = null; }
+    }
+    covered = next;
   }
 
   window.__ai3d = { drawn: () => [...drawn.values()].map(d => `${d.node.userData.name}: ${d.node.userData.owners.join(" + ")}`), skipped: () => ({ ...skipped }) }; // checks

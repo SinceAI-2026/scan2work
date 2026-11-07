@@ -4,6 +4,69 @@ Scan2Work is a local industrial inspection demonstrator built from `Equipment Ro
 
 The workbook supplies a synthetic fault scenario. The demonstration does not establish that the real filmed equipment is faulty.
 
+## Install the prepared Scan2Work demo
+
+The current prepared release is **0.1.1**. It contains the restored **504-object room**,
+30 synthetic workbook bindings, source photos, the AR video and exact-source
+object exports. The optional **1,933-region extraction view** is a separate
+segmentation for review; it does not replace the original objects or establish
+recognition accuracy. Release 0.1.1 includes upstream PR #3’s five split assemblies
+and 18 AI-generated model files, the Scan2Work branding, and the optional Arduino
+module from PR #9. These model files improve presentation; they are illustrative
+geometry with unverified dimensions, not additional measured reconstruction.
+
+Use **Python 3.12** and a WebGL 2 browser on macOS or Linux. The installer creates
+an isolated environment and installs pinned packages. Running the prepared demo
+needs no GPU, API key, Node.js or model download. The first installation needs
+internet access for the archives and Python packages.
+
+[Open the browser demo](https://scan2work.app/) or
+[download release 0.1.1](https://assets.scan2work.app/releases/0.1.1/index.html).
+Install the complete local version with:
+
+```sh
+curl -fsSLo install-scan2work.sh https://assets.scan2work.app/releases/0.1.1/install.sh
+bash install-scan2work.sh --install-dir ~/scan2work-0.1.1 --with-extraction --launch
+```
+
+Omit `--with-extraction` for the smaller room-only installation. To install from a
+copied release folder, run its `install.py` directly:
+
+```sh
+python3.12 install.py --manifest manifest.json --install-dir ~/scan2work-0.1.1 --with-extraction --launch
+```
+
+The room opens at `http://127.0.0.1:8766/`; the optional complete extraction view
+runs at `http://127.0.0.1:8768/`. Stop both with Ctrl+C. Restart and check later:
+
+```sh
+python3.12 ~/scan2work-0.1.1/start.py --open
+python3.12 ~/scan2work-0.1.1/start.py --doctor
+```
+
+The hosted preview keeps shared server state read-only: visitors can browse,
+navigate, inspect, view AR/BIM, download existing objects and simulate room edits
+in their own browser. The local installation also saves technician jobs, scene
+changes and new exact-source object-library exports. New exact exports preserve
+the observed Gaussian rows; they do not run photo refinement or generate a new
+GLB mesh. Separately configured voice and authoring models are outside the offline
+release. Both modes keep synthetic data and unverified physical scale explicit.
+
+Releases are immutable. Install updates into a **new directory**, verify them,
+then migrate work only after checking dataset identity. Existing installations
+are never overwritten. Teammates can reuse the code under `app/` independently:
+
+- [Installation and troubleshooting](docs/installation.md)
+- [Reusable modules and dependencies](docs/dependencies.md)
+- [Asset import and original-data preservation](docs/asset-import-guide.md)
+- [Hosted preview operation](docs/public-demo.md) and [R2 publishing](docs/cloudflare-r2.md)
+- [Current 0.1.1 verification](docs/release-0.1.1.md), [0.1.0 publication](docs/release-0.1.0.md), and [historical local pilot](docs/release-verification.md)
+
+The original development workflow and evaluation results below remain available.
+They describe the upstream generated twin and configured integrations, not a new
+evaluation of the optional 1,933 proposals or a guarantee that every authoring
+feature is enabled in the prepared offline release.
+
 ## Strengths
 
 - **The scan becomes a labelled twin.** 504 framed objects in 24 classes come out of the Gaussian-splat scan. Every one of the 30 workbook assets is bound to its own 3D object, and the AI labels are checked against a hand-labelled sample.
@@ -136,16 +199,16 @@ Select a pump or motor that stands inside one of the five split units and choose
 
 Away from the pump, the robot walks there first. The view glides into first person at the robot and turns to the unit, and the unit's parts ease apart where it stands. The room stays in view behind them, dimmed and blurred (3 px), and the objects' own scan splats are hidden under the model. Other frames, labels and the navigation panels are hidden until **Done** or **Esc**.
 
-- Each part has a callout with its name and size in mm. It also shows the tag of the object that the part holds, with that object's synthetic fault.
+- Each part has a callout with its name and an unverified model size in mm. Only objects with a current workbook binding show a device tag and synthetic fault; unmatched regions show their scene label without borrowed telemetry.
 - The dock on the right has **Explode**, **Reassemble**, **Reset** and **Done**, a slider, the fault list, a button per part and the selected part's detail.
 - Click a part (or its callout or button) to select it. The eye eases about 30 % toward it.
 - The fault part is tinted and outlined in red. Another object's fault in the same unit is shown in amber.
 
-The models are AI-generated (Higgsfield) units, split into parts by geometry rules. scan2service fitted them in raw PLY coordinates of the same `Equipment Room.ply`. The viewer only levels them, `(x, 1.185 − y, −z)` as in `pipeline/ingest.py`, so each unit stands exactly where it was fitted. Objects are matched to a unit by **position**: an object belongs to the unit when its box centre lies inside the unit's box. Tags are never used for this, because the two repos tagged the Excel devices onto the scan independently. The faults come from the matched objects' own Excel records, on the part whose fault codes hold the issue, preferring the part the object stands in. For example, M-005's current imbalance is shown on the motor and P-005's fouling on the pump housing. An issue that no part of the model carries is still listed in the dock, such as P-001's misalignment on a circulator with no coupling.
+The models are AI-generated (Higgsfield) units, split into parts by geometry rules. scan2service fitted them in raw PLY coordinates of the same `Equipment Room.ply`. The viewer only levels them, `(x, 1.185 − y, −z)` as in `pipeline/ingest.py`, so each unit stands exactly where it was fitted. Objects are matched to a unit by **position**: an object belongs to the unit when its box centre lies inside the unit's box. Tags are never used for this, because the two repos tagged the Excel devices onto the scan independently. The faults come from the matched objects' own Excel records, on the part whose fault codes hold the issue, preferring the part the object stands in. For example, M-005's current imbalance is shown on the motor and P-005's fouling on the pump housing. An issue that no part of the model carries is still listed in the dock, if a current workbook binding has an issue that the split geometry cannot represent.
 
 ### AI 3D models in the room
 
-Every Higgsfield unit that scan2service shows in its room is drawn where it was fitted, unshifted: 15 models from its own index (`equip_v1/assets_export/hf3d/index.json`), including the big vessel, cabinet and trolley, plus 3 newer ones from the MVP's `index_new.json`: the Grundfos twin pump unit (on P-002 here) and the valves A257 (on CV-007) and A352 (on M-002). The `_r2` redo is used where there is one. Units that scan2service hides, or whose silhouette fit against the photos is below 0.5, are skipped, and the import lists them with the reason. Each model sits on this viewer's objects whose box centres lie inside it. A small model with none sits on the smallest box that holds its centre. A model with no object of this viewer under it is skipped, so the scan never shows through a model (B165 and B169 here; `window.__ai3d.skipped()` lists them). The room models carry 1024 px copies of their textures, written by the import, while the split units for Take apart keep the full 2048 px. That is about 70 MB of video memory for the 13 room models instead of about 290 MB. Their scan splats are hidden under the model, and their room labels get an **AI 3D** badge. A pump and motor unit is one model, drawn once. The models load one by one after the splat. They follow the explode slider and room moves of their main object, and leave with it. They are hidden in the BIM layer and while an object is taken apart with Wael's take-apart. `?ai3d=0` turns them off. The code is in `web/ai3d.mjs`.
+Every Higgsfield unit that scan2service shows in its room is drawn where it was fitted, unshifted: 15 models from its own index (`equip_v1/assets_export/hf3d/index.json`), including the big vessel, cabinet and trolley, plus 3 newer ones from the MVP's `index_new.json`: the Grundfos twin pump unit (on P-002 here) and the valves A257 (on CV-007) and A352 (on M-002). The `_r2` redo is used where there is one. Units that scan2service hides, or whose silhouette fit against the photos is below 0.5, are skipped, and the import lists them with the reason. Each model sits on this viewer's objects whose box centres lie inside it. A small model with none sits on the smallest box that holds its centre. A model with no object of this viewer under it is skipped, so the scan never shows through a model (B165 and B169 here; `window.__ai3d.skipped()` lists them). The room models carry 1024 px copies of their textures, written by the import, while the split units for Take apart keep the full 2048 px. That is about 70 MB of video memory for the 13 room models instead of about 290 MB. Their scan splats are hidden under the model, and their room labels get an **AI 3D** badge. A pump and motor unit is one model, drawn once. The models load one by one after the splat. They follow the scene explode slider. Removing, rotating or moving any associated object falls back to the source scan, so the illustrative assembly cannot hide or resurrect edited objects. They are hidden in the BIM layer and while an object is taken apart with Wael's take-apart. `?ai3d=0` turns them off. The code is in `web/ai3d.mjs`.
 
 The assets ship in the repo under `web/data/take_apart/`, so no import step is needed: `index.json`, the split units in `parts/` (2048 px textures) and the room models in `ai3d/` (1024 px copies), about 44 MB in 24 files. The rest of `web/data/` stays git-ignored. `scripts/import_take_apart.py` only regenerates them, from the MVP's s2s parts index, scan2service's hf3d index and the MVP's `index_new.json`:
 
@@ -181,7 +244,7 @@ ngrok http 8767                                                      # public HT
 .venv/bin/python -m scripts.build_vale_kb                            # the agent's knowledge base, web/data/vale_kb/*.md
 ```
 
-ElevenLabs calls MCP servers from its cloud, so the agent needs a public HTTPS tunnel to port 8767. ngrok works; ElevenLabs could not reach a Cloudflare quick tunnel in testing. Requests through a tunnel must carry `Authorization: Bearer <FIELD_ATLAS_MCP_TOKEN>`. Store the token in ElevenLabs as a workspace secret, with no trailing newline. Point the tunnel at `mcp_server.py` only, never at `server.py`, whose routes have no authentication.
+ElevenLabs calls MCP servers from its cloud, so the agent needs a public HTTPS tunnel to port 8767. ngrok works; ElevenLabs could not reach a Cloudflare quick tunnel in testing. Requests through a tunnel must carry `Authorization: Bearer <FIELD_ATLAS_MCP_TOKEN>`. Store the token in ElevenLabs as a workspace secret, with no trailing newline. For this voice integration, point the tunnel at `mcp_server.py` only; the normal writable `server.py` routes have no authentication. The separate [public preview mode](docs/public-demo.md) disables shared writes and voice, and must use an isolated prepared dataset.
 
 ## Verify changes
 
@@ -229,7 +292,7 @@ The objects can come from two segmenters. The Excel mapping, navigation, diagnos
 | --- | --- | --- |
 | Segmentation | Colour and geometry rules with DBSCAN (`pipeline/perception.py`) | SAM 2.1 masks on the walkthrough video, stitched into 3D objects by view consensus (`local_models/`) |
 | Naming | Gemini 3.8 Flash on real photos, or the OpenAI Decisions API, or their cached answers | SigLIP 2 zero-shot, DINOv2, OWLv2 and a linear probe |
-| Needs an API key or internet | Yes, for a fresh labelling run (the cache replays earlier answers) | No. Open weights from Hugging Face, run on this machine (CUDA, Apple GPU or CPU) |
+| Needs an API key or internet | Yes, for a fresh labelling run (the cache replays earlier answers) | No API key for segmentation. Initial Hugging Face model downloads need internet; cached weights run locally (CUDA, Apple GPU or CPU) |
 | Plant images leave the machine | Yes, when labelling | No |
 | Objects in the current build | 467 | 485 (415 segmented, 70 pipe cylinders) |
 | Label accuracy on the 39-object sample | 85% | 31% |
@@ -246,7 +309,7 @@ Run the twin on the local objects (results committed in `local_models/data/pipel
 VALMET_SEGMENTER=local bash scripts/check.sh
 ```
 
-Point `VALMET_LOCAL_OBJECTS` at another run's `objects.json` and `objects.npz` folder to use it. To re-run the segmentation itself, follow [local_models/README.md](local_models/README.md). It needs the PyTorch stack in `local_models/requirements.txt`.
+Point `VALMET_LOCAL_OBJECTS` at another run's `objects.json` and `objects.npz` folder to use it. To re-run the segmentation itself, follow [local_models/README.md](local_models/README.md). It needs the PyTorch stack in `local_models/requirements.txt`, an initial model download and a full source checkout: `local_models/` and model weights are not included in the prepared code archive. `VALMET_SEGMENTER=local` changes segmentation; the surrounding rebuild still includes diagnostics/retrieval and can invoke configured services. It is not the offline prepared-demo launch command.
 
 ## Rebuild scene data
 

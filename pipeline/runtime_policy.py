@@ -13,6 +13,11 @@ from pathlib import Path
 def configure_server_runtime(root: Path, environ=None) -> bool:
     """Return offline mode, setting its flag only for an explicitly offline scene."""
     env = os.environ if environ is None else environ
+    # A hosted preview must never discover credentials or initialize online
+    # services, even if the host inherited an explicit online setting.
+    if env.get("VALMET_PUBLIC_DEMO") == "1":
+        env["VALMET_OFFLINE"] = "1"
+        return True
     if env.get("VALMET_OFFLINE") == "1":
         return True
     data = Path(env.get("VALMET_DATA_DIR", Path(root) / "web" / "data")).expanduser()

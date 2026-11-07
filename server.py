@@ -8,6 +8,7 @@ from __future__ import annotations
 import io
 import json
 import mimetypes
+import os
 import re
 import threading
 import time
@@ -25,6 +26,9 @@ from pipeline import asset_export, decisions_client, field_service, retrieval, c
 from pipeline.asset_records import asset_for_api, route_for_api, UNMAPPED_NOTICE
 
 WEB_DIR = ROOT / "web"
+PUBLIC_DEMO = os.environ.get("VALMET_PUBLIC_DEMO") == "1"
+PUBLIC_BODY_LIMIT = 16 * 1024
+_PUBLIC_WORK_SLOTS = threading.BoundedSemaphore(2)
 DATA_PATH = C.OUT_DIR / "digital_twin.json"
 EDITS_PATH = C.OUT_DIR / "scene_edits.json"   # isolated by the active dataset directory
 _EDITS_LOCK = threading.Lock()
@@ -60,6 +64,34 @@ def saving_status() -> dict:
                 for oid, j in SAVING.items()}
 RETRIEVER = None
 
+
+class PreviewFieldService(field_service.FieldService):
+    """Read the packaged scenario without loading any operator's job history."""
+    def _read(self):
+        return {"jobs": {}}
+
+    def _write(self, log):
+        raise RuntimeError("The public demo does not save field jobs")
+
+
+def public_install_url():
+    value = os.environ.get("VALMET_INSTALL_URL", "").strip()
+    url = urlparse(value)
+    return value if url.scheme in {"http", "https"} and url.netloc and not url.username and not url.password else None
+
+
+def served_manifest():
+    """Runtime settings are a response projection, never a dataset rewrite."""
+    manifest = dict(TWIN_DATA)
+    if 'VALMET_PROPOSAL_VIEW_URL' in os.environ and isinstance(manifest.get('proposal_review'), dict):
+        manifest['proposal_review'] = {**manifest['proposal_review'],
+            'full_view_url': os.environ['VALMET_PROPOSAL_VIEW_URL'] or None}
+    if PUBLIC_DEMO:
+        manifest['runtime'] = {**(manifest.get('runtime') or {}), 'public_demo': True,
+            'offline': True, 'external_models_enabled': False, 'shared_writes_enabled': False,
+            'install_url': public_install_url()}
+    return manifest
+
 INTENT_KEYWORDS = {
     "root_cause": ["why", "root", "cause", "fail", "deviat", "issue", "fault", "diagnos"],
     "telemetry": ["telem", "trend", "pressure", "setpoint", "stiction", "vibrat", "temp", "sensor", "data"],
@@ -84,7 +116,7 @@ def classify_intent(question: str) -> tuple[str, str]:
             ],
         }],
         timeout=15,
-    ) if question.strip() else None
+    ) if question.strip() and not PUBLIC_DEMO else None
     if ans and ans.get("intent", {}).get("choice"):
         decisions_client.save_cache()
         return ans["intent"]["choice"], "decisions_api"
@@ -100,14 +132,14 @@ FIELD_ACTIONS = {"start_job", "complete_check", "add_note", "close_job"}
 
 def load_data():
     global TWIN_DATA, ASSETS_BY_ID, ASSETS_BY_OBJ, RETRIEVER, FIELD
-    RETRIEVER = retrieval.load_saved(try_gemma=not C.OFFLINE)
+    RETRIEVER = retrieval.load_saved(try_gemma=not (C.OFFLINE or PUBLIC_DEMO))
     with open(DATA_PATH, "r", encoding="utf-8") as f:
         TWIN_DATA = json.load(f)
     ASSETS_BY_ID = {a["asset_id"]: a for a in TWIN_DATA["assets"]}
     ASSETS_BY_OBJ = {a["id"]: a for a in TWIN_DATA["assets"]}
     if len(ASSETS_BY_ID) != len(TWIN_DATA["assets"]) or len(ASSETS_BY_OBJ) != len(TWIN_DATA["assets"]):
         raise ValueError("Duplicate object or asset IDs in the imported scene")
-    FIELD = field_service.FieldService(TWIN_DATA, RETRIEVER)
+    FIELD = (PreviewFieldService if PUBLIC_DEMO else field_service.FieldService)(TWIN_DATA, RETRIEVER)
 
 
 
@@ -274,6 +306,48 @@ class TwinRequestHandler(SimpleHTTPRequestHandler):
     def log_message(self, fmt, *args):
         pass
 
+    def setup(self):
+        super().setup()
+        if PUBLIC_DEMO:
+            self.connection.settimeout(15)
+
+    def list_directory(self, path):
+        if PUBLIC_DEMO:
+            self.send_error(403, "Directory listings are unavailable in the public demo")
+            return None
+        return super().list_directory(path)
+
+    def _public_static_allowed(self):
+        """Do not publish shared operator state, hidden files or symlink escapes."""
+        file = Path(self.translate_path(self.path)).resolve()
+        roots = (WEB_DIR.resolve(), C.OUT_DIR.resolve())
+        root = next((root for root in roots if file == root or root in file.parents), None)
+        if root is None:
+            return False
+        relative = file.relative_to(root)
+        return not any(part.startswith('.') for part in relative.parts) and not (
+            file.name in {'field_log.json', 'scene_edits.json', 'decisions_cache.json', 'secrets.env'}
+            or file.name.endswith(('.lock', '.tmp', '.env')))
+
+    def send_head(self):
+        if PUBLIC_DEMO:
+            if not self._public_static_allowed():
+                self.send_error(404, "File unavailable in the public demo")
+                return None
+            if Path(self.translate_path(self.path)).resolve() == DATA_PATH.resolve():
+                raw = json.dumps(served_manifest()).encode('utf-8')
+                self.send_response(200)
+                self.send_header('Content-Type', 'application/json; charset=utf-8')
+                self.send_header('Content-Length', str(len(raw)))
+                self.end_headers()
+                return io.BytesIO(raw)
+        return super().send_head()
+
+    def _public_read_only(self):
+        self.close_connection = True
+        return self._send_json({'error': 'This hosted demo does not save shared changes. Install the demo to save jobs and library objects.',
+            'code': 'public_demo_read_only', 'persisted': False, 'install_url': public_install_url()}, 403)
+
     def end_headers(self):
         self.send_header("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
         super().end_headers()
@@ -327,6 +401,10 @@ class TwinRequestHandler(SimpleHTTPRequestHandler):
 
     def _live(self, method: str, path: str, body: dict):
         """The Arduino fault panel (with Tiger Data and Snowflake): all of it lives in live/, imported on first use."""
+        if PUBLIC_DEMO:
+            # Even a state GET can log a completed board task. Do not import the
+            # optional store module (or discover its credentials) in this mode.
+            return self._public_read_only()
         try:
             from live import board as live_board
         except Exception as err:  # noqa: BLE001 - the panel is optional; the twin works without it
@@ -341,17 +419,22 @@ class TwinRequestHandler(SimpleHTTPRequestHandler):
             return self._live("GET", path, {})
         qs = parse_qs(parsed.query)
 
+        if path == '/data/digital_twin.json' and (PUBLIC_DEMO or 'VALMET_PROPOSAL_VIEW_URL' in os.environ):
+            return self._send_json(served_manifest())
+
         if path == "/api/scene/edits":
-            return self._send_json(read_edits())
+            return self._send_json({'removed': []} if PUBLIC_DEMO else read_edits())
 
         if path.startswith("/data/") and path.lower().endswith((".mp4", ".webm")):
+            if PUBLIC_DEMO and not self._public_static_allowed():
+                return self.send_error(404, "Media unavailable in the public demo")
             media = Path(self.translate_path(path)).resolve()
             if C.OUT_DIR.resolve() in media.parents and media.is_file():
                 return self._send_media(media)
             return self.send_error(404, "Media not found in the active dataset")
 
         if path == "/api/field-log":  # the technician's job log, written by mcp_server.py
-            return self._send_json(field_service.read_log())
+            return self._send_json({'jobs': {}} if PUBLIC_DEMO else field_service.read_log())
 
         if path == "/api/field-jobs":  # the viewer's inspection queue: needs inspection / done, with checks and notes
             return self._send_json(FIELD.inspection_queue())
@@ -396,13 +479,19 @@ class TwinRequestHandler(SimpleHTTPRequestHandler):
             return self._send_json(route_for_api(route))
 
         if path == "/api/work-orders":
-            return self._send_json({"drafts": WORK_ORDER_DRAFTS})
+            return self._send_json({"drafts": [] if PUBLIC_DEMO else WORK_ORDER_DRAFTS})
 
         if path == "/api/library":
-            return self._send_json({"saved": asset_export.read_library(), "saving": saving_status()})
+            return self._send_json({"saved": asset_export.read_library(), "saving": {} if PUBLIC_DEMO else saving_status()})
 
         if path == "/api/library/export.zip":
-            raw = library_zip(asset_export.read_library())
+            if PUBLIC_DEMO and not _PUBLIC_WORK_SLOTS.acquire(blocking=False):
+                return self._send_json({'error': 'The demo is busy; please try again shortly.'}, 429)
+            try:
+                raw = library_zip(asset_export.read_library())
+            finally:
+                if PUBLIC_DEMO:
+                    _PUBLIC_WORK_SLOTS.release()
             self.send_response(200)
             self.send_header("Content-Type", "application/zip")
             self.send_header("Content-Disposition", 'attachment; filename="scan2work-library.zip"')
@@ -415,8 +504,29 @@ class TwinRequestHandler(SimpleHTTPRequestHandler):
 
     def do_POST(self):
         parsed = urlparse(self.path)
-        length = int(self.headers.get("Content-Length", "0"))
-        body = json.loads(self.rfile.read(length).decode("utf-8") or "{}") if length > 0 else {}
+        if PUBLIC_DEMO and parsed.path not in {'/api/copilot/diagnose', '/api/work-orders/draft'}:
+            return self._public_read_only()
+        try:
+            length = int(self.headers.get("Content-Length", "0"))
+            if length < 0 or self.headers.get('Transfer-Encoding'):
+                raise ValueError('Invalid body length')
+        except ValueError:
+            self.close_connection = True
+            return self._send_json({'error': 'A valid Content-Length is required'}, 400)
+        if length > (PUBLIC_BODY_LIMIT if PUBLIC_DEMO else 1024 * 1024):
+            self.close_connection = True
+            return self._send_json({'error': 'Request body is too large'}, 413)
+        try:
+            body = json.loads(self.rfile.read(length).decode("utf-8") or "{}")
+            if not isinstance(body, dict):
+                raise ValueError('Expected JSON object')
+            for key in ('asset_id', 'question', 'notes'):
+                if key in body and body[key] is not None and not isinstance(body[key], str):
+                    raise ValueError('Text fields must be strings')
+            if PUBLIC_DEMO and (len(body.get('question') or '') > 2000 or len(body.get('notes') or '') > 4000):
+                raise ValueError('Question or notes exceed the demo limit')
+        except (ValueError, UnicodeError):
+            return self._send_json({'error': 'Expected a JSON object with bounded text fields'}, 400)
 
         if parsed.path.startswith("/api/live/"):
             return self._live("POST", parsed.path, body)
@@ -424,7 +534,14 @@ class TwinRequestHandler(SimpleHTTPRequestHandler):
         if parsed.path == "/api/copilot/diagnose":
             aid = body.get("asset_id") or TWIN_DATA["target_asset_id"]
             q = body.get("question") or ""
-            return self._send_json(answer_copilot_question(aid, q))
+            if PUBLIC_DEMO and not _PUBLIC_WORK_SLOTS.acquire(blocking=False):
+                return self._send_json({'error': 'The demo is busy; please try again shortly.'}, 429)
+            try:
+                answer = answer_copilot_question(aid, q)
+            finally:
+                if PUBLIC_DEMO:
+                    _PUBLIC_WORK_SLOTS.release()
+            return self._send_json(answer)
 
         if parsed.path == "/api/work-orders/draft":
             aid = body.get("asset_id") or TWIN_DATA["target_asset_id"]
@@ -435,6 +552,10 @@ class TwinRequestHandler(SimpleHTTPRequestHandler):
                 return self._send_json({"error": "No grounded maintenance draft is available for this item"}, 422)
             draft = dict(asset["diagnostics"].get("work_order_draft") or {})
             draft["notes"] = body.get("notes", "Field verification dispatched via Autonomous Copilot.")
+            if PUBLIC_DEMO:
+                draft['status'] = 'DEMO_DRAFT'
+                return self._send_json({'ok': True, 'draft': draft, 'persisted': False,
+                                       'public_demo': True, 'total_drafts': 0})
             draft["status"] = "DRAFT_SUBMITTED"
             WORK_ORDER_DRAFTS.append(draft)
             return self._send_json({"ok": True, "draft": draft, "total_drafts": len(WORK_ORDER_DRAFTS)})
@@ -466,6 +587,8 @@ class TwinRequestHandler(SimpleHTTPRequestHandler):
         return self._send_json({"error": "Unknown endpoint"}, 404)
 
     def do_DELETE(self):
+        if PUBLIC_DEMO:
+            return self._public_read_only()
         parts = [p for p in urlparse(self.path).path.split("/") if p]
         if len(parts) == 3 and parts[:2] == ["api", "library"]:
             try:
@@ -481,8 +604,11 @@ def run_server(port: int = 8765, host: str = "127.0.0.1"):
     mimetypes.add_type("application/octet-stream", ".ply")
     mimetypes.add_type("model/gltf-binary", ".glb")
     load_data()
+    # --lan retains upstream's Arduino workflow. The installed launcher can
+    # override it; the explicitly public preview always sits behind its proxy.
+    host = '127.0.0.1' if PUBLIC_DEMO else os.environ.get('VALMET_BIND_HOST', host)
     server = ThreadingHTTPServer((host, port), TwinRequestHandler)
-    print(f"Valmet Industrial Metaverse Digital Twin server listening on http://{host}:{port}")
+    print(f"Valmet Industrial Metaverse Digital Twin server listening on http://{host}:{server.server_address[1]}", flush=True)
     server.serve_forever()
 
 

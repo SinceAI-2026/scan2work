@@ -3,9 +3,21 @@
 // /api/live/board once a second and hides itself if the server has no fault panel. Tells the rest of the viewer
 // through a "fault-panel" window event; nothing depends on it.
 
+import { canWriteSharedData, sharedWrite } from "./runtime-access.mjs";
+
 const API = "/api/live/board";
 const STATUS_TEXT = { fault: "Fault", in_progress: "Job open", done: "Done", clear: "All clear", waiting: "Waiting" };
 const CHIP = '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linejoin="round" stroke-width="1.5"><path d="M4 12c0-3.771 0-5.657 1.172-6.828S8.229 4 12 4s5.657 0 6.828 1.172S20 8.229 20 12s0 5.657-1.172 6.828S15.771 20 12 20s-5.657 0-6.828-1.172S4 15.771 4 12Z"/><path d="M7.732 16.268C8.464 17 9.643 17 12 17c.79 0 1.447 0 2-.028L16.972 14c.028-.553.028-1.21.028-2c0-2.357 0-3.536-.732-4.268S14.357 7 12 7s-3.536 0-4.268.732S7 9.643 7 12s0 3.536.732 4.268Z"/><path stroke-linecap="round" d="M8 2v2m8-2v2m-4-2v2M8 20v2m4-2v2m4-2v2m6-6h-2M4 8H2m2 8H2m2-4H2m20-4h-2m2 4h-2"/></g></svg>'; // hugeicons:chip
+
+async function mount() {
+  // The shared demo must never contact a connected physical board or its stores.
+  let runtime;
+  try {
+    const response = await fetch("./data/digital_twin.json");
+    if (!response.ok) return;
+    runtime = (await response.json()).runtime;
+  } catch { return; }
+  if (!canWriteSharedData(runtime)) return;
 
 const host = document.createElement("div");
 host.className = "fault-panel-switch";
@@ -96,8 +108,11 @@ async function poll() {
 card.addEventListener("click", async e => {
   const action = e.target.closest("button[data-action]")?.dataset.action;
   if (!action) return;
-  const res = await fetch(`${API}/action`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action, by: "viewer" }) });
+  const res = await sharedWrite(runtime, `${API}/action`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action, by: "viewer" }) });
   if (res.ok) render(await res.json());
 });
 
-poll();
+await poll();
+}
+
+mount();

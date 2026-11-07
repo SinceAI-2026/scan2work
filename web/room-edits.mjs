@@ -19,13 +19,14 @@ async function serverEdits(action) {
   return result.removed;
 }
 
-export function roomEditStore(canEdit, datasetId = "") {
-  const storageKey = datasetId ? `${STORAGE_KEY}:${encodeURIComponent(datasetId)}` : STORAGE_KEY;
+export function roomEditStore(canEdit, datasetId = "", {localOnly = false} = {}) {
+  // A public visitor's removals must never enter the installed app's pending server queue.
+  const storageKey = (datasetId ? `${STORAGE_KEY}:${encodeURIComponent(datasetId)}` : STORAGE_KEY) + (localOnly ? ":public-demo" : "");
   let cache = {};
   try { cache = JSON.parse(localStorage.getItem(storageKey)) || {}; } catch {}
   const valid = list => Array.isArray(list) ? list.filter(edit=>canEdit(edit?.id)) : [];
   let removed = valid(cache.removed);
-  let pending = valid(cache.pending);
+  let pending = localOnly ? [] : valid(cache.pending);
   let offline = false;
   const snapshot = () => ({removed,offline});
   const save = () => {
@@ -44,13 +45,19 @@ export function roomEditStore(canEdit, datasetId = "") {
   }
   return {
     async load() {
-      try { removed = await sync(); } catch { offline = true; }
+      if (!localOnly) try { removed = await sync(); } catch { offline = true; }
       save();
       return snapshot();
     },
     async edit(action, id, note="") {
       if (!canEdit(id)) throw new Error("This object cannot be removed.");
       const change = {action,id,note};
+      if (localOnly) {
+        removed = removed.filter(edit=>edit.id!==id);
+        if (action === "remove") removed.push({id,at:new Date().toISOString(),by:"browser",note});
+        save();
+        return snapshot();
+      }
       try {
         if (pending.length) removed = await sync();
         removed = valid(await serverEdits(change));

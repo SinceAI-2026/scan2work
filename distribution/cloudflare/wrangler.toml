@@ -1,0 +1,16 @@
+name = "scan2work"
+main = "proxy.mjs"
+compatibility_date = "2026-11-07"
+workers_dev = true
+routes = [{pattern = "scan2work.app", custom_domain = true}]
+
+[vars]
+ORIGIN = "http://v2202609409444511285.goodsrv.de:20229"
+
+[env.review]
+name = "scan2work-review"
+routes = [{pattern = "review.scan2work.app", custom_domain = true}]
+workers_dev = true
+
+[env.review.vars]
+ORIGIN = "http://v2202609409444511285.goodsrv.de:20250"

@@ -6,6 +6,8 @@
 // are: everything here matches by POSITION (an object's box centre inside a model's or part's raw box), never by tag.
 
 // pipeline/ingest.py level_scene: this scene = (x, 1.185 - y, -z) of the raw PLY (the same formula both ways)
+import { displayAssetTag } from "./asset-presentation.mjs";
+
 export const RAW_FLOOR_Y = 1.185;
 export const toRaw = p => [p[0], RAW_FLOOR_Y - p[1], -p[2]];
 export const inside = (box, p) => box && [0, 1, 2].every(k => p[k] >= box[0][k] && p[k] <= box[1][k]);
@@ -21,7 +23,7 @@ export function unitFor(doc, asset) {
 /** This viewer's objects inside the unit, with their own Excel issues (focus = the object taken apart). */
 export function unitDevices(unit, focus, assets) {
   return assets.filter(a => a.center && inside(unit.entry.box, toRaw(a.center)))
-    .map(a => ({ id: a.id, tag: a.tag || a.id, issue: a.issue_code, own: a.id === focus.id, at: toRaw(a.center) }));
+    .map(a => ({ id: a.id, tag: a.source_region_id ? a.id : displayAssetTag(a), issue: a.mapped === false || a.source_region_id ? null : a.issue_code, own: a.id === focus.id, at: toRaw(a.center) }));
 }
 
 /** Where each object's issue lives: a part whose fault_codes hold it, preferring the part the object stands in. */
@@ -44,9 +46,11 @@ export const unplacedFaults = (devices, faults) =>
 /** The object a part holds (its centre inside the part's box), for the part's callout. */
 export const deviceIn = (part, devices) => devices.find(d => inside(part.box, d.at)) ?? null;
 
-/** Floor distance (m) from a point to the device's box: "at the device" when small. */
+/** Floor distance (scan units) from a point to the device's box: "at the device" when small. */
 export function floorDistance(asset, x, z) {
-  const lo = asset.aabb_min, hi = asset.aabb_max;
+  const lo = asset.aabb_min ?? asset.bbox_min ?? asset.center?.map((v,k) => v - (asset.size?.[k] ?? 0) / 2);
+  const hi = asset.aabb_max ?? asset.bbox_max ?? asset.center?.map((v,k) => v + (asset.size?.[k] ?? 0) / 2);
+  if (!lo || !hi) return Infinity;
   return Math.hypot(Math.max(lo[0] - x, 0, x - hi[0]), Math.max(lo[2] - z, 0, z - hi[2]));
 }
 
@@ -67,5 +71,5 @@ export function spreadLabels(ys, gap, lo, hi) {
   return out.map(y => Math.max(lo, y));
 }
 
-export const sizeText = s => (s?.length === 3 ? `${s[0]} × ${s[1]} × ${s[2]} mm` : "");
+export const sizeText = s => (s?.length === 3 ? `${s[0]} × ${s[1]} × ${s[2]} mm (model)` : "");
 export const codeText = code => String(code).replace(/_/g, " ").toLowerCase();

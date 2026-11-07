@@ -11,6 +11,7 @@ import { indexRoomScan, fillRoomObject, traceRoomInstance, reviewedTrolleyParts 
 import { loadRoomPlacements, saveRoomPlacements, placedRoomAsset, roomBoundsOverlap, roomPlacementError, copyPlacedSplats } from "./room-placement.mjs";
 import { navigationAfterRoomEdits } from "./room-edit-navigation.mjs";
 import { roomEditStore } from "./room-edits.mjs";
+import { isPublicDemo, mountDemoBanner } from "./runtime-access.mjs";
 import { createGameMap, mapFrame, mapPoint, mapWorldPoint } from "./game-map.mjs";
 import { bindSemanticPlan } from "./semantic-plan.mjs";
 import { createBimRoom } from "./bim-room.mjs";
@@ -104,6 +105,7 @@ async function init() {
     fetch("./data/walk_poses.json").then(res => res.ok ? res.json() : null).catch(() => null),
   ]);
   state.twin = twin;
+  mountDemoBanner(twin.runtime);
   state.datasetId = twin.scene?.dataset_id || twin.runtime?.dataset_id || "";
   Object.assign(state,scenePolicy(twin));
   state.visualReviewFilter = state.imported ? "all" : "mapped";
@@ -158,21 +160,22 @@ async function init() {
   mountExplodeControls();
   takeApart = createTakeApart({
     camera, controls, state, uniforms: () => splatMaterial?.uniforms, setPreset: applyCameraPreset,
-    setLayer:setViewLayer, setCeilingCut, beforeOpen:()=>proposalReview?.close(),
+    setLayer:setViewLayer, setCeilingCut, beforeOpen:()=>{ proposalReview?.close(); roomParts?.close({immediate:true}); },
     container: document.getElementById("canvas-container"), scene, renderer,
   });
   roomParts = createRoomParts({
     scene, camera, renderer, container: document.getElementById("canvas-container"), state, boxMeshes,
     uniforms: () => splatMaterial?.uniforms, look: firstLook, eye: ROBOT_EYE_M, setPreset: applyCameraPreset,
-    robot: robotPosition, walkTo: dispatchRobotToAsset, closeOther: () => takeApart?.close(), setInspector: setInspectorOpen,
+    roomAsset, removed: id => removedIds.has(id),
+    robot: robotPosition, walkTo: dispatchRobotToAsset, closeOther: () => { takeApart?.close(); proposalReview?.close(); }, setInspector: setInspectorOpen,
     onStage: (asset, on) => ai3d?.hold(asset, on),
   });
   ai3d = createAi3d({
     scene, renderer, state, hudElements, uniforms: () => splatMaterial?.uniforms, ready: roomParts.ready,
-    roomAsset, removed: id => removedIds.has(id), otherOpen: () => !!takeApart?.isOpen,
+    roomAsset, removed: id => removedIds.has(id), otherOpen: () => !!takeApart?.isOpen || !!proposalReview?.isOpen,
   });
   buildRobotAvatar();
-  editStore = roomEditStore(id => canRemove(state.assetsByObj.get(id)),state.datasetId);
+  editStore = roomEditStore(id => canRemove(state.assetsByObj.get(id)),state.datasetId,{localOnly:isPublicDemo(twin.runtime)});
   roomPlacements = loadRoomPlacements(state.assetsByObj, canRemove,state.datasetId);
   const savedEdits = await editStore.load();
   applyRoomEdits(savedEdits, true);
@@ -185,7 +188,7 @@ async function init() {
     button:document.getElementById("btn-review-proposals"), uniforms:()=>splatMaterial.uniforms,
     count:sourceScan[4], texSize:splatMaterial.uniforms.uTexSize.value,
     onOpen:()=>{
-      takeApart.close(); setInspectorOpen(false);
+      takeApart.close(); roomParts?.close({immediate:true}); setInspectorOpen(false);
       if(state.journey.phase==="moving")applyJourneyEvent({type:"pause"});
       const previous={preset:state.cameraPreset,layer:state.viewLayer,cut:state.ceilingCut,
         explode:explodeState.amount,position:camera.position.clone(),target:controls.target.clone()};
@@ -800,6 +803,7 @@ function setViewLayer(layer) {
   state.viewLayer = layer;
   const bim = layer === "bim";
   if (bim && takeApart?.isOpen) takeApart.close();
+  if (bim) roomParts?.close({immediate:true});
   const aerialNow = isAerial();
   if (aerialNow) bimView?.setRoom(state.roomAssets,state.twin.scene.walls,state.twin.navigation.grid_meta);
   bimView?.setActive(bim);
@@ -1957,7 +1961,7 @@ function renderRoomEditControls() {
   count.textContent=`${state.twin.assets.length.toLocaleString()} ${state.imported ? "regions" : "objects"} · ${removedIds.size} removed${moved.length ? ` · ${moved.length} moved` : ''}`;
   document.getElementById('room-change-count').textContent=String(removedIds.size+moved.length);
   const status=document.getElementById('room-edit-status');
-  status.textContent=[editsOffline && 'edits not saved to server',moved.length && 'Moved positions are saved in this browser.'].filter(Boolean).join(' · ');
+  status.textContent=[editsOffline && 'edits not saved to server',isPublicDemo(state.twin.runtime) && removedIds.size && 'Removals are saved in this browser.',moved.length && 'Moved positions are saved in this browser.'].filter(Boolean).join(' · ');
   status.hidden=!status.textContent;
   const asset=state.selectedAsset;
   const removed=removedIds.has(asset.id);
@@ -2651,10 +2655,9 @@ async function bindArView() {
   const status = document.getElementById("ar-view-status");
   const targetTime = state.assetsById.get(state.twin.target_asset_id)?.photo_source?.video_t_s;
   try {
-    const listing = await fetch("./data/", {cache:"no-store"});
-    if (!listing.ok) return;
-    const directory = new DOMParser().parseFromString(await listing.text(), "text/html");
-    if (!directory.querySelector('a[href="overlay_walk.mp4"]')) return;
+    // The public host disables directory listings. Probe the known optional video without downloading it.
+    const clip = await fetch("./data/overlay_walk.mp4", {method:"HEAD",cache:"no-store"});
+    if (!clip.ok) return;
   } catch {
     return;
   }

@@ -1,0 +1,16 @@
+# Scan2Work prepared-data runtime; Python 3.12, macOS / Linux.
+# Exact versions from the tested environment, including transitive dependencies.
+# Install binary wheels only. No torch, CUDA, API SDK or model download required.
+numpy==2.5.4
+scipy==1.18.1
+scikit-learn==1.9.1
+pandas==3.1.1
+openpyxl==3.1.5
+pillow==13.0.0
+joblib==1.6.0
+threadpoolctl==3.8.0
+narwhals==2.28.0
+cloudpickle==3.1.2
+python-dateutil==4.0.0
+tzdata==2026.6
+et-xmlfile==2.0.0

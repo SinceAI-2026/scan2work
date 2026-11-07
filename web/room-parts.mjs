@@ -11,6 +11,9 @@ import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { unitFor, unitDevices, faultParts, unplacedFaults, deviceIn, floorDistance, easeTo, spreadLabels, sizeText, codeText, RAW_FLOOR_Y } from "./parts-data.mjs";
 
+import { displayAssetTag } from "./asset-presentation.mjs";
+import { canShowGeneratedModel } from "./generated-model-policy.mjs";
+
 const DATA = "./data/take_apart/";
 const SPREAD = 1.9;     // further apart than on the card, so nothing overlaps from the eyes
 const ROOM_FADE = 0.75; // the rest of the room only mildly dimmed: the same view, not a stage
@@ -76,7 +79,7 @@ function blurRoom(r, sigmaCss) {
 /** ctx: { scene, camera, renderer, container, state, uniforms(), look (first-person yaw/pitch), eye (m), setPreset(name),
  *  robot() -> {x, z}, walkTo(asset), closeOther(), boxMeshes, setInspector(open), onStage(asset, on) } */
 export function createRoomParts(ctx) {
-  let doc = null, live = null, pending = null, opening = false;
+  let doc = null, live = null, pending = null, opening = false, generation = 0;
   const ready = fetch(`${DATA}index.json`).then(r => (r.ok ? r.json() : null)).then(d => (doc = d)).catch(() => null);
   const arrivedAt = a => ctx.state.journey.phase === "arrived" && ctx.state.journey.route?.asset_id === a.asset_id;
   const near = a => { const r = ctx.robot(); return floorDistance(a, r.x, r.z) <= NEAR_M || arrivedAt(a); };
@@ -84,7 +87,13 @@ export function createRoomParts(ctx) {
   // Equipment details: Wael's own "Take apart" button (and T) run this one for a device with a split unit model
   // (walking there first if needed); for every other device they keep Wael's Take apart as it is.
   const btn = document.getElementById("btn-take-apart"), ownTitle = btn?.title ?? "";
-  const mine = () => !!unitFor(doc, ctx.state.selectedAsset);
+  function availableUnit(asset) {
+    const unit = unitFor(doc, asset);
+    if (!unit) return null;
+    const owners = unitDevices(unit, asset, ctx.state.twin.assets).map(d => ctx.state.assetsByObj.get(d.id));
+    return canShowGeneratedModel(owners, { roomAsset: ctx.roomAsset, removed: ctx.removed }) ? unit : null;
+  }
+  const mine = () => !!availableUnit(ctx.state.selectedAsset);
   document.addEventListener("click", e => {
     if (!e.target.closest?.("#btn-take-apart") || !mine()) return;
     e.stopPropagation(); // before Wael's listener on the button
@@ -104,7 +113,7 @@ export function createRoomParts(ctx) {
   if (btn) new MutationObserver(label).observe(btn, { childList: true, characterData: true, subtree: true });
 
   function open(asset) {
-    if (!unitFor(doc, asset) || live || opening) return;
+    if (!availableUnit(asset) || live || opening) return;
     if (near(asset)) { pending = null; start(asset); return; }
     pending = asset; // walk there first; frame() starts it on arrival
     ctx.walkTo(asset);
@@ -112,10 +121,16 @@ export function createRoomParts(ctx) {
 
   async function start(asset) {
     opening = true;
+    const version = ++generation;
     try {
       ctx.closeOther();
-      const unit = unitFor(doc, asset);
+      const unit = availableUnit(asset);
+      if (!unit) return;
       const gltf = await new GLTFLoader().loadAsync(DATA + unit.entry.file);
+      if (version !== generation || !availableUnit(asset)) {
+        gltf.scene.traverse(n => { n.geometry?.dispose(); for (const m of [].concat(n.material ?? [])) { m.map?.dispose(); m.dispose(); } });
+        return;
+      }
       live = build(asset, unit, gltf.scene);
     } catch (err) {
       console.error("in-room Take apart:", err);
@@ -186,11 +201,11 @@ export function createRoomParts(ctx) {
     ui.className = "room-parts";
     ui.innerHTML = `<svg width="100%" height="100%"></svg><div class="rp-labels"></div>
       <div class="rp-dock">
-        <div class="rp-box rp-bar"><b>Take apart · ${esc(asset.tag)} <span class="rp-muted">in the room</span></b>
+        <div class="rp-box rp-bar"><b>Take apart · ${esc(displayAssetTag(asset))} <span class="rp-muted">in the room</span></b>
           <input type="range" min="0" max="100" value="0" aria-label="How far apart"><output>0 %</output>
           <div class="rp-row"><button type="button" data-a="explode">Explode</button><button type="button" data-a="assemble">Reassemble</button>
             <button type="button" data-a="reset" title="All apart again, nothing selected">Reset</button><button type="button" class="rp-done" data-a="done" title="Put it back together (Esc)">Done</button></div></div>
-        <div class="rp-box"><div class="rp-muted">The unit as it stands here: ${esc(entry.label)} · sizes ${esc(entry.size_label ?? "fitted to the scan")}</div>
+        <div class="rp-box"><div class="rp-muted">AI-generated unit preview: ${esc(entry.label)} · model dimensions · physical scale unverified</div>
           ${faults.map(f => `<div class="rp-fault${f.own ? "" : " mate"}"><b>${esc(f.tag)} ${esc(codeText(f.code))}</b> (synthetic) → ${esc(parts.find(x => x.node === f.node)?.name)}</div>`).join("")}
           ${unplacedFaults(devices, faults).map(d => `<div class="rp-fault${d.own ? "" : " mate"}"><b>${esc(d.tag)} ${esc(codeText(d.issue))}</b> (synthetic): no part of this model carries it</div>`).join("")}</div>
         <div class="rp-box"><div class="rp-list"></div></div>
@@ -260,7 +275,7 @@ export function createRoomParts(ctx) {
       panel.hidden = !p;
       if (p) panel.innerHTML = `<h4>${esc(p.name)}${tagOf(p) ? ` <span class="rp-muted">· ${esc(tagOf(p))}</span>` : ""}</h4>
         ${p.fault ? `<p class="rp-fault"><b>${esc(p.fault.tag)} ${esc(codeText(p.fault.code))}</b>: ${esc(p.fault.note ?? "status synthetic (Valmet pack)")}</p>` : ""}
-        <div class="rp-muted">${esc(sizeText(p.size_mm))} (height × along the pipe × across) · fitted to the scan</div>
+        <div class="rp-muted">${esc(sizeText(p.size_mm))} (height × along the pipe × across) · physical scale unverified</div>
         <p>${esc(p.what)} <span class="rp-muted">(general engineering knowledge)</span></p>`;
     }
     slider.addEventListener("input", () => (target = Number(slider.value) / 100));
@@ -432,7 +447,7 @@ export function createRoomParts(ctx) {
       ctx.look.pitch = THREE.MathUtils.clamp(Math.atan2(asset.center[1] - ctx.eye, Math.hypot(dx, dz)), -1.1, 1.1); // back on the device
       ctx.setInspector(inspectorWas);
     }
-    const state = () => ({ tag: asset.tag, model: entry.file, devices: devices.map(d => d.tag), explode: +explode.toFixed(2), target, selected, glide: +Math.min(glide, GLIDE_S).toFixed(2),
+    const state = () => ({ tag: displayAssetTag(asset), model: entry.file, devices: devices.map(d => d.tag), explode: +explode.toFixed(2), target, selected, glide: +Math.min(glide, GLIDE_S).toFixed(2),
       pulledBack, focus: +focusK.toFixed(2), parts: pickable.length, faults: faults.map(f => `${f.tag}:${f.code}->${f.node}`),
       labels: pickable.filter(p => !p.label.hidden).map(p => p.label.innerText.replace(/\n/g, " / ")) });
     /** For checks: a part's centre on screen now (client px). */
@@ -442,7 +457,7 @@ export function createRoomParts(ctx) {
       v.copy(p.anchor).applyMatrix4(p.obj.matrixWorld).project(cam);
       return [rc.left + ((v.x + 1) / 2) * rc.width, rc.top + ((1 - v.y) / 2) * rc.height];
     };
-    return { frame, draw, close, state, partPoint, select };
+    return { asset, frame, draw, close, finish, state, partPoint, select };
   }
 
   window.addEventListener("keydown", e => {
@@ -465,12 +480,13 @@ export function createRoomParts(ctx) {
         if (route?.asset_id !== p.asset_id || ctx.state.journey.phase === "blocked") pending = null; // went elsewhere
         else if (arrivedAt(p)) { pending = null; start(p); }
       }
+      if (live && !availableUnit(live.asset)) live.finish();
       syncButton();
       live?.frame(dt);
     },
     /** Every frame after the room is drawn. */
     draw() { live?.draw(); },
-    close() { live?.close(); },
+    close({ immediate = false } = {}) { pending = null; generation++; if (immediate) live?.finish(); else live?.close(); },
     debug: () => (live ? live.state() : { open: false, pending: pending?.tag ?? null, opening }),
     partPoint: node => live?.partPoint(node) ?? null,
   };

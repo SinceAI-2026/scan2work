@@ -6,6 +6,7 @@
 // A save runs in the background on the server; the card polls GET /api/library until it is done, so a reload or a
 // closed card does not lose it, and reopening the object picks the save up again.
 import { loadGspl, createSplatObject } from "./splat-object.mjs";
+import { canWriteSharedData, installAction, sharedWrite } from "./runtime-access.mjs";
 
 const LIBRARY = "./data/library/";
 const GHOST_ROOM = 0.07;
@@ -27,6 +28,8 @@ const plural = (n, word) => `${n.toLocaleString()} ${word}${n === 1 ? "" : "s"}`
 
 /** ctx: { camera, controls, state, uniforms() -> splat material uniforms, setPreset(name), container, scene, renderer } */
 export function createTakeApart(ctx) {
+  const runtime = ctx.state.twin?.runtime;
+  const writable = canWriteSharedData(runtime);
   const card = document.createElement("section");
   card.className = "apart-card";
   card.hidden = true;
@@ -107,6 +110,7 @@ export function createTakeApart(ctx) {
     const tag = asset.mapped && asset.tag ? `${esc(asset.tag)} · ${esc(asset.asset_id)} · ${esc(asset.condition_state)}` : "No device record in the Excel pack";
     const exact = Boolean(ctx.state.exactMembership || asset.source_region_id || asset.membership_mode === "exact-source-rows");
     const facts = entry ? describe(entry)
+      : !writable ? `<p class="apart-facts">Showing ${plural(asset.exact_owned_gaussians ?? asset.n_gaussians ?? 0, "source Gaussian")}. ${installAction(runtime)} to export this object to your own library.</p>`
       : exact ? `<p class="apart-facts">${busy ? `Exporting ${esc(asset.id)}${job?.seconds ? ` (${job.seconds} s so far)` : ""}. You can close this card; the save carries on.` : `${plural(asset.exact_owned_gaussians ?? asset.n_gaussians ?? 0, "source Gaussian")} · ${esc(asset.review_status || (ctx.state.baseline ? "original room membership" : "unreviewed"))}. Save exports this exact region for your team.`} Original membership is retained; missing geometry is not rebuilt.</p>`
       : busy ? `<p class="apart-facts">Cutting ${esc(asset.id)} out of the scan and fitting it to the walkthrough photos. This takes 1 to 3 minutes${job?.seconds ? ` (${job.seconds} s so far)` : ""}. You can close this card; the save carries on.</p>`
       : `<p class="apart-facts">Showing the scan. Save to library cuts this object out and refines it against the walkthrough photos (1 to 3 minutes).</p>`;
@@ -122,7 +126,7 @@ export function createTakeApart(ctx) {
       ${api.error ? `<p class="apart-facts warn">${esc(api.error)}</p>` : ""}
       <div class="apart-actions">
         ${entry ? `<span class="apart-save saved">Saved to library ✓</span>`
-          : `<button class="apart-save" data-act="save" ${busy ? "disabled" : ""}>${busy ? "Saving…" : "Save to library"}</button>`}
+          : writable ? `<button class="apart-save" data-act="save" ${busy ? "disabled" : ""}>${busy ? "Saving…" : "Save to library"}</button>` : ""}
         ${files.ply ? `<a class="apart-btn" href="${LIBRARY}${files.ply}" download>Scan .ply</a>` : ""}
         ${files.source_rows ? `<a class="apart-btn" href="${LIBRARY}${files.source_rows}" download>Source row IDs</a>` : ""}
         ${files.model_ply ? `<a class="apart-btn" href="${LIBRARY}${files.model_ply}" download>Model .ply</a>` : ""}
@@ -143,13 +147,14 @@ export function createTakeApart(ctx) {
   }
 
   async function saveActive() {
+    if (!writable) return;
     const asset = api.active.asset;
     if (savingNow(asset) || api.saved.has(asset.id)) return;
     api.error = "";
     api.saving = { ...api.saving, [asset.id]: { seconds: 0 } };
     render();
     try {
-      const res = await fetch("./api/library", {
+      const res = await sharedWrite(runtime, "./api/library", {
         method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: asset.id }),
       });
       const doc = await res.json();

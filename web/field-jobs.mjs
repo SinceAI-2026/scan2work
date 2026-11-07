@@ -5,6 +5,8 @@
 // showEquipment(tag) selects the equipment and moves the camera to it; the assistant calls it as a client tool.
 // It drives the viewer through its own controls (the list cards and View location), so app.js needs no changes.
 
+import { canWriteSharedData, installAction, sharedWrite } from "./runtime-access.mjs";
+
 const POLL_MS = 3000;
 const STATE_TEXT = { attention_required: "Urgent", degraded: "Degraded", watch: "Watch" };
 const STATE_HELP = {
@@ -18,11 +20,14 @@ let showAll = false;
 let data = { needs_inspection: [], done: [], jobs: {} };
 let lastJson = "";
 let currentTag = () => "none";
+let runtime;
 
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 
 async function api(path, body) {
-  const res = await fetch(path, body ? { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) } : {});
+  const res = body
+    ? await sharedWrite(runtime, path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
+    : await fetch(path);
   const out = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(out.error || `HTTP ${res.status}`);
   return out;
@@ -105,6 +110,13 @@ function renderJob(root) {
   }
   root.hidden = tag === "none";
   if (root.hidden) return;
+  const readOnly = !canWriteSharedData(runtime);
+  root.querySelector(".fj-install").hidden = !readOnly;
+  if (readOnly) {
+    root.querySelector(".fj-status").textContent = "";
+    for (const el of root.querySelectorAll(".fj-start,.fj-checks,.fj-notes,.fj-sub,.fj-form")) el.hidden = true;
+    return;
+  }
   const job = data.jobs[tag];
   const status = root.querySelector(".fj-status");
   status.textContent = job ? progress(job) : "No job yet";
@@ -219,6 +231,7 @@ function mountJob() {
   root.className = "section-block field-job";
   root.hidden = true;
   root.innerHTML = `<div class="sec-title-row"><h3 class="sec-title">Technician job</h3><span class="fj-status"></span></div>
+    <p class="fj-install demo-install-note" hidden>${installAction(runtime)} to record your own inspection checklist and notes.</p>
     <button type="button" class="fj-btn primary fj-start">Start inspection checklist</button>
     <ol class="fj-checks"></ol>
     <h4 class="fj-sub">Technician notes</h4><ul class="fj-notes"></ul>
@@ -281,8 +294,9 @@ async function poll() {
   }
 }
 
-export function mountFieldJobs(selectedTag) {
+export function mountFieldJobs(selectedTag, runtimeConfig) {
   currentTag = selectedTag;
+  runtime = runtimeConfig;
   mountQueue();
   mountJob();
   poll();

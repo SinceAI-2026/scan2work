@@ -4,6 +4,7 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { loadGspl, createSplatObject } from "./splat-object.mjs";
+import { canWriteSharedData, installAction, mountDemoBanner, sharedWrite } from "./runtime-access.mjs";
 
 const LIB = "./data/library/";
 let TARGET_DEMO = "OBJ-206"; // CV-003, the faulty control valve of the Equipment Room scenario
@@ -21,6 +22,7 @@ function classColor(name) {
 }
 
 let saved = [], focusId = null, filterClass = null, showScan = false;
+let runtime = {shared_writes_enabled:false}; // Wait for the manifest before allowing mutations.
 
 async function load() {
   try {
@@ -33,7 +35,16 @@ async function load() {
 }
 
 async function main() {
-  try { const twin = await fetch("./data/digital_twin.json").then(r => r.json()); TARGET_DEMO = twin.target_object_id || TARGET_DEMO; } catch {}
+  try {
+    const twin = await fetch("./data/digital_twin.json").then(r => r.json());
+    TARGET_DEMO = twin.target_object_id || TARGET_DEMO;
+    runtime = twin.runtime || {};
+    mountDemoBanner(runtime);
+    if (!canWriteSharedData(runtime)) {
+      document.querySelector("#types h2").textContent = "Saved demo objects";
+      document.querySelector("#types .hint").innerHTML = `Explore and download these saved objects. ${installAction(runtime)} to export more objects and build your own library.`;
+    }
+  } catch {}
   await load();
   render();
   document.getElementById("q").addEventListener("input", filter);
@@ -64,8 +75,8 @@ function render() {
   document.getElementById("instances").innerHTML = saved.length ? list.map(card).join("") : `
     <div id="empty">
       <h3>Your library is empty</h3>
-      <p>Objects get here from the room: select equipment, choose <b>Take apart</b> (or press <b>T</b>), then
-      <b>Save to library</b>. The server exports its source Gaussians. Imported regions retain exact membership; missing geometry is not generated.</p>
+      ${canWriteSharedData(runtime) ? `<p>Objects get here from the room: select equipment, choose <b>Take apart</b> (or press <b>T</b>), then
+      <b>Save to library</b>. The server exports its source Gaussians. Imported regions retain exact membership; missing geometry is not generated.</p>` : `<p>${installAction(runtime)} to build your own asset library. You can still isolate and explore objects in the room.</p>`}
       <a class="btn primary" href="./index.html#apart=${TARGET_DEMO}">Take apart the faulty valve CV-003</a>
     </div>`;
   filter();
@@ -135,14 +146,16 @@ function focus(id) {
       ${e.files.model_ply ? `<a class="btn" href="${LIB}${e.files.model_ply}" download>Model .ply</a>` : ""}
       ${e.files.glb ? `<a class="btn" href="${LIB}${e.files.glb}" download>.glb</a>` : ""}
       <a class="btn" href="./index.html#apart=${encodeURIComponent(e.id)}">In the room</a>
-      <button class="btn danger" data-remove="${esc(e.id)}">Remove</button>
-    </div>`;
+      ${canWriteSharedData(runtime) ? `<button class="btn danger" data-remove="${esc(e.id)}">Remove</button>` : ""}
+    </div>
+    ${canWriteSharedData(runtime) ? "" : `<p class="demo-install-note">Downloads are available. ${installAction(runtime)} to manage your own library.</p>`}`;
 }
 
 async function remove(id) {
+  if (!canWriteSharedData(runtime)) return;
   const e = saved.find(x => x.id === id);
   if (!confirm(`Remove ${e?.tag || e?.label || id} from the library? Its saved files are deleted; you can save it again from the room.`)) return;
-  const res = await fetch(`./api/library/${encodeURIComponent(id)}`, { method: "DELETE" });
+  const res = await sharedWrite(runtime, `./api/library/${encodeURIComponent(id)}`, { method: "DELETE" });
   if (!res.ok) return alert(`Could not remove ${id}: HTTP ${res.status}`);
   saved = (await res.json()).saved.sort((a, b) => b.saved_at.localeCompare(a.saved_at));
   if (focusId === id) focusId = null;

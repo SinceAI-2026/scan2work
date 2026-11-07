@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import {renderAssetPhoto} from "./asset-photo.mjs";
 import {decodeInstanceIds,escapeHtml as esc} from "./imported-assets.mjs";
-import {validateProposalCatalog,findProposals,proposalVisibilityText} from "./proposal-review-data.mjs";
+import {validateProposalCatalog,findProposals,proposalVisibilityText,proposalFullViewUrl} from "./proposal-review-data.mjs";
 
 /** Optional read-only overlay. Canonical catalog, ownership and navigation are never changed. */
 export function mountProposalReview({config,container,scene,camera,controls,button,uniforms,count,texSize,onOpen,onOriginal,originalLabel=id=>id}) {
@@ -60,8 +60,7 @@ export function mountProposalReview({config,container,scene,camera,controls,butt
     if(direction.lengthSq()<.1)direction.set(.8,.35,1).normalize();
     const distance=Math.max(1.0,Math.min(8,Math.hypot(...region.size)*2.2));
     controls.target.fromArray(region.center);camera.position.copy(controls.target).addScaledVector(direction,distance);controls.update();
-    let full;
-    try {full=new URL(config.full_view_url || "http://127.0.0.1:8768/",location.href);if(!["http:","https:"].includes(full.protocol))full=null;else full.hash=`apart=${encodeURIComponent(region.id)}`;}catch{}
+    const full=proposalFullViewUrl(config.full_view_url,region.id,location.href);
     detail.hidden=false;
     detail.innerHTML=`<h3>${esc(region.label || region.id)}</h3><p class="proposal-review-note">${esc(region.id)} · ${esc(region.review_status || "unreviewed")}</p>
       <p>${esc(proposalVisibilityText(region))}</p>
@@ -69,7 +68,7 @@ export function mountProposalReview({config,container,scene,camera,controls,butt
       <figure class="asset-photo" hidden><img alt="" hidden><figcaption></figcaption></figure>
       <strong>Overlapping room objects</strong><div class="proposal-overlaps"></div>
       <p class="proposal-review-note">Shared geometry is an association for review, not a new label or device binding.</p>
-      ${full ? `<a class="btn-outline-full" target="_blank" rel="noopener" href="${esc(full.href)}">Inspect complete candidate ↗</a>` : ""}`;
+      ${full ? `<a class="btn-outline-full" target="_blank" rel="noopener" href="${esc(full.href)}">Inspect complete candidate ↗</a>` : '<p class="proposal-review-note">Complete candidate inspection is available with the optional extraction dataset.</p>'}`;
     renderAssetPhoto({...region,source_region_id:region.id},detail.querySelector("figure"),location.href);
     const matches=detail.querySelector(".proposal-overlaps");
     const originals=region.original_matches || [];

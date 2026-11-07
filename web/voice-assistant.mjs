@@ -26,8 +26,8 @@ async function mount() {
     registeredTags=new Set(twin.assets.filter(asset=>asset.mapped).map(asset=>asset.tag));
   }
   catch { return; }
-  if (runtime?.offline || runtime?.external_models_enabled === false) {
-    mountFieldJobs(selectedTag);
+  if (runtime?.public_demo || runtime?.offline || runtime?.external_models_enabled === false) {
+    mountFieldJobs(selectedTag, runtime);
     return;
   }
   const widget = document.createElement("elevenlabs-convai");
@@ -59,7 +59,7 @@ async function mount() {
       },
     };
   });
-  mountFieldJobs(selectedTag);
+  mountFieldJobs(selectedTag, runtime);
   window.__voiceAssistant = { selectedTag, showEquipment };
 }
 

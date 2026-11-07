@@ -1,0 +1,14 @@
+{
+	admin off
+	auto_https off
+}
+
+# Public HTTP origin ports. The external HTTPS edge terminates TLS.
+# This is a separate Caddy process, not the instance's management/auth proxy.
+http://:10100 {
+	reverse_proxy 127.0.0.1:9080
+}
+
+http://:10200 {
+	reverse_proxy 127.0.0.1:9081
+}
