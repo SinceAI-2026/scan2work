@@ -1,5 +1,6 @@
 import * as THREE from "three";
-import { assetPresentation } from "./asset-presentation.mjs";
+import { scenePolicy, firstNavigationPoint, regionSummary, escapeHtml as esc } from "./imported-assets.mjs";
+import { assetPresentation, displayAssetTag } from "./asset-presentation.mjs";
 import { renderAssetPhoto } from "./asset-photo.mjs";
 import { blockBox, planObstacleDrop } from "./temporary-obstacles.mjs";
 import { resolveRenderQuality } from "./render-quality.mjs";
@@ -21,6 +22,8 @@ import { classCss } from "./asset-presentation.mjs";
 import { filterShows, onFilterChange } from "./view-filter.mjs";
 import { ICONS } from "./view-icons.mjs";
 import { createTakeApart } from "./take-apart.mjs";
+import { mountProposalReview } from "./proposal-review.mjs";
+import { bindRoomControls } from "./room-controls.mjs";
 import { createRoomParts } from "./room-parts.mjs";
 import { createAi3d } from "./ai3d.mjs";
 import { sampleRoute, nearbyAssets, planFromPosition, reachableFloor, floorDestination, assetDestination, planRoomTour, advanceAlongRoute, segmentIsFree } from "./navigation-view.mjs";
@@ -39,9 +42,15 @@ const state = {
   splatMode: "ewa",        // "ewa" | "semantic"
   cameraPreset: "walk",
   boxesMode: "proximity",  // "proximity" | "all" | "off"
-  viewLayer: "scan",       // "scan" | "detected" | "bim" (Show bar)
-  ceilingCut: false,       // hide splats and frames above CEILING_CUT_M (on by default in bird's-eye)
+  viewLayer: "scan",
+  ceilingCut: false,
   visualReviewFilter: "mapped",
+  listLimit: 100,
+  imported: false,
+  exactMembership: false,
+  baseline: false,
+  scaleUnverified: false,
+  navigationAvailable: true,
   classFilter: "all",
   searchQuery: "",
 };
@@ -72,10 +81,11 @@ let previousRouteLine;
 const boxMeshes = new Map();
 const hudElements = new Map();
 const imageCache = new Map();
-const attract = {enabled:new URLSearchParams(location.search).get("attract") !== "0",active:false,lastActivity:0};
+const attract = {enabled:new URLSearchParams(location.search).get("attract") === "1",active:false,lastActivity:0};
 const walkKeys = new Set();
 const movementKeys = ["w", "a", "s", "d", "arrowup", "arrowdown", "arrowleft", "arrowright"];
 let equipmentObstacles;
+let proposalReview = null;
 let takeApart = null; // one object alone, the room faded (take-apart.mjs)
 let roomParts = null; // a pump unit apart where it stands, in first person (room-parts.mjs)
 let ai3d = null; // Higgsfield models drawn in place of their devices (ai3d.mjs)
@@ -94,9 +104,36 @@ async function init() {
     fetch("./data/walk_poses.json").then(res => res.ok ? res.json() : null).catch(() => null),
   ]);
   state.twin = twin;
+  state.datasetId = twin.scene?.dataset_id || twin.runtime?.dataset_id || "";
+  Object.assign(state,scenePolicy(twin));
+  state.visualReviewFilter = state.imported ? "all" : "mapped";
+  document.getElementById("select-visual-review").value = state.visualReviewFilter;
+  for (const option of document.querySelectorAll("#select-visual-review option")) {
+    if (["baseline","new","floor"].includes(option.value)) option.hidden = !state.imported;
+    if (option.value === "all" && !state.imported) option.textContent = "All room objects";
+    if (option.value === "mapped" && !state.imported) option.textContent = "Registered equipment";
+  }
+  if (state.baseline) document.getElementById("dataset-note").textContent = "Wael room model · synthetic service data · scale unverified";
+  document.getElementById("btn-room-fill-label").hidden = state.exactMembership;
+  if (state.scaleUnverified) {
+    document.querySelectorAll(".room-move-fields label").forEach(el => {el.firstChild.textContent=el.firstChild.textContent.replace("(m)","(units)");});
+    document.querySelectorAll(".technical-details .field-label").forEach(el => {el.textContent=el.textContent.replace("scan units (m)","scan units (unverified)");});
+  }
+  if (state.imported) {
+    state.boxesMode = "selected";
+    document.querySelectorAll("[data-bmode]").forEach(b => b.classList.toggle("active", b.dataset.bmode === "selected"));
+    document.getElementById("dataset-note").textContent = "Expanded extraction · regions need review · scale unverified";
+    document.getElementById("btn-room-fill-label").hidden = true;
+    document.querySelector("[data-layer=bim]").lastChild.textContent = "Geometry";
+    document.getElementById("semantic-plan-model").textContent = "Geometry preview";
+    document.getElementById("semantic-plan-export").textContent = "Approximate IFC";
+    document.querySelectorAll(".technical-details .field-label").forEach(el => { el.textContent = el.textContent.replace("scan units (m)", "scan units (unverified)"); });
+    document.querySelector("#arrival-evidence .field-label").textContent = "Synthetic workbook telemetry";
+    document.querySelectorAll(".room-move-fields label").forEach(el => { el.firstChild.textContent = el.firstChild.textContent.replace("(m)", "(scan units)"); });
+  }
   state.roomAssets = twin.assets;
   originalNavigation = twin.navigation;
-  walkPoses = Array.isArray(poses) ? poses : [];
+  walkPoses = !state.imported && Array.isArray(poses) ? poses : [];
   if (walkPoses.length) twin.navigation = withWalkthroughPassages(twin.navigation, twin.assets, walkPoses);
   initialNavigation = twin.navigation;
   equipmentObstacles = manualObstacles(state.twin.assets, state.twin.navigation.grid_meta.robot_radius_m);
@@ -107,7 +144,9 @@ async function init() {
   }
   state.twin.assets.forEach((asset, i) => instancesById.set(asset.id, i + 1));
 
-  const first = state.twin.navigation.primary_route.waypoints[0];
+  const availableStart = firstNavigationPoint(state.twin.navigation);
+  state.navigationAvailable = Boolean(availableStart);
+  const first = availableStart || {position:[0,0,0],t:0,distance_m:0,yaw:0,clearance_m:0};
   state.journey = createJourney({asset_id:null,tag:"Explore the room",kind:"idle",duration_s:0,total_distance_m:0,waypoints:[first],validated:true});
   const targetAsset = state.assetsById.get(state.twin.target_asset_id) || state.twin.assets[0];
   state.selectedAsset = targetAsset;
@@ -119,6 +158,7 @@ async function init() {
   mountExplodeControls();
   takeApart = createTakeApart({
     camera, controls, state, uniforms: () => splatMaterial?.uniforms, setPreset: applyCameraPreset,
+    setLayer:setViewLayer, setCeilingCut, beforeOpen:()=>proposalReview?.close(),
     container: document.getElementById("canvas-container"), scene, renderer,
   });
   roomParts = createRoomParts({
@@ -132,14 +172,34 @@ async function init() {
     roomAsset, removed: id => removedIds.has(id), otherOpen: () => !!takeApart?.isOpen,
   });
   buildRobotAvatar();
-  editStore = roomEditStore(id => canRemove(state.assetsByObj.get(id)));
-  roomPlacements = loadRoomPlacements(state.assetsByObj, canRemove);
+  editStore = roomEditStore(id => canRemove(state.assetsByObj.get(id)),state.datasetId);
+  roomPlacements = loadRoomPlacements(state.assetsByObj, canRemove,state.datasetId);
   const savedEdits = await editStore.load();
   applyRoomEdits(savedEdits, true);
   buildRouteMap();
   rebuildRouteGeometry();
 
   bindUIEvents();
+  proposalReview = mountProposalReview({
+    config:twin.proposal_review, container:document.getElementById("canvas-container"), scene,camera,controls,
+    button:document.getElementById("btn-review-proposals"), uniforms:()=>splatMaterial.uniforms,
+    count:sourceScan[4], texSize:splatMaterial.uniforms.uTexSize.value,
+    onOpen:()=>{
+      takeApart.close(); setInspectorOpen(false);
+      if(state.journey.phase==="moving")applyJourneyEvent({type:"pause"});
+      const previous={preset:state.cameraPreset,layer:state.viewLayer,cut:state.ceilingCut,
+        explode:explodeState.amount,position:camera.position.clone(),target:controls.target.clone()};
+      applyCameraPreset("aerial"); setViewLayer("scan"); setCeilingCut(false);
+      explodeState.amount=0; document.getElementById("explode-range").value="0";
+      return ()=>{
+        applyCameraPreset(previous.preset);setViewLayer(previous.layer);setCeilingCut(previous.cut);
+        explodeState.amount=previous.explode;document.getElementById("explode-range").value=String(previous.explode);
+        camera.position.copy(previous.position);controls.target.copy(previous.target);controls.update();
+      };
+    },
+    onOriginal:id=>{ const asset=state.assetsByObj.get(id); if(asset){selectAsset(asset,true);viewRoomLocation(asset);} },
+    originalLabel:id=>{const asset=state.assetsByObj.get(id);return asset?.mapped && asset.tag ? `${id} · ${asset.tag}` : id;},
+  });
   renderProposalList();
   selectAsset(targetAsset, false);
   applyCameraPreset("aerial");
@@ -161,6 +221,7 @@ async function init() {
     updateAttractMode(now);
     stepSimulation(dt, now * 0.001);
     takeApart.frame(boxMeshes);
+    if (proposalReview?.isOpen) for (const entry of boxMeshes.values()) entry.group.visible=false;
     roomParts.frame(dt);
     ai3d.frame();
     bimView.update(state.selectedAsset);
@@ -178,6 +239,7 @@ function updateSidebarStats() {
   const mapped = assets.filter((a) => a.mapped).length;
   const alerts = assets.filter((a) => a.mapped && assetPresentation(a).needsAttention).length;
   document.getElementById("sidebar-stats-text").textContent =
+    state.imported ? `${assets.length.toLocaleString()} regions · ${mapped} Excel records · ${alerts} alerts` :
     `${mapped} registered assets · ${alerts} need attention`;
 }
 
@@ -306,10 +368,14 @@ function updateSplatViewportUniforms() {
 
 async function loadEwaGaussianSplats(url) {
   const res = await fetch(url);
+  if (!res.ok) throw new Error("Scene data is unavailable. Run the offline asset importer.");
   const buf = await res.arrayBuffer();
+  if (buf.byteLength < 16) throw new Error("Scan file is truncated.");
   const header = new DataView(buf, 0, 16);
+  if (String.fromCharCode(...new Uint8Array(buf,0,4)) !== "GSPL") throw new Error("Unsupported scan file format.");
   const count = header.getUint32(8, true);
   const stride = header.getUint32(12, true) || 40;
+  if (!count || ![16,40].includes(stride) || buf.byteLength !== 16 + count*stride) throw new Error("Scan file size does not match its header.");
 
   const TEX_W = 2048;
   const TEX_H = Math.ceil(count / TEX_W);
@@ -705,9 +771,13 @@ function applyCameraPreset(preset) {
   const fab = document.getElementById("view-fab");
   if (fab) {
     document.getElementById("view-fab-icon").innerHTML = ICONS[VIEW_ICONS[preset]] || "";
-    fab.dataset.tip = VIEW_NAMES[preset] || "View";
-    fab.setAttribute("aria-label", `Change view: ${VIEW_NAMES[preset] || preset}`);
+    document.getElementById("view-fab-label").textContent=VIEW_NAMES[preset] || (preset==="apart" ? "Isolated item" : "Free view");
+    fab.setAttribute("aria-label", `Change view: ${document.getElementById("view-fab-label").textContent}`);
   }
+  document.getElementById("view-control-hint").textContent=preset==="first"
+    ? "Drag to look · WASD / arrows to walk · Shift to move faster"
+    : preset==="walk" ? "Camera follows the robot · click the map to choose a destination"
+    : "Drag to orbit · right-drag to pan · scroll to zoom";
   setViewLayer(aerial ? state.viewLayer : "scan");
 
   if (AERIAL.has(preset)) {
@@ -737,12 +807,26 @@ function setViewLayer(layer) {
   for (const el of document.querySelectorAll(".layer-aerial")) el.hidden = !aerialNow;
   setTintMask(a => filterShows(a) || a.is_target);
   if (splatMesh) splatMesh.visible = !bim;
-  document.querySelectorAll("[data-layer]").forEach(b => b.classList.toggle("active", b.dataset.layer === layer));
+  document.querySelectorAll("[data-layer]").forEach(b => {
+    b.classList.toggle("active", b.dataset.layer === layer);
+    b.setAttribute("aria-pressed",String(b.dataset.layer === layer));
+  });
   const aerial = aerialNow;
   document.getElementById("ceiling-toggle").closest("label").hidden = bim;
   const legend = document.getElementById("class-legend");
   legend.hidden = !(aerial && layer !== "scan");
   if (!legend.hidden) renderClassLegend(legend);
+  updateLayerCount();
+}
+
+function updateLayerCount() {
+  const el=document.getElementById("room-layer-count");
+  if(!el || !state.roomAssets)return;
+  const visible=state.roomAssets.filter(a=>(filterShows(a)||a.is_target||a.id===state.selectedAsset?.id)
+    && (state.viewLayer==="bim"||!state.ceilingCut||a.id===state.selectedAsset?.id||a.center[1]-a.size[1]/2<=CEILING_CUT_M-.15)).length;
+  const shown=state.viewLayer==="bim"||state.boxesMode!=="off" ? visible : 0;
+  el.textContent=`${state.viewLayer==="bim" ? "Objects" : "Frames"}: ${shown.toLocaleString()} of ${state.roomAssets.length.toLocaleString()}${state.viewLayer!=="bim"&&state.ceilingCut?" · ceiling hidden":""}`;
+  document.getElementById("btn-show-all").hidden=shown===state.roomAssets.length;
 }
 
 // Coloured objects legend: every class in the room with its colour and count, most common first.
@@ -758,6 +842,7 @@ function setCeilingCut(on) {
   const box = document.getElementById("ceiling-toggle");
   if (box) box.checked = on;
   if (splatMaterial?.uniforms.uCeilCut) splatMaterial.uniforms.uCeilCut.value = on ? CEILING_CUT_M : 0;
+  updateLayerCount();
 }
 
 // After applyExplode: class colours in the Detected layer, and no frames above a hidden ceiling.
@@ -853,7 +938,7 @@ function buildAssetBoundingBoxes() {
     {
       const tagEl = document.createElement("div");
       tagEl.className = `hud-tag ${asset.condition_state} ${assetPresentation(asset).kind}`;
-      tagEl.textContent = `${asset.tag} · ${asset.label}`;
+      tagEl.textContent = `${displayAssetTag(asset)} · ${asset.label}`;
       tagEl.setAttribute("role", "button");
       tagEl.tabIndex = 0;
       tagEl.addEventListener("keydown", e => { if (e.key === "Enter") selectAsset(asset, true); });
@@ -927,7 +1012,7 @@ function rebuildReachableOverlay() {
   const floor=reachableFloor(navigation,cell ? position : {x,z});
   mapBackground=createGameMap(navigation,floor,state.roomAssets);
   const legend = document.getElementById("map-coverage");
-  legend.textContent = navigation.walkthrough_passages ? "Teal · Walkthrough passages" : "Outlined objects block movement";
+  legend.textContent = state.imported ? "Grid simulation · physical scale unverified" : navigation.walkthrough_passages ? "Teal · Walkthrough passages" : "Outlined objects block movement";
   legend.classList.toggle("walkthrough-legend", !!navigation.walkthrough_passages);
 }
 
@@ -988,10 +1073,10 @@ function drawRouteMap(nav) {
   ctx.fillStyle="#79e2ef";ctx.strokeStyle="#10242e";ctx.lineWidth=3;
   ctx.beginPath();ctx.moveTo(0,-16);ctx.lineTo(-11,11);ctx.lineTo(0,7);ctx.lineTo(11,11);ctx.closePath();ctx.fill();ctx.stroke();ctx.restore();
   ctx.restore();
-  // A true one-metre scale, independent of map panel size.
+  // One source unit; the imported scan has no verified physical scale.
   const length=frame.width/(m.nx*m.res),x=frame.x+frame.width-length,y=canvas.height-12;
   ctx.strokeStyle="#b0c8ce";ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(x,y-5);ctx.lineTo(x,y);ctx.lineTo(x+length,y);ctx.lineTo(x+length,y-5);ctx.stroke();
-  ctx.font="15px sans-serif";ctx.fillStyle="#b0c8ce";ctx.textAlign="center";ctx.fillText("1 m",x+length/2,y-9);
+  ctx.font="15px sans-serif";ctx.fillStyle="#b0c8ce";ctx.textAlign="center";ctx.fillText(state.scaleUnverified || state.imported ? "1 unit" : "1 m",x+length/2,y-9);
 }
 
 function rebuildRouteGeometry() {
@@ -1052,8 +1137,7 @@ function stepSimulation(dt, elapsedSec) {
   robotGroup.rotation.y = yaw;
   if (lidarRing) lidarRing.rotation.y = elapsedSec * 5.0;
 
-  // The robot is driven above (route or keyboard) the same way in every view; the view only places the camera.
-  robotGroup.visible = state.cameraPreset !== "first";
+  robotGroup.visible = state.navigationAvailable && state.cameraPreset !== "first";
   if (state.cameraPreset === "first") updateWalkCamera(nav, dt, route);
   else if (state.cameraPreset === "walk") updateFollowCamera(nav, dt, route);
   else controls.update();
@@ -1076,13 +1160,15 @@ function stepSimulation(dt, elapsedSec) {
     let vis = false;
     if (state.boxesMode === "off") {
       vis = false;
+    } else if (state.boxesMode === "selected") {
+      vis = isSel;
     } else if (isAerial()) {
       vis = isSel || a.is_target || filterShows(a);
     } else if (state.boxesMode === "all") {
       vis = true;
     } else {
       // "proximity" mode: show selected, target, and up to nearby canonical Valmet assets
-      vis = isSel || a.is_target || isNear;
+      vis = isSel || a.is_target || (isNear && (!state.imported || a.mapped));
     }
 
     entry.group.visible = vis;
@@ -1157,7 +1243,8 @@ function updateHudLabels() {
   const rx = robotGroup.position.x;
   const rz = robotGroup.position.z;
   const proxR = state.twin.navigation.grid_meta.proximity_radius_m || 1.65;
-  const everyLabel = isAerial();
+  // Nearby keeps the same small shortlist in every camera; dense labels are an explicit All choice.
+  const everyLabel = state.boxesMode === "all";
   const byClass = state.viewLayer !== "scan";   // Coloured objects and BIM: labels name the class, in its colour
 
   const candidates = [];
@@ -1178,7 +1265,7 @@ function updateHudLabels() {
 
     const text = byClass
       ? (a.mapped ? `${a.tag} · ${a.label}` : a.label)
-      : `${a.tag} · ${dist.toFixed(1)} m · ${a.condition_state.replaceAll("_", " ")}`;
+      : `${displayAssetTag(a)} · ${dist.toFixed(1)} ${state.scaleUnverified ? "units" : "m"} · ${assetPresentation(a).kind === "instrumented" ? String(a.condition_state).replaceAll("_", " ") : assetPresentation(a).kind}`;
     if (el._text !== text) { el.textContent = text; el._text = text; el._size = null; }
     if (el._byClass !== byClass) {
       el._byClass = byClass;
@@ -1239,7 +1326,7 @@ function renderProximityStream(mappedNearby) {
   const key = mappedNearby.map(n => `${n.id}:${n.distance_m.toFixed(1)}`).join("|");
   if (key === proximityKey) return;
   proximityKey = key;
-  listEl.innerHTML = mappedNearby
+  listEl.innerHTML = mappedNearby.slice(0, 30)
     .map((n) => {
       const a = state.assetsByObj.get(n.id);
       const cls = n.is_target ? "target" : n.condition_state;
@@ -1247,8 +1334,8 @@ function renderProximityStream(mappedNearby) {
       const status = kind === "instrumented" ? (n.mapped ? `${n.health_score}%` : "procedural") : kind;
       return `
         <div class="prox-row ${cls}" data-obj="${n.id}">
-          <span>${n.tag} · ${a ? a.label : ""}</span>
-          <span>${n.distance_m.toFixed(1)}m · ${status}</span>
+          <span>${esc(displayAssetTag(n))} · ${esc(a ? a.label : "")}</span>
+          <span>${n.distance_m.toFixed(1)} ${state.scaleUnverified || state.imported ? "units" : "m"} · ${status}</span>
         </div>
       `;
     })
@@ -1265,47 +1352,33 @@ function renderProximityStream(mappedNearby) {
 function renderProposalList() {
   const listEl = document.getElementById("asset-list");
   const q = state.searchQuery.trim().toLowerCase();
-
-  const filtered = state.roomAssets.filter((a) => {
+  const filtered = state.roomAssets.filter(a => {
     if (state.visualReviewFilter === "alerts" && !(a.mapped && assetPresentation(a).needsAttention)) return false;
     if (state.visualReviewFilter === "mapped" && !a.mapped) return false;
+    const baseline = String(a.source_region_id || a.id).startsWith("linards-");
+    const floor = a.structure_role === "floor" || a.id.startsWith("floor-");
+    if (state.visualReviewFilter === "new" && (baseline || floor)) return false;
+    if (state.visualReviewFilter === "baseline" && !baseline) return false;
+    if (state.visualReviewFilter === "floor" && !floor) return false;
     if (state.classFilter !== "all" && a.class !== state.classFilter) return false;
-    if (!q) return true;
-    return (
-      a.tag.toLowerCase().includes(q) ||
-      a.asset_id.toLowerCase().includes(q) ||
-      a.id.toLowerCase().includes(q) ||
-      a.label.toLowerCase().includes(q)
-    );
+    return !q || [a.tag,a.asset_id,a.id,a.label,a.class_label].some(v => String(v || "").toLowerCase().includes(q));
   });
-
-  listEl.innerHTML = filtered
-    .map((a) => {
-      const sel = state.selectedAsset && state.selectedAsset.id === a.id ? "selected" : "";
-      const stateCls =
-        a.condition_state === "degraded" || a.condition_state === "attention_required"
-          ? "prop-badge-degraded"
-          : a.condition_state === "watch"
-          ? "prop-badge-watch"
-          : "";
-      return `
-        <div class="proposal-card ${sel}" data-obj="${a.id}">
-          <div class="prop-class">${a.label}</div>
-          <div class="prop-meta">
-            <span>${a.tag} · ${a.asset_id}</span>
-            <span class="${stateCls}">${assetPresentation(a).notice || (a.health_score == null ? "No health reading" : `Health ${a.health_score}%`)} · ${a.condition_state}</span>
-          </div>
-        </div>
-      `;
-    })
-    .join("");
-
-  for (const card of listEl.querySelectorAll(".proposal-card")) {
-    card.addEventListener("click", () => {
-      const a = state.assetsByObj.get(card.dataset.obj);
-      if (a) selectAsset(a, true);
-    });
-  }
+  const shown = filtered.slice(0, state.listLimit);
+  document.getElementById("asset-result-count").textContent = `${shown.length.toLocaleString()} of ${filtered.length.toLocaleString()} ${state.imported ? "regions" : "objects"}`;
+  listEl.innerHTML = shown.map(a => {
+    const selected = state.selectedAsset?.id === a.id;
+    const status = a.source_region_id ? regionSummary(a) : assetPresentation(a).notice || `${Number.isFinite(a.health_score) ? `Health ${a.health_score}% · ` : ""}${String(a.condition_state || "").replaceAll("_", " ")}`;
+    return `<button class="proposal-card ${selected ? "selected" : ""}" data-obj="${esc(a.id)}" aria-pressed="${selected}">
+      <span class="prop-class">${esc(a.label || a.id)}</span>
+      <span class="prop-meta"><span>${esc(a.mapped && a.tag ? a.tag + " · " + a.id : a.id)}</span>
+      <span>${esc(status)}</span>${a.mapped && state.imported ? '<span class="prop-mapping">Synthetic Excel mapping</span>' : ""}</span></button>`;
+  }).join("") || '<p class="list-empty">No matching regions. Try a name or source ID.</p>';
+  if (filtered.length > shown.length) listEl.insertAdjacentHTML("beforeend", '<button id="show-more-regions" class="btn-outline-full">Show next 100 regions</button>');
+  listEl.querySelector("#show-more-regions")?.addEventListener("click", () => { state.listLimit += 100; renderProposalList(); });
+  for (const card of listEl.querySelectorAll(".proposal-card")) card.addEventListener("click", () => {
+    const a = state.assetsByObj.get(card.dataset.obj);
+    if (a) selectAsset(a, true);
+  });
 }
 
 function drawDetectionCrop(asset) {
@@ -1343,7 +1416,7 @@ function drawDetectionCrop(asset) {
     ctx.strokeRect(rx, ry, rw, rh);
 
     // Tag pill on top-left of 2D box
-    const tagTxt = `${asset.tag} · ${asset.label}`;
+    const tagTxt = `${displayAssetTag(asset)} · ${asset.label}`;
     ctx.font = "bold 12px -apple-system, sans-serif";
     const tw = ctx.measureText(tagTxt).width + 12;
     ctx.fillStyle = "#d94838";
@@ -1372,10 +1445,12 @@ function fmtComma(num) {
 }
 
 function selectAsset(asset, openInspector = false) {
+  proposalReview?.close();
   if (movePreview && movePreview.asset.id !== asset.id) closeMovePreview();
   asset = roomAsset(asset);
   if (removedIds.has(asset.id) && takeApart?.isOpen) takeApart.close();
   state.selectedAsset = asset;
+  updateLayerCount();
   if (takeApart?.isOpen && takeApart.active.asset !== asset) takeApart.open(asset);
   copilotRequestId++;
   const presentation = assetPresentation(asset);
@@ -1386,7 +1461,7 @@ function selectAsset(asset, openInspector = false) {
     renderAssetPhoto(null,document.getElementById("asset-photo"),location.href);
     document.getElementById("detail-id-status").textContent = `${asset.id} · Removed from room`;
     document.getElementById("detail-health-pill").hidden = true;
-    document.getElementById("detail-title").textContent = `${asset.label} · ${asset.tag}`;
+    document.getElementById("detail-title").textContent = `${asset.label} · ${displayAssetTag(asset)}`;
     document.getElementById("detail-subtitle").textContent = presentation.category;
     renderProposalList();
     if (openInspector) setInspectorOpen(true);
@@ -1399,29 +1474,33 @@ function selectAsset(asset, openInspector = false) {
   document.getElementById("movable-notice").textContent = presentation.notice;
   document.getElementById("movable-notice").className = `movable-notice ${presentation.kind}`;
   document.getElementById("btn-draft-wo").hidden = uninstrumented;
+  document.getElementById("btn-take-apart").textContent=asset.source_region_id ? "Isolate region" : "Isolate item";
   renderProposalList();
 
   const navigateButton = document.getElementById("btn-navigate-selected");
-  navigateButton.disabled = false;
+  navigateButton.disabled = !state.navigationAvailable;
   navigateButton.textContent = "Navigate here";
   if (openInspector) setInspectorOpen(true);
 
   document.getElementById("detail-id-status").textContent =
-    `${asset.asset_id} · ${asset.id} / ${asset.condition_state}`;
+    uninstrumented ? `${asset.id} · ${presentation.kind}` : `${asset.asset_id} · ${asset.id} / ${asset.condition_state}`;
   const hp = document.getElementById("detail-health-pill");
   hp.hidden = uninstrumented;
   hp.className = `health-pill ${asset.condition_state}`;
   hp.textContent = uninstrumented ? presentation.notice : `${asset.health_score == null ? "Movable object" : `Health ${asset.health_score}%`}`;
 
-  document.getElementById("detail-title").textContent = `${asset.label} · ${asset.tag}`;
-  document.getElementById("service-guidance-title").textContent = `Service guidance for ${asset.tag}`;
+  document.getElementById("detail-title").textContent = `${asset.label} · ${displayAssetTag(asset)}`;
+  document.getElementById("service-guidance-title").textContent = `${state.twin.runtime?.offline ? "Workbook guidance" : "Service guidance"} for ${asset.tag}`;
   document.getElementById("detail-subtitle").textContent =
     presentation.category;
 
-  const effPct = Math.round((asset.effective_confidence || 0.8) * 100);
+  const effPct = Number.isFinite(asset.effective_confidence) ? Math.round(asset.effective_confidence * 100) : null;
   const dqTxt = asset.dq_penalty ? ` (includes -${Math.round(asset.dq_penalty * 100)}% data quality penalty)` : "";
   document.getElementById("detail-match-note").textContent =
-    `Original box: ${asset.label}. Best visual match: ${asset.label}. Effective AI confidence: ${effPct}%${dqTxt}.`;
+    asset.source_region_id ? `${regionSummary(asset)}. Labels and boundaries are unverified.${asset.mapped ? " Device readings are synthetic Excel data mapped procedurally." : ""}` :
+    uninstrumented ? `${presentation.notice}. Original scan geometry; no device reading is assigned.` :
+    `Original box: ${asset.label}. Effective AI confidence: ${effPct === null ? "not measured" : effPct + "%"}${dqTxt}.`;
+  document.getElementById("detail-match-note").hidden = false;
 
   // 2D camera detection photo + red box
   drawDetectionCrop(asset);
@@ -1522,7 +1601,8 @@ function renderTelemetryChart(asset) {
   if (!s1 || s1.length < 2) {
     ctx.fillStyle = "#5a605d";
     ctx.font = "11px sans-serif";
-    ctx.fillText(`Nominal: Pressure ${asset.telemetry?.latest?.process_pressure_bar ?? 4.8} bar · Signal 99.2%`, 10, H / 2);
+    const pressure = asset.telemetry?.latest?.process_pressure_bar;
+    ctx.fillText(Number.isFinite(pressure) ? `Workbook pressure: ${pressure} bar` : "No telemetry series available.", 10, H / 2);
     return;
   }
 
@@ -1591,9 +1671,9 @@ function renderJourneyControls(nav) {
   document.getElementById("btn-manual-walk").hidden = !manual;
   document.getElementById("btn-drop-obstacle").disabled = manual || !!state.demoObstacle || !["moving","paused"].includes(journey.phase) || journey.route.total_distance_m-nav.distance < 2;
   const remaining=Math.max(0,journey.route.total_distance_m-nav.distance);
-  document.getElementById("nav-hud-metrics").textContent=manual ? "WASD to walk · ← → to turn · F to inspect nearby" : idle ? "Choose a map point, equipment, or room tour." : `${remaining.toFixed(1)} m remaining · ${view.remainingSeconds} s`;
-  document.getElementById("sim-dist-label").textContent=idle?"":`${nav.distance.toFixed(1)} / ${journey.route.total_distance_m.toFixed(1)} m`;
-  document.getElementById("navigation-message").textContent=view.error;
+  document.getElementById("nav-hud-metrics").textContent=manual ? "WASD to walk · ← → to turn · F to inspect nearby" : idle ? "Choose a map point, equipment, or room tour." : `${remaining.toFixed(1)} ${state.scaleUnverified || state.imported ? "scan units" : "m"} remaining · ${view.remainingSeconds} s`;
+  document.getElementById("sim-dist-label").textContent=idle?"":`${nav.distance.toFixed(1)} / ${journey.route.total_distance_m.toFixed(1)} ${state.scaleUnverified || state.imported ? "units" : "m"}`;
+  document.getElementById("navigation-message").textContent=view.error || (!state.navigationAvailable ? "No supported floor route is available. Inspect with Free view." : "");
   document.getElementById("map-feedback").textContent=view.error;
 }
 
@@ -1671,6 +1751,7 @@ function cellAtPosition({x,z}, navigation=state.twin.navigation) {
 }
 
 function prepareRoomEdits(edits, placements=roomPlacements) {
+  if (state.exactMembership) return prepareExactRoomEdits(edits, placements);
   const ids = new Set(edits.map(edit=>edit.id));
   const affected = new Set([...ids,...placements.keys()].sort());
   const reviews = new Map(), parts = new Map();
@@ -1724,6 +1805,29 @@ function prepareRoomEdits(edits, placements=roomPlacements) {
   return {ids,parts,instances,assets,navigation,fills,placed,owners};
 }
 
+// Exact-membership datasets retain their original ownership. Semantic classes and navigation are independent.
+function prepareExactRoomEdits(edits, placements) {
+  const ids = new Set(edits.map(edit => edit.id));
+  const affected = new Set([...ids, ...placements.keys()]);
+  const instances = new Set([...affected].map(id => instancesById.get(id)));
+  const assets = state.twin.assets.filter(a => !ids.has(a.id)).map(a => placements.has(a.id) ? placedRoomAsset(a, placements.get(a.id)) : a);
+  let navigation = initialNavigation;
+  const placed = [];
+  if (placements.size) {
+    indexedScan ??= indexRoomScan(...sourceScan);
+    for (const asset of assets.filter(a => a.transform)) {
+      const owner = instancesById.get(asset.id);
+      placed.push(copyPlacedSplats(indexedScan, indexedScan.owned.get(owner) || [], asset, owner));
+      if (asset.center[1] - asset.size[1]/2 < 1.62 && asset.center[1] + asset.size[1]/2 > .10) {
+        const c = Math.abs(Math.cos(asset.yaw)), s = Math.abs(Math.sin(asset.yaw));
+        navigation = blockBox(navigation, {x:asset.center[0],z:asset.center[2],size:Math.max(asset.size[0]*c+asset.size[2]*s,asset.size[0]*s+asset.size[2]*c)});
+      }
+    }
+  }
+  if (state.demoObstacle) navigation = blockBox(navigation, state.demoObstacle);
+  return {ids,parts:new Map(),instances,assets,navigation,fills:[],placed,owners:sourceScan?.[3]};
+}
+
 function uploadRoomFill(instances, layers, owners) {
   const u = splatMaterial.uniforms;
   if (owners && u.uInstTex.value.image.data !== owners) {
@@ -1763,7 +1867,7 @@ function applyRoomEdits(snapshot, initial=false, prepared) {
   removedIds = ids;
   foldedRoomParts = parts;
   state.roomAssets = assets;
-  if (bimView?.active) bimView.setRoom(assets,state.twin.scene.walls,navigation.grid_meta);
+  if (bimView?.active) bimView.setRoom(assets,state.twin.scene.walls,navigation.grid_meta,state.twin.scene.derived_context);
   liveRoomAssets = new Map(assets.map(asset=>[asset.id,asset]));
   state.twin.navigation = navigation;
   equipmentObstacles = manualObstacles(assets,navigation.grid_meta.robot_radius_m);
@@ -1826,7 +1930,7 @@ function replanAfterRoomEdit(prior) {
 function renderRoomEditControls() {
   const count=document.getElementById('room-object-count');
   const moved = [...roomPlacements.keys()].filter(id=>!removedIds.has(id));
-  count.textContent=`${state.twin.assets.length} objects · ${removedIds.size} removed${moved.length ? ` · ${moved.length} moved` : ''}`;
+  count.textContent=`${state.twin.assets.length.toLocaleString()} ${state.imported ? "regions" : "objects"} · ${removedIds.size} removed${moved.length ? ` · ${moved.length} moved` : ''}`;
   document.getElementById('room-change-count').textContent=String(removedIds.size+moved.length);
   const status=document.getElementById('room-edit-status');
   status.textContent=[editsOffline && 'edits not saved to server',moved.length && 'Moved positions are saved in this browser.'].filter(Boolean).join(' · ');
@@ -1848,7 +1952,7 @@ function renderRoomEditControls() {
   reset.disabled=editBusy;
   const notice=document.getElementById('room-edit-notice');
   notice.textContent=removed ? (asset.mapped ? `${asset.tag} removed: its Excel record is no longer located in this room` : 'Removed from this room.') :
-    roomPlacements.has(asset.id) ? `Moved to X ${asset.center[0].toFixed(2)} m, Z ${asset.center[2].toFixed(2)} m. The photo shows the original location.` : '';
+    roomPlacements.has(asset.id) ? `Moved to X ${asset.center[0].toFixed(2)}, Z ${asset.center[2].toFixed(2)} ${state.scaleUnverified || state.imported ? "scan units (unverified)" : "m"}. The photo shows the original location.` : '';
   notice.hidden=!notice.textContent;
   const list=document.getElementById('room-edit-list');
   list.replaceChildren();
@@ -1857,7 +1961,7 @@ function renderRoomEditControls() {
     row.className='room-change-row';
     const name=document.createElement('button'), time=document.createElement('time'), restore=document.createElement('button');
     name.type=restore.type='button';
-    name.textContent=item.tag;
+    name.textContent=displayAssetTag(item);
     name.title=item.label;
     name.addEventListener('click',()=>selectAsset(item,true));
     const at=new Date(edit.at);
@@ -1867,7 +1971,7 @@ function renderRoomEditControls() {
       time.textContent=at.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
     }
     restore.textContent='Restore';
-    restore.setAttribute('aria-label',`Restore ${item.tag}`);
+    restore.setAttribute('aria-label',`Restore ${displayAssetTag(item)}`);
     restore.disabled=editBusy;
     restore.addEventListener('click',()=>changeRoom('restore',item));
     row.append(name,time,restore);
@@ -1878,11 +1982,11 @@ function renderRoomEditControls() {
     row.className='room-change-row';
     const name=document.createElement('button'), reset=document.createElement('button');
     name.type=reset.type='button';
-    name.textContent=item.tag;
+    name.textContent=displayAssetTag(item);
     name.title=item.label;
     name.addEventListener('click',()=>selectAsset(item,true));
     reset.textContent='Reset position';
-    reset.setAttribute('aria-label',`Reset position of ${item.tag}`);
+    reset.setAttribute('aria-label',`Reset position of ${displayAssetTag(item)}`);
     reset.disabled=editBusy;
     reset.addEventListener('click',()=>changePlacement(item,null));
     row.append(name,reset);
@@ -1902,7 +2006,7 @@ async function changeRoom(action,asset) {
     if (action==='restore') {
       const position=roomPlacements.get(asset.id);
       const source=state.assetsByObj.get(asset.id);
-      const review=reviewedTrolleyParts(source,state.assetsByObj);
+      const review=state.exactMembership ? null : reviewedTrolleyParts(source,state.assetsByObj);
       const restored=position ? placedRoomAsset(source,position,review?.baseY) : asset;
       if (state.roomAssets.some(other=>other.transform && roomBoundsOverlap(restored,other))) {
         throw new Error('Move the other object away from this location first.');
@@ -1963,7 +2067,7 @@ function beginMovePreview(asset) {
   walkKeys.clear();
   viewRoomLocation(asset);
   const source=state.assetsByObj.get(asset.id);
-  const review=reviewedTrolleyParts(source,state.assetsByObj);
+  const review=state.exactMembership ? null : reviewedTrolleyParts(source,state.assetsByObj);
   const [sx,sy,sz]=source.size;
   const baseY=review?.baseY ?? source.center[1]-sy/2;
   const box = new THREE.BoxGeometry(sx,source.center[1]+sy/2-baseY,sz);
@@ -2039,7 +2143,7 @@ function changePlacement(asset, placement) {
     if (!prepared.navigation || !cellAtPosition(robotPosition(),prepared.navigation)) {
       throw new Error('Move the robot clear of this location before placing the object.');
     }
-    saveRoomPlacements(next);
+    saveRoomPlacements(next,state.datasetId);
     roomPlacements=next;
     closeMovePreview();
     applyRoomEdits({removed:activeEdits,offline:editsOffline},false,prepared);
@@ -2063,7 +2167,7 @@ function bindRoomEdits() {
     if (removedIds.has(asset.id)) { changeRoom('restore',asset); return; }
     pendingAsset=asset;
     dialog.returnValue='';
-    document.getElementById('room-remove-message').textContent=`Remove ${asset.tag} · ${asset.label} from this room? You can restore it from Room changes.`;
+    document.getElementById('room-remove-message').textContent=`Remove ${displayAssetTag(asset)} · ${asset.label} from this room? You can restore it from Room changes.`;
     dialog.showModal();
   });
   dialog.addEventListener('close',()=>{
@@ -2085,7 +2189,7 @@ function bindRoomEdits() {
   });
 }
 
-// Circular view button: opens a row of view icons to its right; picking one switches view and closes it.
+// Labelled camera menu; choosing a mode keeps the existing camera behaviour.
 function bindViewSwitch() {
   for (const el of document.querySelectorAll("[data-icon]")) if (ICONS[el.dataset.icon]) el.insertAdjacentHTML("afterbegin", ICONS[el.dataset.icon]);
   const fab = document.getElementById("view-fab"), menu = document.getElementById("view-menu");
@@ -2096,15 +2200,15 @@ function bindViewSwitch() {
   };
   fab.addEventListener("click", () => setOpen(menu.hidden));
   for (const btn of menu.querySelectorAll("[data-cam]")) {
-    btn.addEventListener("click", () => { applyCameraPreset(btn.dataset.cam); setOpen(false); fab.focus(); });
+    btn.addEventListener("click", () => { proposalReview?.close(); applyCameraPreset(btn.dataset.cam); setOpen(false); fab.focus(); });
   }
   document.addEventListener("pointerdown", e => { if (!menu.hidden && !e.target.closest("#view-switch")) setOpen(false); });
   document.addEventListener("keydown", e => {
     if (menu.hidden) return;
     if (e.key === "Escape") { setOpen(false); fab.focus(); }
-    if (e.key === "ArrowRight" || e.key === "ArrowLeft") {   // roving focus inside the open menu
+    if (["ArrowRight","ArrowLeft","ArrowDown","ArrowUp"].includes(e.key)) {
       const items = [...menu.querySelectorAll(".view-item")], i = items.indexOf(document.activeElement);
-      if (i >= 0) { e.preventDefault(); e.stopPropagation(); items[(i + (e.key === "ArrowRight" ? 1 : items.length - 1)) % items.length].focus(); }
+      if (i >= 0) { e.preventDefault(); e.stopPropagation(); items[(i + (["ArrowRight","ArrowDown"].includes(e.key) ? 1 : items.length - 1)) % items.length].focus(); }
     }
   }, true);
 }
@@ -2226,6 +2330,7 @@ function navigationError(error) {
 function dispatchRobotToAsset(asset) {
   asset=roomAsset(asset);
   if (!asset || removedIds.has(asset.id)) return;
+  if (!state.navigationAvailable) { navigationError(new Error("No supported floor route is available; use Free view to inspect.")); return; }
   takeApart?.close();
   try {
     const start=robotPosition();
@@ -2243,6 +2348,14 @@ function dispatchRobotToAsset(asset) {
     selectAsset(asset,false);
     activateRoute(route);
   } catch(error) {navigationError(error);}
+}
+
+function showMissionView({inspection=false}={}) {
+  proposalReview?.close();takeApart?.close();
+  const search=document.getElementById("asset-search");
+  if(search.value){search.value="";search.dispatchEvent(new Event("input"));}
+  if(inspection)document.getElementById("tab-inspect")?.click();
+  applyCameraPreset("walk");
 }
 
 function registerActivity() {
@@ -2271,10 +2384,19 @@ function updateAttractMode(now) {
 function bindUIEvents() {
   bindArView();
   bindRoomEdits();
+  bindRoomControls({onShowAll:()=>{
+    document.getElementById("layer-all").checked=true;
+    document.getElementById("layer-pipes").checked=true;
+    document.getElementById("layer-relevant").checked=false;
+    state.boxesMode="all";
+    document.querySelectorAll("[data-bmode]").forEach(b=>b.classList.toggle("active",b.dataset.bmode==="all"));
+    setCeilingCut(false);
+    document.getElementById("layer-all").dispatchEvent(new Event("change"));
+  }});
   bimView=createBimRoom({scene,camera});
   onFilterChange(() => setViewLayer(state.viewLayer));
   semanticPlan=bindSemanticPlan({
-    snapshot:()=>({assets:state.roomAssets,walls:state.twin.scene.walls,navigation:state.twin.navigation,
+    snapshot:()=>({assets:state.roomAssets,walls:state.twin.scene.walls,derived_context:state.twin.scene.derived_context,navigation:state.twin.navigation,scaleUnverified:state.scaleUnverified,
       robot:robotPosition(),journey:state.journey,selected:state.selectedAsset}),
     inspect:asset=>selectAsset(asset,true),
     navigate:dispatchRobotToAsset,
@@ -2299,7 +2421,7 @@ function bindUIEvents() {
       return;
     }
     if (key === "shift") walkKeys.add(key);
-    if (movementKeys.includes(key)) {
+    if (movementKeys.includes(key) && state.navigationAvailable) {
       event.preventDefault();
       if (!state.manualWalk && event.repeat) return;
       if (!state.manualWalk) beginManualWalk();
@@ -2323,9 +2445,13 @@ function bindUIEvents() {
   document.addEventListener("visibilitychange",registerActivity);
   document.getElementById("autoplay-chip").addEventListener("click",registerActivity);
   document.getElementById("btn-drop-obstacle").addEventListener("click",dropDemoObstacle);
-  for(const id of ["btn-room-tour","btn-go-target"])document.getElementById(id).disabled=false;
+  for(const id of ["btn-room-tour","btn-go-target"])document.getElementById(id).disabled=!state.navigationAvailable;
+  document.getElementById("btn-go-target").disabled ||= !state.assetsById.has(state.twin.target_asset_id);
   document.getElementById("btn-room-tour").addEventListener("click",()=>{
-    try{activateRoute(planRoomTour(state.twin.navigation,robotPosition()));}catch(error){navigationError(error);}
+    try{
+      const route=planRoomTour(state.twin.navigation,robotPosition());
+      showMissionView();activateRoute(route);
+    }catch(error){navigationError(error);}
   });
   document.getElementById("route-map").addEventListener("click",e=>{
     const rect=e.currentTarget.getBoundingClientRect(),m=state.twin.navigation.grid_meta;
@@ -2336,8 +2462,10 @@ function bindUIEvents() {
       if (point) setMovePoint(point);
       return;
     }
+    if(!state.navigationAvailable){navigationError(new Error("No supported floor route is available; use Free view to inspect."));return;}
     if(!point){navigationError(new Error("Choose a point inside the room walls."));return;}
     const objects=state.roomAssets.filter(asset=>{
+      if(state.imported && (cellAtPosition(point) || (!asset.mapped && asset.review_status!=="accepted"))) return false;
       if(asset.tier!=="equipment"||asset.center[1]-asset.size[1]/2>1.62||asset.center[1]+asset.size[1]/2<.10)return false;
       const dx=point.x-asset.center[0],dz=point.z-asset.center[2],c=Math.cos(asset.yaw),s=Math.sin(asset.yaw);
       return Math.abs(dx*c+dz*s)<=asset.size[0]/2 && Math.abs(-dx*s+dz*c)<=asset.size[2]/2;
@@ -2363,17 +2491,19 @@ function bindUIEvents() {
   document.getElementById("select-splat-mode").addEventListener("change", resizeRenderer);
   document.getElementById("select-visual-review").addEventListener("change", (e) => {
     state.visualReviewFilter = e.target.value;
+    state.listLimit = 100;
     renderProposalList();
   });
 
   document.getElementById("asset-search").addEventListener("input", (e) => {
     state.searchQuery = e.target.value;
+    state.listLimit = 100;
     renderProposalList();
   });
 
   bindViewSwitch();
   for (const btn of document.querySelectorAll("[data-layer]")) {
-    btn.addEventListener("click", () => setViewLayer(btn.dataset.layer));
+    btn.addEventListener("click", () => { proposalReview?.close(); setViewLayer(btn.dataset.layer); });
   }
   document.getElementById("ceiling-toggle").addEventListener("change", e => setCeilingCut(e.target.checked));
 
@@ -2382,6 +2512,7 @@ function bindUIEvents() {
       document.querySelectorAll("[data-bmode]").forEach((b) => b.classList.remove("active"));
       btn.classList.add("active");
       state.boxesMode = btn.dataset.bmode;
+      updateLayerCount();
     });
   }
 
@@ -2391,7 +2522,7 @@ function bindUIEvents() {
 
   document.getElementById("btn-go-target").addEventListener("click", () => {
     const target = state.assetsById.get(state.twin.target_asset_id);
-    if (target) dispatchRobotToAsset(target);
+    if (target) {showMissionView({inspection:true});dispatchRobotToAsset(target);}
   });
 
   document.getElementById("btn-take-apart").addEventListener("click", () => takeApart.open(state.selectedAsset));
@@ -2404,7 +2535,7 @@ function bindUIEvents() {
     const asset=state.selectedAsset;
     const requestId=++copilotRequestId;
     const current=()=>requestId===copilotRequestId && state.selectedAsset?.asset_id===asset.asset_id;
-    out.textContent = "Querying grounded telemetry, events, and Valmet SOP corpus...";
+    out.textContent = state.twin.runtime?.offline ? "Reading local workbook evidence…" : "Querying grounded telemetry, events, and Valmet SOP corpus...";
     try {
       const res = await fetch("/api/copilot/diagnose", {
         method: "POST",
@@ -2502,4 +2633,10 @@ async function bindArView() {
   dialog.addEventListener("close", () => video.pause());
 }
 
-init();
+init().catch(error => {
+  console.error(error);
+  document.getElementById("sidebar-stats-text").textContent = "Unable to load this scene";
+  const notice = document.getElementById("dataset-note");
+  notice.textContent = error.message;
+  notice.classList.add("load-error");
+});

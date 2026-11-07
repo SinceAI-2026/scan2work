@@ -38,6 +38,8 @@ def save_cache() -> None:
 
 
 def enabled() -> bool:
+    if C.OFFLINE:
+        return False
     return bool(os.environ.get("OPENAI_API_KEY")) or bool(_load_cache())
 
 
@@ -47,6 +49,8 @@ def decide(input_, questions: list[dict], timeout: float = 60.0, cache_key: str 
     cache_key: optional stable key (e.g. asset id + geometry) for requests whose bytes differ across
     machines, such as rendered images; defaults to a hash of the full request body.
     """
+    if C.OFFLINE:
+        return None
     body = {"model": C.DECISIONS_MODEL, "input": input_, "questions": questions}
     raw = json.dumps(body, sort_keys=True)
     key = cache_key or hashlib.sha256(raw.encode()).hexdigest()

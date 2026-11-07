@@ -90,7 +90,35 @@
 .ar-view{margin:auto;width:min(1040px,92vw);max-height:90vh;padding:16px;border:1px solid #607565;border-radius:10px;background:#172622;color:#f1f8ed}
 .ar-view::backdrop{background:#101a16bb}.ar-view-header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}.ar-view-header h2{font-size:16px}.ar-view video{display:block;width:100%;max-height:76vh;background:#111}
 .arrival-safety{padding:8px 10px;border-left:3px solid #a5712a;border-radius:4px;background:#f6edda;color:#654717;font-size:11px;line-height:1.45}
+/* Imported regions: concise evidence, neutral candidates, and a bounded list. */
+.dataset-note { font-size: 11px; line-height: 1.5; color: #6b7277; margin: 7px 0 0; }
+.dataset-note.load-error { color: #b53128; }
+.asset-result-count { color: #687378; font-size: 11px; margin: 8px 0; }
+button.proposal-card { width: 100%; text-align: left; font: inherit; color: inherit; }
+button.proposal-card .prop-class, button.proposal-card .prop-meta { display: block; }
+button.proposal-card .prop-meta span { display: block; overflow-wrap: anywhere; }
+.prop-mapping { color: #75633c; }
+.list-empty { font-size: 12px; padding: 12px; }
+.hud-tag.candidate { background: #e6ecee; color: #34444a; border-color: #96a8b0; }
+.evidence-controls { display: flex; gap: 5px; flex-wrap: wrap; padding: 8px; }
+.evidence-controls button, .evidence-controls a { border: 1px solid #bdc8c8; border-radius: 5px; padding: 4px 7px; background: white; color: #374843; font: inherit; font-size: 11px; cursor: pointer; }
+.evidence-controls button[aria-current=true] { background: #d2e9dc; }
+.asset-photo .evidence-note { color: #65716f; font-size: 10px; line-height: 1.4; padding: 0 9px 8px; margin: 0; }
+.layer-counts{font-size:11px;line-height:1.4;max-width:240px;color:inherit;opacity:.85}
+#bim-search{min-width:0;width:100%;max-width:240px;padding:6px;border:1px solid #385761;border-radius:4px;background:#0e1c24;color:#e0edf0}
+#bim-search-results{display:grid;gap:3px;max-width:240px;max-height:155px;overflow:auto}
+#bim-search-results:empty{display:none}
+#bim-search-results button{text-align:left;font-size:11px;overflow-wrap:anywhere}
 
 /* Map in the top-right corner, under the view controls; the voice assistant widget has the bottom-right corner. */
 .route-map-panel{top:56px;bottom:auto;max-height:calc(100% - 140px);overflow-y:auto}
 @media(max-width:650px){.route-map-panel{top:140px;max-height:calc(100% - 230px)}}
+.proposal-review-panel{position:absolute;top:58px;right:16px;bottom:18px;z-index:29;width:min(330px,calc(100% - 32px));overflow:auto;background:#f6f7f0;color:#24372e;padding:14px;border:1px solid #bdcaba;border-radius:8px;box-shadow:0 8px 30px #0004;display:flex;flex-direction:column;gap:10px;font-size:12px}
+.proposal-review-heading{display:flex;justify-content:space-between;align-items:center}.proposal-review-heading button{border:0;background:none;font-size:24px;color:inherit}
+.proposal-review-note,.proposal-review-status{font-size:11px;line-height:1.45;color:#657467}
+.proposal-review-panel label{display:grid;gap:5px}.proposal-review-panel input{width:100%;padding:7px;border:1px solid #bdcaba;border-radius:4px}
+.proposal-review-list{display:grid;gap:4px;max-height:200px;min-height:90px;overflow:auto;flex-shrink:0}
+.proposal-review-list button,.proposal-overlaps button{padding:8px;text-align:left;border:1px solid #d5decf;border-radius:5px;background:white;color:inherit}
+.proposal-review-list button[aria-pressed=true]{border-color:#c87544;background:#f9eadb}.proposal-review-list small{display:block;font-size:10px;color:#657467;margin-top:4px}
+.proposal-review-detail{display:grid;gap:8px;padding-top:10px;border-top:1px solid #bdcaba}.proposal-review-detail h3{font-size:15px}.proposal-overlaps{display:grid;gap:4px}.proposal-review-detail a{text-align:center;text-decoration:none}
+.proposal-review-open .route-map-panel{display:none}.proposal-review-open .navigation-hud{max-width:calc(100% - 375px)}

@@ -37,6 +37,7 @@ export async function showEquipment(equipment) {
   const keep = { q: search.value, f: filter.value };
   if (!card()) { search.value = ""; search.dispatchEvent(new Event("input")); }
   if (!card()) { filter.value = "all"; filter.dispatchEvent(new Event("change")); }
+  if (!card()) { search.value = obj; search.dispatchEvent(new Event("input")); }
   if (!card()) throw new Error(`${tag} is not in the room list (removed from the room?)`);
   card().click();
   document.getElementById("btn-room-location").click();
@@ -97,12 +98,18 @@ function renderQueue(root) {
 // ------------------------------------------------------------------ the job card (Equipment details)
 function renderJob(root) {
   const tag = currentTag();
+  if (root.dataset.equipment !== tag) {
+    root.querySelector("#fj-text").value = "";
+    root.querySelector(".fj-error").textContent = "";
+    root.dataset.equipment = tag;
+  }
   root.hidden = tag === "none";
   if (root.hidden) return;
   const job = data.jobs[tag];
   const status = root.querySelector(".fj-status");
   status.textContent = job ? progress(job) : "No job yet";
   status.className = `fj-status ${job?.status || "none"}`;
+  root.querySelector(".fj-start").hidden = Boolean(job);
   root.querySelector(".fj-checks").innerHTML = (job?.checks || []).map((c) => `
     <li class="${c.done ? "done" : ""}"><label>
       <input type="checkbox" data-check="${esc(c.id)}" ${c.done ? "checked disabled" : ""} ${job.status !== "in_progress" ? "disabled" : ""}>
@@ -111,7 +118,7 @@ function renderJob(root) {
     </label></li>`).join("");
   root.querySelector(".fj-notes").innerHTML = (job?.notes || []).slice().reverse().map((n) => `
     <li class="${esc(n.kind)}"><div class="fj-note-meta">${esc(n.kind)} · ${esc(n.by || "technician")} · ${esc(n.at)}</div>${esc(n.text)}</li>`).join("")
-    || `<li class="fj-empty">No notes yet. Notes from the call with Ilkka appear here too.</li>`;
+    || `<li class="fj-empty">No notes yet.</li>`;
   const open = job?.checks.filter((c) => !c.done).length ?? 1;
   const done = root.querySelector(".fj-mark-done");
   done.hidden = job?.status === "fixed";
@@ -162,16 +169,16 @@ function mountQueue() {
     if (b) showEquipment(b.dataset.tag).catch((err) => flash(err.message));
   });
 
-  // The viewer's own search, filter and list move into the second tab as they are (same elements, same listeners).
+  // Search stays visible above both tabs; the original filter and list keep their handlers.
   const panel = document.createElement("section");
   panel.id = "equipment-panel";
   panel.className = "equipment-panel side-panel";
   panel.setAttribute("role", "tabpanel");
   panel.setAttribute("aria-labelledby", "tab-equipment");
-  for (const el of [document.querySelector(".left-sidebar .filter-group"), document.getElementById("select-visual-review"),
-    document.getElementById("asset-list")]) if (el) panel.appendChild(el);
+  for (const el of [document.getElementById("select-visual-review"),
+    document.getElementById("asset-result-count"), document.getElementById("asset-list")]) if (el) panel.appendChild(el);
 
-  const anchor = sidebar.querySelector(".mission-box");
+  const anchor = sidebar.querySelector(".filter-group") || sidebar.querySelector(".mission-box");
   anchor ? anchor.after(tabs, root, panel) : sidebar.append(tabs, root, panel);
 
   const select = (name) => {
@@ -194,6 +201,16 @@ function mountQueue() {
   let saved = "inspect";
   try { saved = localStorage.getItem(TAB_KEY) || saved; } catch { /* private window */ }
   select(saved === "equipment" ? "equipment" : "inspect");
+  const search=document.getElementById("asset-search"),filter=document.getElementById("select-visual-review");
+  let previousFilter=null;
+  search.addEventListener("input",()=>{
+    if(search.value.trim()) {
+      if(previousFilter===null){previousFilter=filter.value;filter.value="all";filter.dispatchEvent(new Event("change"));}
+      select("equipment");
+    } else if(previousFilter!==null) {
+      filter.value=previousFilter;previousFilter=null;filter.dispatchEvent(new Event("change"));
+    }
+  },true);
 }
 
 function mountJob() {
@@ -202,6 +219,7 @@ function mountJob() {
   root.className = "section-block field-job";
   root.hidden = true;
   root.innerHTML = `<div class="sec-title-row"><h3 class="sec-title">Technician job</h3><span class="fj-status"></span></div>
+    <button type="button" class="fj-btn primary fj-start">Start inspection checklist</button>
     <ol class="fj-checks"></ol>
     <h4 class="fj-sub">Technician notes</h4><ul class="fj-notes"></ul>
     <form class="fj-form">
@@ -214,6 +232,12 @@ function mountJob() {
       </div>
       <p class="fj-error" role="status"></p>
     </form>`;
+  root.querySelector(".fj-start").addEventListener("click", async e => {
+    const button = e.currentTarget;
+    button.disabled = true;
+    try { await act(root, { action: "start_job", equipment: currentTag() }); }
+    finally { button.disabled = false; }
+  });
   root.addEventListener("change", async (e) => {
     const id = e.target.dataset?.check;
     if (!id) return;

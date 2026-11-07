@@ -27,7 +27,8 @@ class FieldServiceTest(unittest.TestCase):
         self.addCleanup(self.tmp.cleanup)
 
     def test_spoken_tags_resolve_to_one_asset(self):
-        ids = {self.service.asset(t)["asset_id"] for t in ("CV-003", "cv 003", "CV3", "ASSET-003", "OBJ-206")}
+        target_object = self.service.asset("CV-003")["id"]
+        ids = {self.service.asset(t)["asset_id"] for t in ("CV-003", "cv 003", "CV3", "ASSET-003", target_object)}
         self.assertEqual(ids, {"ASSET-003"})
         with self.assertRaises(ValueError):
             self.service.asset("XX-999")

@@ -4,6 +4,7 @@ import { filterShows, wallsShown, onFilterChange } from "./view-filter.mjs";
 import { bimCylinder, mergedVesselEnvelope } from "./bim-geometry.mjs";
 import { explodeOffset } from "./explode.mjs";
 import { classHue } from "./asset-presentation.mjs";
+import { visualGeometry } from "./scene-layers.mjs";
 
 const UP = new THREE.Vector3(0,1,0);
 
@@ -78,9 +79,11 @@ export function createBimRoom({scene, camera}) {
     for (const asset of items) {
       const cylinder=bimCylinder(asset);
       const envelope=mergedVesselEnvelope(asset,cylinder);
-      const colour=asset.is_target ? 0xee705e : classHue(String(asset.class || "").toLowerCase());   // same as Coloured objects
+      const unreviewed=Boolean(asset.source_region_id && asset.label_verified!==true);
+      const geometry=visualGeometry(asset);
+      const colour=unreviewed ? 0x97a9b0 : asset.is_target ? 0xee705e : classHue(String(asset.class || "").toLowerCase());
       const material=new THREE.MeshStandardMaterial({color:colour,roughness:.74,metalness:.05,
-        transparent:envelope,opacity:envelope ? .18 : 1,depthWrite:!envelope});
+        transparent:envelope||unreviewed,opacity:unreviewed ? .12 : envelope ? .18 : 1,depthWrite:!envelope&&!unreviewed});
       let mesh;
       if (cylinder?.radius>0) {
         const start=new THREE.Vector3().fromArray(cylinder.start), end=new THREE.Vector3().fromArray(cylinder.end);
@@ -92,9 +95,9 @@ export function createBimRoom({scene, camera}) {
         }
       }
       if (!mesh) {
-        mesh=new THREE.Mesh(new THREE.BoxGeometry(...asset.size),material);
-        mesh.position.fromArray(asset.center);
-        mesh.rotation.y=-asset.yaw;
+        mesh=new THREE.Mesh(new THREE.BoxGeometry(...geometry.size),material);
+        mesh.position.fromArray(geometry.center);
+        mesh.rotation.y=-(geometry.yaw||0);
       }
       const edge=new THREE.LineSegments(new THREE.EdgesGeometry(mesh.geometry,30),
         new THREE.LineBasicMaterial({color:0xd7eef0,transparent:true,opacity:.23}));

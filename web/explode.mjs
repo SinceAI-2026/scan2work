@@ -3,6 +3,7 @@
 // centre (splats in the shader, frames and tags in JS). Wired into app.js by scripts/patch_explode_view.py.
 import * as THREE from "three";
 import { assetPresentation, classHue } from "./asset-presentation.mjs";
+import { decodeInstanceIds } from "./imported-assets.mjs";
 
 export const explodeState = { amount: 0, segment: false };
 const offsets = new Map();
@@ -26,6 +27,7 @@ function computeOffsets(assets) {
 
 // One colour per class (the "Detected objects" layer): splats and frames of all valves share a hue, etc.
 export function classColour(asset) {
+  if(asset.source_region_id && asset.label_verified!==true)return new THREE.Color(0x97a9b0);
   return new THREE.Color(classHue(String(asset.class || "").toLowerCase()));
 }
 
@@ -42,26 +44,17 @@ function floatTex(data, w, h, format) {
   return t;
 }
 
-// Returns shader uniforms. Missing file -> harmless dummy textures (feature simply does nothing).
+// Fail closed: a different scan's ownership must never select or edit an object.
 export async function loadInstanceUniforms(url, count, texW, texH, assets) {
   computeOffsets(assets);
   const instData = new Float32Array(texW * texH);
   let complete = false;
   const tableW = 256, tableH = Math.ceil((assets.length + 1) / tableW);
   const table = new Float32Array(tableW * tableH * 4);
-  try {
-    const res = await fetch(url);
-    if (res.ok) {
-      const buf = await res.arrayBuffer();
-      const n = new DataView(buf).getUint32(8, true);
-      const ids = new Uint16Array(buf, 12, Math.min(n, count));
-      complete = n === count;
-      for (let i = 0; i < ids.length; i++) {
-        if (ids[i] < assets.length) instData[i] = ids[i] + 1;
-        else if (ids[i] !== 65535) complete = false;
-      }
-    }
-  } catch (e) { console.warn("explode view: no splat_instance.bin", e); }
+  const res = await fetch(url);
+  if (!res.ok) throw new Error("Object membership is unavailable. Re-import the scene before selecting objects.");
+  instData.set(decodeInstanceIds(await res.arrayBuffer(), count, assets.length));
+  complete = true;
   assets.forEach((a, i) => {
     const o = offsets.get(a.id), c = classColour(a), k = (i + 1) * 4;
     table[k] = o.x; table[k + 1] = o.y; table[k + 2] = o.z;
@@ -81,6 +74,8 @@ export async function loadInstanceUniforms(url, count, texW, texH, assets) {
     uApart: { value: 0 },      // take-apart view (take-apart.mjs): instance id + 1 of the isolated object, 0 = off
     uApartRoom: { value: 0 },  // opacity left to every other splat while one object is taken apart
     uApartSelf: { value: 1 },  // opacity of the isolated object's scan splats (0 while its saved model stands in)
+    uProposalTex: { value: floatTex(new Float32Array(1),1,1,THREE.RedFormat) },
+    uProposalId: { value: 0 }, // optional review overlay, independent of canonical object ownership
   };
 }
 
@@ -94,6 +89,8 @@ export const SHADER_DECL = `
       uniform float uApart;
       uniform float uApartRoom;
       uniform float uApartSelf;
+      uniform sampler2D uProposalTex;
+      uniform float uProposalId;
 `;
 export const SHADER_OFFSET = `
         float instId = synthetic ? floor(max(0.0, -fillCovB.w)) : texture2D(uInstTex, uv).x;
@@ -116,6 +113,9 @@ export const SHADER_COLOR = `
         }
         if (uApart > 0.5) vColor.a *= abs(instId - uApart) > 0.5 ? uApartRoom : uApartSelf;
         else if (instId < 0.5) vColor.a *= 1.0 - 0.85 * max(uExplode, uSegment * 0.6);
+        if (uProposalId > 0.5 && !synthetic && abs(texture2D(uProposalTex, uv).x - uProposalId) < 0.5) {
+          vColor.rgb = mix(vColor.rgb, vec3(1.0, 0.38, 0.13), 0.75);
+        }
 `;
 
 // Coloured objects: only objects the predicate accepts take their class colour (the "Show in room" boxes).
@@ -141,7 +141,8 @@ export function applyExplode(boxMeshes, splatMaterial) {
     const passiveColor = assetPresentation(a).frameColor;
     const c = a.is_target ? new THREE.Color(0xd94838) : explodeState.segment ? classColour(a)
       : passiveColor !== null ? new THREE.Color(passiveColor) : objectColor(a.id);
-    entry.group.visible = true;
+    // The display and proximity controls remain authoritative while exploding.
+    if (!entry.group.visible) continue;
     entry.lineMat.color.copy(c);
     entry.fillMat.color.copy(c);
     entry.lineMat.opacity = 0.9;

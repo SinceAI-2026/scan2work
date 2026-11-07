@@ -153,3 +153,355 @@ Browser verification on the same date confirmed that selecting P-001 while trave
 Repeat the browser check after changes. Complete a route to equipment and confirm that the matching diagnosis, evidence, and inspection steps open. Then select another object during a route and confirm that arrival still resolves to the route destination. A floor destination or room tour must not show an unrelated equipment diagnosis.
 
 The challenge submission also requires a runnable demo, source and setup instructions, five to eight slides, and a demo video below five minutes. The [slide outline](slides-outline.md) and [recording sequence](demo-sequence.md) are preparation documents. They are not the final slide deck or recorded video.
+
+## Expanded Field Atlas import (offline)
+
+`pipeline/import_field_atlas.py` is a separate adapter, not another detection pipeline.
+It accepts an extracted shared asset package or the original Field Atlas repository:
+
+```sh
+VALMET_OFFLINE=1 .venv/bin/python -m pipeline.import_field_atlas \
+  --bundle-root /path/to/Field-Atlas-assets-2026-11-07 \
+  --workbook /path/to/Valmet_SinceAI_2026_Synthetic_Industrial_Metaverse_Builder_Pack.xlsx
+```
+
+The package's `model1/demo/data/scene-extraction/room.ply` is the default scan;
+`--source '/path/to/Equipment Room.ply'` supports the original checkout. `--output`
+selects a different data directory. Stop the server before reimporting. Generation
+happens in a temporary staging directory; validation failures do not overwrite the
+active artifacts, and the new `digital_twin.json` manifest is published last.
+Library saves, technician logs, edits and the upstream Decisions cache are preserved.
+
+Integrity checks validate the full source PLY SHA256, payload size, declared row
+count, raw ownership SHA256, object ordering, owner IDs, disjoint row indices and
+per-object counts. A rigid transform maps source `[x,y,z]` to `[x,1.185-y,-z]`.
+It changes neither scale nor object membership. The physical scale is unverified.
+
+The imported scene contains 1,933 unreviewed regions, with exactly 711,568 owned
+source Gaussians. All 415 baseline regions and their 103,378 rows remain. Regions
+are proposals/partial surfaces, not a claim that 1,933 physical objects were
+recognized correctly. 964,913 source rows remain unassigned. Recognition accuracy
+is not measured by these coverage counts, and upstream gold labels/scorecards
+must not be reused for these new region IDs.
+
+`boiler_room_points.bin` (GSPL v3, stride40) and `splat_instance.bin` (GSID v1)
+share exactly the same row ordering; GSID values are zero-based asset indices,
+with 65535 denoting unassigned context. `splat_source_rows.npy` maps every rendered
+row back to the original scan. The existing Wael renderer uses original anisotropic
+covariance and DC colour; it does not render higher-order SH. `source_scan.ply`
+retains every original attribute. `source_members.npz` preserves exact region rows.
+The library export rechecks source SHA256, all source positions and every region's
+membership before exporting native PLY, GSPL, a thumbnail and original row IDs.
+No box filling, floor deletion, geometric expansion, training, or synthetic mesh is
+performed on imported regions.
+
+Only 30 procedural equipment bindings receive the provided Excel telemetry,
+alarms and maintenance records. Other regions have unique `REGION-...` IDs,
+`mapped=false`, unknown condition, no health score and empty telemetry. Their
+copilot response states that service data is missing. Native video evidence is
+copied where present; automatic regions retain rendered proposal evidence, which
+is labelled separately. These photos are identification evidence, not calibrated
+photogrammetric reconstruction.
+
+The CV-003 demo preserves Wael's physical anchor: `linards-BOX-0173`, the orange
+actuator visible in its native walkthrough crop. Its imported upstream region
+boundary is still unreviewed. The prior Field Atlas CV-003 binding to
+`linards-BOX-0262` is retained in source provenance and explicitly overridden for
+this demonstration; BOX-0262 receives no invented replacement telemetry.
+
+Navigation uses 37,687 observed floor samples and 188,536 obstacle samples from
+the original scan. Region boxes are not treated as solid objects. Unknown floor
+is blocked; robot clearance and lengths are simulation assumptions in source
+units. All generated segments are collision-checked against this occupancy grid,
+which does not prove real-world safety or completeness of the scan. The supplied
+import produces 28 available routes, including the CV-003 target (4.619 source
+units), and two unavailable destinations (CV-011, P-006) with explicit reasons.
+The viewer calculates proximity across all assets live; saved routes carry a
+compact 16-item summary per waypoint with the full nearby count preserved.
+
+Both the importer and the default server disable external inference explicitly.
+`VALMET_OFFLINE=1` bypasses keychain/secret loading, model downloads and Decisions
+API calls, even if the shell already contains an API key. Copilot text is a
+deterministic explanation of synthetic Excel records, with TF-IDF document
+retrieval. Confidence values inherited from Excel are synthetic dataset values,
+not newly measured recognition accuracy. Legacy training/AI pipeline entry points
+remain separate; the offline import never invokes them.
+
+Verification:
+
+```sh
+VALMET_OFFLINE=1 .venv/bin/python -m unittest discover -s tests -p 'test_*.py' -v
+node tests/test_navigation_view.mjs
+```
+
+The new tests cover swapped owner IDs, reordered manifests, overlapping/foreign
+rows, wrong source hashes, coordinate transforms, offline credentials, safe
+unmapped diagnostics, failed-import isolation, all real ownership counts, exact
+native PLY export bytes and route traversal against the saved occupancy grid.
+The two legacy OBJ-206/refinement tests are skipped without their legacy scan
+layout; the imported target has a separate exact-export integration test.
+
+## Recovery of plan and BIM context after the expanded import
+
+**Update:** The original archive was subsequently supplied. The actual object, source-row and runtime-floor comparison is in [Original data audit](original-data-audit.md). The missing-artifact statements below describe the earlier recovery stage, not current availability.
+
+The first import preserved the scan and the new exact region memberships, but it
+**did omit useful derived layers from Wael's pipeline**. More extraction regions
+did not automatically make a richer BIM model. In particular, the initial import
+had zero wall guides, zero fitted pipe cylinders, no oriented geometry proxies,
+and no retained catalog-name normalization. 383 of the 415 baseline regions had
+usable names but generic `unclassified` categories, so class-based plan filters
+hid them. It also displayed a sparse monochrome plan raster.
+
+At the time of this recovery, the original Wael generated `digital_twin.json`
+was absent from the clone and locally searched directories. Its published 504
+objects and 24 classes could not establish an exact object-by-object overlap.
+The 415 preserved baseline regions refer to **Linards**, not Wael's 504 objects.
+The user subsequently supplied the original archive; its actual labels, merges,
+photos, fitted assets and exact source-row relationships are now documented in
+[Original data audit](original-data-audit.md). They were audited read-only and
+were not automatically merged into this recovery.
+
+`pipeline/derived_context.py` now restores independently derived display context
+using the existing Wael geometry methods, without changing the exact extraction:
+
+| Layer | First expanded import | Context recovery |
+| --- | ---: | ---: |
+| Exact imported regions | 1,933 | 1,933, unchanged |
+| Owned source Gaussian rows | 711,568 | 711,568, unchanged |
+| Retained catalog names normalized into viewer classes | 0 | 415, still unverified |
+| Regions with generic `unclassified` category | 1,897 | 1,514 |
+| Configured Wael wall guides | 0 | 4, explicitly assumed |
+| Fitted pipe geometry context | 0 | 120 unreviewed cylinder hypotheses |
+| Approximate oriented display envelopes | 0 | 1,933 (427 with nonzero yaw) |
+| Observed low-surface context | Not exported separately | 154,288 samples / 13,628 cells |
+| Available navigation routes | 28 | 28, unchanged |
+
+The auxiliary context is available in `scene.derived_context` and the standalone
+`web/data/derived_context.json`; the audit is in `context_recovery_report.json`.
+Each region gets a `geometry_proxy` separate from its canonical center, size,
+yaw, source IDs and exact members. Pipe geometry is a separate layer, not 120 new
+segmented objects. It uses `pipes.fit_segments` (normal/radius voting and a
+continuous surface-arc check), never `pipes.integrate`, which would change source
+ownership. Each cylinder records support, arc coverage and related existing
+region IDs. Labels are normalized from existing Linards names only; no AI model
+was rerun and the 1,514 unclassified regions remain unclassified.
+
+The four wall lines reproduce the original configured Wael guides and explicitly
+carry `assumption=true` and `measured=false`. They are not detected wall geometry.
+Observed low-surface cells use a broader display gate than navigation and do not
+fill unknown holes. The raster now includes native scan colours, thin obstacles
+and equipment context, with at most 1.5-pixel display interpolation. These display
+layers never open robot routes or assert floor safety. Navigation JSON SHA256 is
+identical before and after context recovery:
+`2976d8edcc4879401c607ef4e0d288c43e6269fe9f1e662261409db763d61443`.
+
+The full original PLY SHA256 remains
+`83d8c7d99316c08c9719cfc2c5a6b9d1903b89847780e2458adc662c79f32955`.
+GSPL, GSID and source membership files are not rewritten by context recovery.
+The import now runs this recovery automatically. To apply it to an existing
+import without rebuilding extraction or navigation:
+
+```sh
+VALMET_OFFLINE=1 .venv/bin/python -m pipeline.derived_context
+VALMET_OFFLINE=1 .venv/bin/python -m unittest discover -s tests -p test_derived_context.py -v
+```
+
+All context remains in unverified source units. These improvements restore useful
+plan/BIM display layers; they do not establish survey accuracy, complete object
+recognition, complete pipes, or a verified construction BIM.
+
+The recovered IFC export includes all 1,933 region entities, 120 separately
+identified unreviewed pipe-fit proxies, four assumed wall guides and an assumed
+slab. Pipe context is exported as `IFCBUILDINGELEMENTPROXY`, without Gaussian
+ownership claims. The observed-floor mask is recorded through its source sample
+count, resolution and supported-cell count; it is not exported as a measured
+floor mesh. The generated IFC4 file parsed with IfcOpenShell and returned zero
+schema validation errors. Schema validity does not validate geometry, scale,
+wall placement or the catalog labels. Moved assets use their placed canonical
+envelopes so an original scan proxy cannot remain at a stale location; independent
+scan-context pipe fits do not follow an arbitrary moved region.
+
+## Original baseline with an optional proposal review layer
+
+The active demonstration can now use the supplied Wael archive as its canonical
+baseline. `pipeline/build_baseline_demo.py` stages a **new directory** and refuses
+to replace an existing directory, input tree or parent of either input. It never
+activates the staged data automatically. Every original field of all 504 objects,
+their 30 canonical bindings, 471 photo references, 83 attached cylinders and the
+complete stored navigation object is checked for equality. Original GSPL and GSID
+files are copied byte-for-byte, preserving the original 1,046,910-row rendering.
+The four archived asset-library entries remain available with their original
+refinement provenance.
+
+The staged dataset also contains the full source PLY, an audited original source-row
+map and a compact exact ownership file for the 598,437 rows assigned by the archived
+GSID. Original detector `n_gaussians` values are preserved. A separate
+`exact_owned_gaussians` field controls new native PLY exports: CV-003 / OBJ-206 retains
+its original detector count of 346, while native export contains its actual 1,231
+GSID-owned source rows. No additional box filling, floor deletion or refinement runs.
+A library containing both archived refinements and new exact exports explicitly
+reports mixed provenance, with individual entry metadata authoritative.
+
+The 1,933 expanded regions are kept **outside** the canonical asset list:
+
+- `proposal-review/catalog.json` contains their original IDs, geometry, unreviewed
+  labels, evidence, full/visible member counts and source-row links to original
+  objects. It does not assign synthetic telemetry or duplicate canonical device IDs.
+- `proposal-review/projected_instance.bin` uses the same GSID format and row ordering
+  as the unchanged baseline renderer, but indexes the separate proposal catalog.
+- 627,926 proposal-owned rows are visible in the original renderer; 83,642 additional
+  owned rows remain available in the complete extraction review at port 8768.
+- `proposal-review/full_source_members.npz` preserves all 711,568 proposal members.
+  All 3,716 referenced proposal evidence files are copied locally for review.
+- `digital_twin.json.proposal_review` advertises the catalog, projected ownership,
+  full-view URL and counts. It defaults to hidden. Neither proposal visibility nor
+  selection changes original identities, equipment bindings or navigation.
+
+The original baseline has `scene.dataset_kind="wael-original-baseline"` and a
+manifest-derived dataset ID. Its assets deliberately do not have `source_region_id`,
+so original semantic rendering and walkthrough-passage behavior remain available.
+Exact ownership is a separate capability (`scene.membership_mode="exact-source-rows"`)
+and must not be confused with the expanded-import visual mode.
+
+### Explicit data-directory selection
+
+`VALMET_DATA_DIR` selects the served data **and** all dataset writes. It governs
+`/data/...` static files, the API manifest, retrieval index, technician log, scene
+edits and asset library. UI/code still come from the current checkout. This keeps
+baseline operations separate from the complete extraction-review application's
+files and browser origin. Running `server.py` without this variable still serves
+this checkout's `web/data` directory; it does not silently switch datasets.
+
+Current baseline launch:
+
+```sh
+VALMET_OFFLINE=1 \
+VALMET_DATA_DIR=/Users/perttu/Downloads/SinceAI-2026/Wael-baseline-stage-2026-11-07 \
+.venv/bin/python server.py 8766
+```
+
+The complete extraction application is preserved independently under
+`/Users/perttu/Downloads/SinceAI-2026/Wael-extraction-review` at port 8768.
+
+Baseline tests use the selected staged directory and assert unchanged original
+fields, images, cylinders, bindings, navigation and renderer hashes; exact proposal
+projection; byte-exact native target export; isolated static routing; and upstream's
+asynchronous library-save HTTP 202 contract. Imported-region and derived-context
+artifact checks remain strict but run only against their applicable dataset. They
+can be run independently against the preserved extraction data:
+
+```sh
+VALMET_OFFLINE=1 \
+VALMET_DATA_DIR=/Users/perttu/Downloads/SinceAI-2026/Wael-extraction-review/web/data \
+.venv/bin/python -m unittest discover -s tests -p test_field_atlas_import.py -v
+```
+
+### Browser verification of the restored baseline
+
+The baseline was activated on port 8766 using the staged data directory; the
+checkout's expanded `web/data` and the complete review on port 8768 remain intact.
+Browser verification confirmed:
+
+- Navigation reached **ARRIVED** at CV-003 / OBJ-206 and displayed grounded service
+  guidance.
+- Saving the target continued in the background after its card was closed. The
+  HTTP 202 job produced a native PLY containing exactly 1,231 owned source rows.
+- Removing and restoring OBJ-004 returned the scene to zero removed objects.
+- Selecting the 171-row proposal linked it to OBJ-206 through 170 shared rows;
+  proposal review did not change the canonical catalog or equipment bindings.
+- The actual browser IFC export contained 504 assets, 87 cylinder geometries
+  (83 archived cylinders plus four legacy runtime vessel fits), and four walls.
+  IfcOpenShell reported zero schema validation errors. This checks IFC structure,
+  not measured scale, segmentation correctness or construction readiness.
+
+### Compatibility with the upstream no-borrowed-profile policy
+
+Upstream commit `ef96298` stops assigning healthy workbook profiles to unmapped
+fixed objects in new builds. The supplied original archive still contains 321
+such historical profiles. Its files and fields remain unchanged for provenance
+and reproducibility; they are not treated as assigned device records. The viewer
+gates operational presentation on `mapped`, and `pipeline/asset_records.py` applies
+the same rule to API asset lists, details, telemetry, events, maintenance,
+diagnostics and route-proximity records. The route's geometry is unchanged.
+Unmapped records expose their object ID, scan geometry and evidence,
+with no health score, borrowed readings or service history. An explicit provenance
+field identifies any archived profile excluded from the response.
+
+Unmapped copilot requests return a no-assigned-record explanation without model
+routing or quoting archived diagnoses. Work orders and the technician queue remain
+limited to mapped records. This compatibility layer does not rewrite the archive,
+rebind devices, regenerate extraction or change the original 30 workbook records.
+
+### Interactive feature parity checklist
+
+A source review compared upstream `359530b` with merged `d0eae2b`. The upstream
+main-view action IDs and functions remain present. This is a code inventory, not
+a claim of full behavioral equivalence; the following interactions should be
+checked in the browser after changes to the toolbar or panel layout.
+
+| User action | Retained entry point / expected check |
+| --- | --- |
+| Browse freely | Aerial orbit, pan and zoom; First person and Follow robot; WASD/arrow movement and drag-to-look. |
+| Choose a destination | Tour the room, Inspect faulty device, Navigate here, and clicking reachable map floor. |
+| Control the mission | Start/resume/pause, arrival report, visible route, manual takeover and M to resume the mission. |
+| Demonstrate replanning | Drop obstacle during an eligible route; retain the detour or blocked-route explanation and old-route trace. |
+| Inspect equipment | Search/filter, queue selection, evidence photos, source geometry, View location and equipment details. |
+| Change scene presentation | Scan, Coloured and BIM layers; nearby/all/off frames; walls, pipes, equipment, ceiling, render quality and explode controls. |
+| Isolate and return | Isolate region / T, orbit, turntable / R, ghost room / G, and Esc back to the previous scene view. |
+| Edit the room | Move, placement preview, cancel/place/reset, remove/restore, and the Room changes list; the designated target remains protected. |
+| Inspect video evidence | AR walkthrough playback, seeking and target excerpt, using the locally preserved overlay clip. |
+| Inspect/export BIM | Search/select on the 2D plan, navigate or view equipment, open the 3D model, and download IFC4. |
+| Reuse an object | Background Save to library, save status after closing the card, library search/class filters, supported file downloads, ZIP, and return to the room. |
+| Complete service work | Mapped-device telemetry and grounded guidance; draft work order; start checklist, safety-first checks, notes and completion. |
+| Review extra extraction | Separate candidate review, source evidence and original-object overlaps; no implicit changes to canonical objects or bindings. |
+
+Toolbar regression checks include retaining the current camera/layer when merely
+selecting a list item, preserving every collapsed control's accessible entry
+point, and offering service actions only for a mapped workbook device. An `OBJ-*`
+identifier must not be mistaken for a registered device tag. Archived library
+profiles also require the same no-borrowed-readings presentation as the main room.
+
+The active baseline deliberately differs from the upstream runtime:
+
+- External voice calls are disabled by its offline runtime flags. The voice
+  integration remains in the repository; local inspection jobs remain available.
+- New library saves preserve exact source rows, native PLY and scan GSPL. They do
+  **not** currently generate a photo-refined model PLY or GLB mesh. This is an
+  active capability difference, not an optional refinement button in the current
+  UI. Four preserved archived library entries still provide their existing model
+  or enhanced PLY/GSPL and GLB files; the viewer retains support for those files.
+- Legacy photo refinement remains as local CPU PyTorch code, not an external AI
+  service. It currently needs a missing `torch` dependency and dataset-aware
+  source/frame paths before use with the staged baseline. The active dataset has
+  334 matching frames and the original source PLY; its exact assets must remain
+  separate from any future derived preview or reconstruction.
+- Automatic idle demonstration is opt-in with `?attract=1`; normal browsing does
+  not start an unsolicited mission.
+- Exact-membership room edits retain the initial conservative floor grid. Moved
+  objects can block additional space; removing an object does not automatically
+  certify the floor beneath it or open a new shortcut. Dynamic obstacle replanning
+  remains available independently.
+
+There is no general add-new-instance action in the upstream main-room interface;
+move, remove and restore operate on its existing objects. Keeping those actions
+does not establish a new object-instantiation capability.
+
+### Usability verification on the isolated baseline copy
+
+Browser QA on port 8769 confirmed the compact toolbar has visible labels and the
+Display panel starts closed; Esc closes it and returns focus to Display. Searching
+for unmapped OBJ-004 retained the selected BIM view, and Show all exposed all 504
+objects. Its move to X=0, Z=0, base height=0 and reset both worked; remove/restore
+ended with zero removed objects. Isolation showed its 977 native Gaussians and a
+background library save completed with exports.
+
+The CV-003 route arrived after 5.5 source units; the explicit Inspect faulty device
+action cleared the search and selected Follow robot. Aerial drag-to-orbit and a
+map-click destination producing a new 4.4-unit route worked. The AR video loaded
+at 1280×720 with `readyState=4`. The plan exposed 504 objects, 87 cylinder geometries
+and four walls, and an actual IFC download completed. This round did not repeat
+full IFC schema validation. No browser errors were observed; 21 viewer tests
+passed and both patch scripts reported zero edits. The main dataset was unchanged.
+These are observed interaction checks, not a user study or proof of complete
+capability parity.

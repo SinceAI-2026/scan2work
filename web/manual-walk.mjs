@@ -2,8 +2,10 @@ import { segmentIsFree } from "./navigation-view.mjs";
 
 export function manualObstacles(assets, radius) {
   // Use the same height band as the room grid's equipment footprints.
-  return assets.filter(({tier, center, size}) =>
-    tier === "equipment" && center[1] - size[1] / 2 <= 1.62 && center[1] + size[1] / 2 >= .10
+  // Imported envelopes describe ownership extents, not solid obstacles. Their
+  // occupancy grid (including conservative moved-object blocks) is authoritative.
+  return assets.filter(({tier, center, size, source_region_id}) =>
+    !source_region_id && tier === "equipment" && center[1] - size[1] / 2 <= 1.62 && center[1] + size[1] / 2 >= .10
   ).map(({center, size, yaw}) => ({
     x: center[0], z: center[2], c: Math.cos(yaw), s: Math.sin(yaw),
     halfX: size[0] / 2 + radius, halfZ: size[2] / 2 + radius,

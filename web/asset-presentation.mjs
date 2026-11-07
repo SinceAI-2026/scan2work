@@ -1,17 +1,22 @@
 export function assetPresentation(asset) {
   const cls = String(asset.class || "").toLowerCase();
-  const kind = asset.asset_class === "UNRECORDED_DEVICE" ? "detected"
+  const kind = asset.condition_state === "unknown" || (asset.source_region_id && !asset.mapped) ? "candidate"
     : asset.condition_state === "not_instrumented" ? "facility"
-    : asset.movable || asset.condition_state === "movable" || cls.startsWith("movable_") ? "movable" : "instrumented";
+    : asset.movable || asset.condition_state === "movable" || cls.startsWith("movable_") ? "movable" : asset.mapped === false || asset.asset_class === "UNRECORDED_DEVICE" ? "detected" : "instrumented";
   return {
     kind,
     category: asset.class_label || String(asset.class || "Equipment").replaceAll("_", " "),
-    notice: kind === "detected" ? "Found in the scan · no record in the builder pack"
+    notice: kind === "candidate" ? "Unreviewed region · no assigned device data"
+      : kind === "detected" ? "Found in the scan · no record in the builder pack"
       : kind === "facility" ? "Facility item (not instrumented)"
       : kind === "movable" ? "Movable object (not instrumented)" : "",
-    frameColor: kind === "detected" ? classHue(cls) : kind === "facility" ? 0x9098a1 : kind === "movable" ? 0x8b5cf6 : null,
-    needsAttention: kind === "instrumented" && asset.condition_state !== "healthy",
+    frameColor: kind === "candidate" ? 0x97a9b0 : kind === "detected" ? classHue(cls) : kind === "facility" ? 0x9098a1 : kind === "movable" ? 0x8b5cf6 : null,
+    needsAttention: kind === "instrumented" && ["watch", "degraded", "attention_required"].includes(asset.condition_state),
   };
+}
+
+export function displayAssetTag(asset) {
+  return asset.mapped === false ? asset.id : asset.tag || asset.id;
 }
 
 // One fixed colour per class, after linards-main-new's classColor.ts (same hues for the same kinds of object:
