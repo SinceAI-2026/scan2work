@@ -1483,6 +1483,7 @@ function selectAsset(asset, openInspector = false) {
   const removed = removedIds.has(asset.id);
   renderRoomEditControls();
   document.getElementById("active-asset-details").hidden = removed;
+  document.getElementById("asset-summary").hidden = removed;
   if (removed) {
     renderAssetPhoto(null,document.getElementById("asset-photo"),location.href);
     document.getElementById("detail-id-status").textContent = `${asset.id} · Removed from room`;
@@ -1499,7 +1500,6 @@ function selectAsset(asset, openInspector = false) {
   document.getElementById("movable-notice").hidden = !uninstrumented;
   document.getElementById("movable-notice").textContent = presentation.notice;
   document.getElementById("movable-notice").className = `movable-notice ${presentation.kind}`;
-  document.getElementById("btn-draft-wo").hidden = uninstrumented;
   document.getElementById("btn-take-apart").textContent=asset.source_region_id ? "Isolate region" : "Isolate item";
   renderProposalList();
 
@@ -1520,13 +1520,21 @@ function selectAsset(asset, openInspector = false) {
   document.getElementById("detail-subtitle").textContent =
     presentation.category;
 
+  // Short specs under the title: AI confidence and health, nothing else (the label is already the title)
   const effPct = Number.isFinite(asset.effective_confidence) ? Math.round(asset.effective_confidence * 100) : null;
-  const dqTxt = asset.dq_penalty ? ` (includes -${Math.round(asset.dq_penalty * 100)}% data quality penalty)` : "";
-  document.getElementById("detail-match-note").textContent =
-    asset.source_region_id ? `${regionSummary(asset)}. Labels and boundaries are unverified.${asset.mapped ? " Device readings are synthetic Excel data mapped procedurally." : ""}` :
-    uninstrumented ? `${presentation.notice}. Original scan geometry; no device reading is assigned.` :
-    `Original box: ${asset.label}. Effective AI confidence: ${effPct === null ? "not measured" : effPct + "%"}${dqTxt}.`;
-  document.getElementById("detail-match-note").hidden = false;
+  const specs = [effPct !== null && ["AI confidence", `${effPct}%`, ""],
+    !uninstrumented && asset.health_score != null && ["Health", `${asset.health_score}%`, asset.condition_state]].filter(Boolean);
+  const specList = document.getElementById("detail-specs");
+  specList.replaceChildren(...specs.flatMap(([k, v, cls]) => {
+    const dt = document.createElement("dt"), dd = document.createElement("dd");
+    dt.textContent = k; dd.textContent = v; if (cls) dd.className = cls;
+    return [dt, dd];
+  }));
+  specList.hidden = !specs.length;
+  const note = asset.source_region_id ? `${regionSummary(asset)}. Labels and boundaries are unverified.` :
+    uninstrumented ? `${presentation.notice}. No device reading is assigned.` : "";
+  document.getElementById("detail-match-note").textContent = note;
+  document.getElementById("detail-match-note").hidden = !note;
 
   // 2D camera detection photo + red box
   drawDetectionCrop(asset);
@@ -2619,27 +2627,6 @@ function bindUIEvents() {
       askCopilot(inp.value.trim());
       inp.value = "";
     }
-  });
-
-  document.getElementById("btn-draft-wo").addEventListener("click", async () => {
-    const asset = state.selectedAsset || state.assetsById.get(state.twin.target_asset_id);
-    const res = await fetch("/api/work-orders/draft", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ asset_id: asset.asset_id }),
-    });
-    const data = await res.json();
-    const d = data.draft || asset.diagnostics?.work_order_draft;
-    const modal = document.getElementById("wo-modal");
-    document.getElementById("wo-modal-title").textContent = `Work order draft · ${d?.draft_id || "WO-DRAFT"}`;
-    document.getElementById("wo-modal-body").innerHTML = `
-      <p><strong>Equipment:</strong> ${asset.tag} (${asset.asset_id}) — ${asset.label} (${asset.area_name})</p>
-      <p><strong>Priority:</strong> ${d?.priority?.toUpperCase() || "HIGH"} | <strong>Action:</strong> ${d?.recommended_action || asset.recommended_next_check}</p>
-      <p><strong>Summary:</strong> ${d?.summary || asset.issue_summary}</p>
-      <p><strong>Attached Evidence IDs:</strong> <code>${(d?.evidence_bundle || []).join(", ")}</code></p>
-      <p style="margin-top:8px;color:#204e39;font-weight:600;">${d?.confidence_note || ""}</p>
-    `;
-    modal.classList.remove("hidden");
   });
 
   document.getElementById("wo-modal-close").addEventListener("click", () => {

@@ -126,8 +126,15 @@
         <h2 class="insp-title" id="detail-title" tabindex="-1"></h2>
         <div class="insp-subhead" id="detail-subtitle">
         </div>
-        <div class="room-edit-actions"><button id="btn-room-location" class="btn-outline-full">View location</button><span id="room-edit-tooltip"><button id="btn-room-edit" class="btn-outline-full" disabled>Remove from room</button></span></div>
-        <div class="room-edit-actions"><button id="btn-move-object" class="btn-outline-full" disabled>Move in room</button><button id="btn-reset-position" class="btn-outline-full" hidden>Reset position</button></div>
+        <div id="asset-summary" class="asset-summary">
+          <dl id="detail-specs" class="insp-specs"></dl>
+          <p id="detail-match-note" class="insp-note" hidden></p>
+          <button class="btn-primary-full btn-take-apart" id="btn-take-apart" title="Hide the room and show this region alone (T)">Isolate region</button>
+        </div>
+        <div class="room-edit-actions"><button id="btn-move-object" class="btn-outline-full" disabled>Move in room</button><span id="room-edit-tooltip"><button id="btn-room-edit" class="btn-outline-full" disabled>Remove from room</button></span></div>
+        <div class="room-edit-actions"><button id="btn-reset-position" class="btn-outline-full" hidden>Reset position</button></div>
+        <!-- no visible button: Navigate here replaces it; field-jobs.mjs still clicks it to frame a job's device -->
+        <button id="btn-room-location" hidden>View location</button>
         <form id="room-move-form" class="room-move-form" hidden>
           <p>Click the floor or map to place the outline. Adjust height and angle here.</p>
           <div class="room-move-fields">
@@ -141,14 +148,13 @@
         </form>
         <p id="room-edit-notice" class="room-edit-notice" role="status" hidden></p>
         <div id="active-asset-details" class="active-asset-details">
+        <div class="action-bar-inline">
+          <button class="btn-outline-full" id="btn-navigate-selected">Navigate here</button>
+        </div>
         <figure id="asset-photo" class="asset-photo" hidden>
           <img alt="" decoding="async" referrerpolicy="no-referrer" hidden />
           <figcaption>Real walkthrough frame</figcaption>
         </figure>
-        <p id="detail-match-note" hidden></p>
-        <div class="action-bar-inline">
-          <button class="btn-outline-full" id="btn-navigate-selected">Navigate here</button><button class="btn-outline-full" id="btn-take-apart" title="Hide the room and show this region alone (T)">Isolate region</button><button class="btn-outline-full" id="btn-draft-wo">Draft work order</button>
-        </div>
 
         <p id="movable-notice" class="movable-notice" hidden>Movable object (not instrumented)</p>
 

@@ -280,7 +280,8 @@ function mountJob() {
       flash(`${tag} marked done`);
     }
   });
-  const anchor = document.querySelector("#active-asset-details .action-bar-inline");
+  // the job checklist sits under the equipment photo (which sits under Navigate here)
+  const anchor = document.querySelector("#active-asset-details #asset-photo") || document.querySelector("#active-asset-details .action-bar-inline");
   anchor ? anchor.after(root) : document.getElementById("active-asset-details")?.appendChild(root);
   const title = document.getElementById("detail-title");
   if (title) new MutationObserver(() => {

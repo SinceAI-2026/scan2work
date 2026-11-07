@@ -125,3 +125,16 @@ button.proposal-card .prop-meta span { display: block; overflow-wrap: anywhere; 
 
 /* Scan2Work brand: corner-bracket mark and serif wordmark in the top bar. */
 .brand{display:inline-flex;align-items:center;gap:9px}.brand-mark{width:20px;height:20px;color:#f3f1ea;flex-shrink:0}.topbar .brand-name{font-family:Georgia,"Times New Roman",serif;font-weight:400;font-size:19px;letter-spacing:0;color:#f3f1ea}
+/* Equipment details, top block: compact specs, Take apart as the main action, then room edits, then Navigate here */
+.right-sidebar .inspector-scroll{gap:10px}.right-sidebar .insp-title{font-size:18px}
+#detail-health-pill{display:none} /* health is a spec row now; the pill stays in the DOM for voice-assistant.mjs */
+.asset-summary{display:flex;flex-direction:column;gap:8px}
+.insp-specs{display:grid;grid-template-columns:auto 1fr;gap:3px 10px;margin:0;font-size:11px;line-height:1.4}
+.insp-specs dt{color:var(--text-muted)}.insp-specs dd{margin:0;font:600 11px var(--mono);color:var(--text-main)}
+.insp-specs dd.degraded,.insp-specs dd.attention_required{color:#a64131}.insp-specs dd.watch{color:#946b1d}.insp-specs dd.healthy,.insp-specs dd.ok{color:#3c6244}
+.insp-note{margin:0;font-size:10.5px;line-height:1.45;color:var(--text-muted)}
+.btn-primary-full{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:11px 12px;border:1px solid var(--forest);border-radius:6px;background:var(--forest);color:#fff;font-size:13px;font-weight:650}
+.btn-primary-full:hover{filter:brightness(1.1)}
+.btn-take-apart::before{content:"";width:16px;height:16px;flex:none;background:currentColor;-webkit-mask:var(--apart-icon) center/contain no-repeat;mask:var(--apart-icon) center/contain no-repeat;
+  --apart-icon:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linejoin='round' stroke-linecap='round'%3E%3Cpath d='M12 2.5l4 2.2v4.4l-4 2.2-4-2.2V4.7z'/%3E%3Cpath d='M6 12.6l4 2.2v4.4l-4 2.2-4-2.2v-4.4z'/%3E%3Cpath d='M18 12.6l4 2.2v4.4l-4 2.2-4-2.2v-4.4z'/%3E%3C/svg%3E")}
+.room-edit-actions:not(:has(>:not([hidden]))){display:none}
