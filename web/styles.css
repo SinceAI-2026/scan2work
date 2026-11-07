@@ -104,3 +104,8 @@ button.proposal-card .prop-meta span { display: block; overflow-wrap: anywhere; 
 .evidence-controls button, .evidence-controls a { border: 1px solid #bdc8c8; border-radius: 5px; padding: 4px 7px; background: white; color: #374843; font: inherit; font-size: 11px; cursor: pointer; }
 .evidence-controls button[aria-current=true] { background: #d2e9dc; }
 .asset-photo .evidence-note { color: #65716f; font-size: 10px; line-height: 1.4; padding: 0 9px 8px; margin: 0; }
+.layer-counts{font-size:11px;line-height:1.4;max-width:240px;color:inherit;opacity:.85}
+#bim-search{min-width:0;width:100%;max-width:240px;padding:6px;border:1px solid #385761;border-radius:4px;background:#0e1c24;color:#e0edf0}
+#bim-search-results{display:grid;gap:3px;max-width:240px;max-height:155px;overflow:auto}
+#bim-search-results:empty{display:none}
+#bim-search-results button{text-align:left;font-size:11px;overflow-wrap:anywhere}

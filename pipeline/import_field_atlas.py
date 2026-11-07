@@ -294,6 +294,11 @@ def _build_bundle(bundle_root, source, workbook, output, target_region=DEFAULT_T
           'runtime':{'offline':True,'external_models_enabled':False},'ai_stack':{'cluster_labels':'Preserved suggestions; unreviewed','retrieval_backend':'tfidf','triage':'Deterministic synthetic Excel explanation; no external inference'},
           'target_asset_id':target['asset_id'],'target_object_id':target['id'],'target_tag':target['tag'],
           'assets':assets,'navigation':nav,'knowledge_docs':excel['docs'],'builder_questions':excel['builder_questions'],'api_contract':excel['api_contract']}
+    # Preserve the richer plan/BIM layers as auxiliary geometry. This does not
+    # expand source membership or replace the conservative navigation grid.
+    from .derived_context import enrich as enrich_context
+    recovery = enrich_context(twin, output)
+    report['derived_context'] = recovery['after']
     (output/'digital_twin.json').write_text(json.dumps(twin,separators=(',',':'),allow_nan=False))
     (output/'import_report.json').write_text(json.dumps(report,indent=2))
     print(json.dumps(report,indent=2),flush=True)

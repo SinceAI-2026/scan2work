@@ -2,14 +2,10 @@ import { mapFrame, mapPoint } from "./game-map.mjs";
 import { exportRoomIfc, roomBimWalls } from "./bim-export.mjs";
 import { bimCylinder, mergedVesselEnvelope } from "./bim-geometry.mjs";
 
+import { overhead, major, groupOf, floorRegion, visualGeometry, regionVisible, layerSummary, layerSummaryText } from "./scene-layers.mjs";
+export { overhead, major, groupOf } from "./scene-layers.mjs";
+
 const NS = "http://www.w3.org/2000/svg";
-const OVERHEAD_Y = 1.70;
-const GROUPS = {
-  control_valve: "valve", circulation_pump: "machine", electric_motor: "machine",
-  heat_exchanger: "machine", expansion_vessel: "vessel", pressure_sensor: "instrument",
-  vibration_sensor: "instrument", electrical_cabinet: "fixture", shelf_rack: "fixture",
-  appliance: "fixture", sink: "fixture", structural_column: "fixture",
-};
 const FILLS = {
   valve:"#b9d6f4", machine:"#a7ded2", vessel:"#f3ce9d", instrument:"#d7c8ef",
   fixture:"#d2dbdf", movable:"#eee5f4", other:"#d9e2e4",
@@ -30,11 +26,6 @@ function footprint(asset) {
     x+u*sx*c/2-v*sz*s/2, z+u*sx*s/2+v*sz*c/2,
   ]);
 }
-
-export const overhead = asset => asset.class==="overhead_pipe" || asset.center[1]-asset.size[1]/2>OVERHEAD_Y;
-export const major = asset => asset.mapped || asset.is_target ||
-  (["fixture","machine","vessel"].includes(GROUPS[asset.class]) && asset.size[0]*asset.size[2]>.07);
-export const groupOf = asset => asset.movable ? "movable" : GROUPS[asset.class] || "other";
 
 function floorPath(grid, meta, project) {
   const pieces=[];
@@ -90,6 +81,9 @@ export function bindSemanticPlan({snapshot, inspect, navigate, viewModel}) {
   const results=document.getElementById("semantic-plan-results");
   const showAll=document.getElementById("semantic-plan-all");
   const showOverhead=document.getElementById("semantic-plan-overhead");
+  const showFloor=document.getElementById("semantic-plan-floor");
+  const showPipes=document.getElementById("semantic-plan-pipes");
+  const counts=document.getElementById("semantic-plan-counts");
   const details=document.getElementById("semantic-plan-selection");
   const go=document.getElementById("semantic-plan-navigate");
   const openAsset=document.getElementById("semantic-plan-inspect");
@@ -98,7 +92,7 @@ export function bindSemanticPlan({snapshot, inspect, navigate, viewModel}) {
 
   function select(asset) {
     selected=asset;
-    details.textContent=`${asset.tag || asset.id} · ${asset.label || asset.class}`;
+    details.textContent=`${asset.tag || asset.id} · ${asset.label || asset.class}${asset.source_region_id ? " · unreviewed" : ""}`;
     go.disabled=false;
     openAsset.disabled=false;
     const node=[...svg.querySelectorAll("[data-plan-asset]")].find(item=>item.dataset.planAsset===asset.id);
@@ -132,15 +126,34 @@ export function bindSemanticPlan({snapshot, inspect, navigate, viewModel}) {
     svg.setAttribute("viewBox",`0 0 ${width} ${height}`);
     svg.replaceChildren();
     svg.append(svgNode("rect",{...frame,fill:"#faf8ef"}));
-    svg.append(svgNode("path",{d:floorPath(current.navigation.walkable_grid,meta,project),fill:"#dcebe5"}));
+    const observed=current.derived_context?.observed_floor;
+    if (showFloor.checked && observed?.cells_xz?.length) {
+      const res=observed.res || observed.cell_size || meta.res;
+      let path="";
+      for(const [x,z] of observed.cells_xz){
+        const [left,top]=project(x-res/2,z+res/2),[right,bottom]=project(x+res/2,z-res/2);
+        path+=`M${left} ${top}h${right-left}v${bottom-top}H${left}Z`;
+      }
+      svg.append(svgNode("path",{d:path,fill:"#e2dfca","data-layer":"observed-floor"}));
+    }
+    svg.append(svgNode("path",{d:floorPath(current.navigation.walkable_grid,meta,project),fill:"#dcebe5","data-layer":"walkable-grid"}));
     const walls=roomBimWalls(current.walls,meta);
     for (const {from,to} of walls) {
       const [x1,y1]=project(...from),[x2,y2]=project(...to);
       svg.append(svgNode("line",{x1,y1,x2,y2,stroke:"#23383e","stroke-width":8,"stroke-linecap":"square"}));
     }
 
-    const assets=current.assets.filter(asset=>asset.id===selected?.id ||
-      (overhead(asset) ? showOverhead.checked : showAll.checked || major(asset)));
+    const options={all:showAll.checked,raised:showOverhead.checked,floors:showFloor.checked,selectedId:selected?.id};
+    const assets=current.assets.filter(asset=>regionVisible(asset,options)).map(visualGeometry);
+    counts.textContent=layerSummaryText(layerSummary(current.assets,options));
+    const pipes=current.derived_context?.pipe_segments || [];
+    document.getElementById("semantic-plan-context").textContent=`${walls.length} assumed wall guides · ${showPipes.checked ? pipes.length : 0} / ${pipes.length} fitted pipe segments · context is not additional extracted objects`;
+    if (showPipes.checked) for(const pipe of pipes) {
+      if(!pipe.start || !pipe.end) continue;
+      const [x1,y1]=project(pipe.start[0],pipe.start[2]),[x2,y2]=project(pipe.end[0],pipe.end[2]);
+      const node=svgNode("line",{x1,y1,x2,y2,stroke:"#558d95","stroke-width":Math.max(1.5,2*(pipe.radius || .02)*frame.width/(meta.nx*meta.res)),opacity:.5,"pointer-events":"none"});
+      svg.append(node);
+    }
     assets.sort((a,b)=>Number(overhead(b))-Number(overhead(a)) ||
       Number(a.mapped)-Number(b.mapped)||b.size[0]*b.size[2]-a.size[0]*a.size[2]);
     const scale=frame.width/(meta.nx*meta.res);
@@ -152,9 +165,9 @@ export function bindSemanticPlan({snapshot, inspect, navigate, viewModel}) {
         "aria-label":`${asset.tag || asset.id} · ${asset.label || asset.class}`,"aria-pressed":String(selected?.id===asset.id)});
       const group=groupOf(asset), cylinder=bimCylinder(asset);
       const envelope=mergedVesselEnvelope(asset,cylinder);
-      const fill=raised ? "none" : FILLS[group];
+      const fill=raised ? "none" : floorRegion(asset) ? "#d6d0ae" : FILLS[group];
       const attrs={class:"semantic-plan-shape",fill,stroke,"stroke-width":asset.is_target ? 3 : 1.6,
-        "fill-opacity":envelope ? .25 : 1,
+        "fill-opacity":asset.source_region_id ? (floorRegion(asset) ? .25 : .08) : envelope ? .25 : 1,
         "stroke-dasharray":raised || envelope ? "5 4" : group==="movable" ? "3 2" : "none"};
       if (cylinder?.radius>0) {
         const [x1,y1]=project(cylinder.start[0],cylinder.start[2]), [x2,y2]=project(cylinder.end[0],cylinder.end[2]);
@@ -215,11 +228,13 @@ export function bindSemanticPlan({snapshot, inspect, navigate, viewModel}) {
   search.addEventListener("input",searchAssets);
   showAll.addEventListener("change",draw);
   showOverhead.addEventListener("change",draw);
+  showFloor.addEventListener("change",draw);
+  showPipes.addEventListener("change",draw);
   openAsset.addEventListener("click",()=>{dialog.close();inspect(selected);});
   go.addEventListener("click",()=>{dialog.close();navigate(selected);});
   document.getElementById("semantic-plan-export").addEventListener("click",()=>{
     const room=snapshot();
-    const data=exportRoomIfc(room.assets,room.walls,room.navigation.grid_meta);
+    const data=exportRoomIfc(room.assets,room.walls,room.navigation.grid_meta,new Date(),room.derived_context);
     const url=URL.createObjectURL(new Blob([data],{type:"application/step"}));
     const link=document.createElement("a");
     link.href=url;

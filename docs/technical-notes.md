@@ -240,3 +240,81 @@ unmapped diagnostics, failed-import isolation, all real ownership counts, exact
 native PLY export bytes and route traversal against the saved occupancy grid.
 The two legacy OBJ-206/refinement tests are skipped without their legacy scan
 layout; the imported target has a separate exact-export integration test.
+
+## Recovery of plan and BIM context after the expanded import
+
+The first import preserved the scan and the new exact region memberships, but it
+**did omit useful derived layers from Wael's pipeline**. More extraction regions
+did not automatically make a richer BIM model. In particular, the initial import
+had zero wall guides, zero fitted pipe cylinders, no oriented geometry proxies,
+and no retained catalog-name normalization. 383 of the 415 baseline regions had
+usable names but generic `unclassified` categories, so class-based plan filters
+hid them. It also displayed a sparse monochrome plan raster.
+
+The original Wael generated `digital_twin.json` is not present in the cloned
+repository or the locally searched Downloads/visualization directories. Upstream
+commit `ab777d3` reports 504 objects in 24 classes in its README, but those numbers
+cannot establish an exact object-by-object overlap with this imported scene.
+The 415 preserved baseline regions refer to **Linards**, not Wael's 504 objects.
+The old Wael model's individual AI labels, merges and fitted assets cannot be
+claimed recovered without that generated artifact.
+
+`pipeline/derived_context.py` now restores independently derived display context
+using the existing Wael geometry methods, without changing the exact extraction:
+
+| Layer | First expanded import | Context recovery |
+| --- | ---: | ---: |
+| Exact imported regions | 1,933 | 1,933, unchanged |
+| Owned source Gaussian rows | 711,568 | 711,568, unchanged |
+| Retained catalog names normalized into viewer classes | 0 | 415, still unverified |
+| Regions with generic `unclassified` category | 1,897 | 1,514 |
+| Configured Wael wall guides | 0 | 4, explicitly assumed |
+| Fitted pipe geometry context | 0 | 120 unreviewed cylinder hypotheses |
+| Approximate oriented display envelopes | 0 | 1,933 (427 with nonzero yaw) |
+| Observed low-surface context | Not exported separately | 154,288 samples / 13,628 cells |
+| Available navigation routes | 28 | 28, unchanged |
+
+The auxiliary context is available in `scene.derived_context` and the standalone
+`web/data/derived_context.json`; the audit is in `context_recovery_report.json`.
+Each region gets a `geometry_proxy` separate from its canonical center, size,
+yaw, source IDs and exact members. Pipe geometry is a separate layer, not 120 new
+segmented objects. It uses `pipes.fit_segments` (normal/radius voting and a
+continuous surface-arc check), never `pipes.integrate`, which would change source
+ownership. Each cylinder records support, arc coverage and related existing
+region IDs. Labels are normalized from existing Linards names only; no AI model
+was rerun and the 1,514 unclassified regions remain unclassified.
+
+The four wall lines reproduce the original configured Wael guides and explicitly
+carry `assumption=true` and `measured=false`. They are not detected wall geometry.
+Observed low-surface cells use a broader display gate than navigation and do not
+fill unknown holes. The raster now includes native scan colours, thin obstacles
+and equipment context, with at most 1.5-pixel display interpolation. These display
+layers never open robot routes or assert floor safety. Navigation JSON SHA256 is
+identical before and after context recovery:
+`2976d8edcc4879401c607ef4e0d288c43e6269fe9f1e662261409db763d61443`.
+
+The full original PLY SHA256 remains
+`83d8c7d99316c08c9719cfc2c5a6b9d1903b89847780e2458adc662c79f32955`.
+GSPL, GSID and source membership files are not rewritten by context recovery.
+The import now runs this recovery automatically. To apply it to an existing
+import without rebuilding extraction or navigation:
+
+```sh
+VALMET_OFFLINE=1 .venv/bin/python -m pipeline.derived_context
+VALMET_OFFLINE=1 .venv/bin/python -m unittest discover -s tests -p test_derived_context.py -v
+```
+
+All context remains in unverified source units. These improvements restore useful
+plan/BIM display layers; they do not establish survey accuracy, complete object
+recognition, complete pipes, or a verified construction BIM.
+
+The recovered IFC export includes all 1,933 region entities, 120 separately
+identified unreviewed pipe-fit proxies, four assumed wall guides and an assumed
+slab. Pipe context is exported as `IFCBUILDINGELEMENTPROXY`, without Gaussian
+ownership claims. The observed-floor mask is recorded through its source sample
+count, resolution and supported-cell count; it is not exported as a measured
+floor mesh. The generated IFC4 file parsed with IfcOpenShell and returned zero
+schema validation errors. Schema validity does not validate geometry, scale,
+wall placement or the catalog labels. Moved assets use their placed canonical
+envelopes so an original scan proxy cannot remain at a stale location; independent
+scan-context pipe fits do not follow an arbitrary moved region.

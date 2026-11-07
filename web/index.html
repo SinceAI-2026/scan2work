@@ -63,10 +63,17 @@
         <div id="bim-options" hidden>
           <section class="bim-panel" aria-label="BIM layers">
             <strong>Room model</strong>
+            <span id="bim-counts" class="layer-counts" aria-live="polite"></span>
+            <label for="bim-search">Find any region</label>
+            <input id="bim-search" type="search" placeholder="Name, tag, or source ID" />
+            <div id="bim-search-results"></div>
             <label><input type="checkbox" id="bim-walls" checked> Walls</label>
-            <label><input type="checkbox" id="bim-pipes"> All pipes and overhead</label>
-            <label><input type="checkbox" id="bim-all"> All equipment</label>
+            <label><input type="checkbox" id="bim-pipes"> Include overhead regions</label>
+            <label><input type="checkbox" id="bim-all"> Include small regions</label>
+            <label><input type="checkbox" id="bim-floor" checked> Observed floor / floor patches</label>
+            <label><input type="checkbox" id="bim-context-pipes" checked> Fitted pipe geometry</label>
             <label><input type="checkbox" id="bim-plane"> 1.1 m section plane</label>
+            <span id="bim-context-counts" class="layer-counts"></span>
             <button id="btn-bim-reset" type="button">Reset view</button>
           </section>
           <p id="bim-selection" class="bim-selection" aria-live="polite" hidden></p>
@@ -76,6 +83,8 @@
             <span><i style="background:#e7a05a"></i>Vessels</span>
             <span><i style="background:#aa7bd1"></i>Movables</span>
             <span><i style="background:#ee705e"></i>Target</span>
+            <span><i style="background:#78909b"></i>Unreviewed envelopes</span>
+            <span><i style="background:#a89e6a"></i>Observed floor samples</span>
           </div>
         </div>
         <div id="hud-overlay" class="hud-overlay"></div>
@@ -216,6 +225,7 @@
     <div class="semantic-plan-layout">
       <svg id="semantic-plan-drawing" aria-label="Plan of the equipment room"></svg>
       <aside class="semantic-plan-tools">
+        <p id="semantic-plan-counts" class="layer-counts" aria-live="polite"></p>
         <label for="semantic-plan-search">Find equipment on the plan</label>
         <input id="semantic-plan-search" type="search" placeholder="Tag, name, or ID">
         <div id="semantic-plan-results"></div>
@@ -224,15 +234,20 @@
           <button class="btn-outline-full" id="semantic-plan-inspect" disabled>View equipment</button>
           <button class="btn-outline-full" id="semantic-plan-navigate" disabled>Navigate to equipment</button>
         </div>
-        <label><input type="checkbox" id="semantic-plan-all"> Show all floor objects</label>
-        <label><input type="checkbox" id="semantic-plan-overhead"> Show overhead objects</label>
+        <label><input type="checkbox" id="semantic-plan-all"> Include small regions</label>
+        <label><input type="checkbox" id="semantic-plan-overhead"> Include overhead regions</label>
+        <label><input type="checkbox" id="semantic-plan-floor" checked> Observed floor / floor patches</label>
+        <label><input type="checkbox" id="semantic-plan-pipes" checked> Fitted pipe geometry</label>
+        <p id="semantic-plan-context" class="layer-counts"></p>
         <ul class="semantic-plan-legend" aria-label="Plan legend">
           <li><i style="background:#b9d6f4"></i>Valves</li><li><i style="background:#a7ded2"></i>Pumps and motors</li>
           <li><i style="background:#f3ce9d"></i>Tanks and vessels</li><li><i style="background:#d7c8ef"></i>Instruments</li>
           <li><i style="background:#d2dbdf"></i>Fixtures and structure</li><li><i style="background:#eee5f4"></i>Movable objects</li>
-          <li><i style="background:#dcebe5"></i>Reachable floor</li><li><i style="background:#247384"></i>Robot and route</li>
+          <li><i style="background:#d9e2e4"></i>Unreviewed envelopes</li><li><i style="background:#e2dfca"></i>Observed floor samples</li>
+          <li><i style="background:#dcebe5"></i>Walkable simulation grid</li><li><i style="background:#247384"></i>Robot and route</li>
         </ul>
-        <p>IFC uses fitted pipes and vessel bodies, equipment envelopes, and approximate walls and slab.</p>
+        <p>Observed floor is scan evidence, not a claim that every floor point is walkable. Grey envelopes have unverified labels and boundaries.</p>
+        <p>Approximate IFC includes region envelopes, unreviewed pipe fits, and assumed walls/slab. Floor sample counts are included as evidence, not a reconstructed surface.</p>
       </aside>
     </div>
   </dialog>

@@ -56,15 +56,23 @@ CV-003 keeps Wael’s physical demo location. Native video evidence shows the or
 | Module | Responsibility |
 | --- | --- |
 | `pipeline/import_field_atlas.py` | Bundle adapter, source validation, coordinate conversion and exact ownership export |
+| `pipeline/derived_context.py` | Offline pipe fitting, observed floor, assumed wall guides and display geometry, without changing object membership |
 | `pipeline/knowledge.py` | Read equipment, telemetry, alarms, maintenance and documents from Excel |
 | `pipeline/navigation.py` | Occupancy, clearance, path planning and proximity queries |
 | `pipeline/diagnostics.py`, `pipeline/retrieval.py` | Workbook-grounded service explanations and retrieval |
 | `pipeline/asset_export.py` | Export individual objects to the reusable asset library |
 | `server.py` | Scene, service, library and editing endpoints |
 | `web/imported-assets.mjs` | Imported-region presentation and evidence helpers |
+| `web/scene-layers.mjs` | Shared floor-plan/BIM visibility and display-proxy rules for class-free candidates |
 | `web/explode.mjs`, `web/take-apart.mjs` | Exact-membership separation and object inspection |
 
 The viewer uses Wael’s levelled Y-up coordinates. Native PLY exports retain the original coordinate frame and Gaussian properties. Integration metadata records the conversion; do not align objects by filenames or array order alone.
+
+The floor plan and geometry preview show large candidate regions even when their class is unknown. Visible/hidden counts and the small-region/overhead controls expose the full catalog. Preserved Linards names are normalized for display, with their unverified status retained. Oriented envelopes and fitted pipes are derived geometry, not new confirmed assets.
+
+Observed floor is a separate context layer from the green navigation mask. The four wall guides retain Wael’s configured room-boundary assumptions. Adding these visual layers does not enlarge the walkable grid or change object ownership. Wael’s original generated 504-object artifact is not present in this checkout, so the integration cannot establish a one-to-one preservation claim for that separate extraction.
+
+Imports derive this context automatically. To recover it in an existing imported scene, run `.venv/bin/python -m pipeline.derived_context` and restart the server. This offline command preserves source membership and navigation, and writes `web/data/context_recovery_report.json` with integrity hashes. The current recovery adds 120 pipe-fit hypotheses; IFC export includes them separately from the 1,933 regions and marks the wall/slab assumptions and unverified scale.
 
 ## Validation and limitations
 
@@ -73,6 +81,7 @@ Run the offline checks from the repository root:
 ```sh
 VALMET_OFFLINE=1 .venv/bin/python -m unittest discover -s tests -v
 node --test web/imported-assets.test.mjs
+node --test web/scene-layers.test.mjs web/bim-export-context.test.mjs
 node tests/test_navigation_view.mjs
 node tests/test_journey.mjs
 node tests/test_render_quality.mjs

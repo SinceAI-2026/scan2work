@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { roomBimWalls, WALL_HEIGHT, WALL_THICKNESS, SLAB_THICKNESS } from "./bim-export.mjs";
-import { overhead, major, groupOf } from "./semantic-plan.mjs";
+import { overhead, major, groupOf, floorRegion, visualGeometry, regionVisible, layerSummary, layerSummaryText } from "./scene-layers.mjs";
 import { bimCylinder, mergedVesselEnvelope } from "./bim-geometry.mjs";
 
 const PALETTE = {
@@ -8,7 +8,7 @@ const PALETTE = {
   fixture:0x879da9, movable:0xaa7bd1, pipe:0x4daebb, other:0x78909b,
 };
 const UP = new THREE.Vector3(0,1,0);
-const isPipe = asset => !!asset.cylinder || /pipe/.test(asset.class || "");
+const isPipe = asset => asset.source_region_id ? /pipe/.test(asset.class || "") : !!asset.cylinder || /pipe/.test(asset.class || "");
 
 function disposeGroup(group) {
   group.traverse(object=>{
@@ -18,7 +18,7 @@ function disposeGroup(group) {
   group.clear();
 }
 
-export function createBimRoom({camera, controls, container}) {
+export function createBimRoom({camera, controls, container, onSelect = () => {}}) {
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x0b141b);
   scene.add(new THREE.HemisphereLight(0xe6f5ff,0x547077,2.1));
@@ -28,24 +28,32 @@ export function createBimRoom({camera, controls, container}) {
 
   const room = new THREE.Group();
   const equipment = new THREE.Group();
+  const contextPipes = new THREE.Group();
+  const observedFloor = new THREE.Group();
   const route = new THREE.Line(new THREE.BufferGeometry(),new THREE.LineBasicMaterial({color:0x8de6e9}));
   const robot = new THREE.Mesh(new THREE.CylinderGeometry(.105,.105,.028,24),new THREE.MeshBasicMaterial({color:0xa2eced}));
-  scene.add(room,equipment,route,robot);
+  scene.add(room,equipment,contextPipes,observedFloor,route,robot);
 
   const settings = {
     walls:document.getElementById("bim-walls"),
     pipes:document.getElementById("bim-pipes"),
     all:document.getElementById("bim-all"),
     plane:document.getElementById("bim-plane"),
+    floor:document.getElementById("bim-floor"),
+    contextPipes:document.getElementById("bim-context-pipes"),
   };
   const assets = new Map(), walls = [];
   const selection = document.getElementById("bim-selection");
   const center = new THREE.Vector3();
+  let context = {}, imported = false;
   let active = false, halfWidth = 0, halfDepth = 0, section, displayedAssets, selectedId, displayedRoute, savedDistance;
 
-  function setRoom(items, sourceWalls, meta) {
+  function setRoom(items, sourceWalls, meta, derived = {}) {
     if (displayedAssets === items) return;
     displayedAssets = items;
+    imported = items.some(a => a.source_region_id);
+    context = derived || {};
+    disposeGroup(contextPipes); disposeGroup(observedFloor);
     disposeGroup(room);
     disposeGroup(equipment);
     assets.clear();
@@ -92,13 +100,34 @@ export function createBimRoom({camera, controls, container}) {
       new THREE.LineBasicMaterial({color:0x79dbe4,transparent:true,opacity:.65})));
     room.add(section);
 
-    for (const asset of items) {
+    for (const pipe of context.pipe_segments || []) {
+      if(!pipe.start || !pipe.end || !(pipe.radius > 0)) continue;
+      const start=new THREE.Vector3().fromArray(pipe.start),end=new THREE.Vector3().fromArray(pipe.end);
+      const vector=new THREE.Vector3().subVectors(end,start);
+      if(!vector.lengthSq()) continue;
+      const mesh=new THREE.Mesh(new THREE.CylinderGeometry(pipe.radius,pipe.radius,vector.length(),8),
+        new THREE.MeshStandardMaterial({color:0x6a9ca1,transparent:true,opacity:.4,depthWrite:false}));
+      mesh.position.copy(start).lerp(end,.5);mesh.quaternion.setFromUnitVectors(UP,vector.normalize());
+      contextPipes.add(mesh);
+    }
+    const observed=context.observed_floor;
+    if (observed?.cells_xz?.length) {
+      const res=observed.res || observed.cell_size || meta.res;
+      const cells=new THREE.InstancedMesh(new THREE.PlaneGeometry(res,res),
+        new THREE.MeshBasicMaterial({color:0xa89e6a,transparent:true,opacity:.38,depthWrite:false,side:THREE.DoubleSide}),observed.cells_xz.length);
+      const pose=new THREE.Object3D();pose.rotation.x=-Math.PI/2;
+      observed.cells_xz.forEach(([x,z],i)=>{pose.position.set(x,.008,z);pose.updateMatrix();cells.setMatrixAt(i,pose.matrix);});
+      cells.instanceMatrix.needsUpdate=true;observedFloor.add(cells);
+    }
+    for (const original of items) {
+      const asset=visualGeometry(original);
       const cylinder=bimCylinder(asset);
       const envelope=mergedVesselEnvelope(asset,cylinder);
       const pipe=isPipe(asset);
-      const colour=asset.is_target ? 0xee705e : PALETTE[pipe ? "pipe" : groupOf(asset)];
+      const uncertain=Boolean(asset.source_region_id && asset.label_verified !== true);
+      const colour=asset.is_target ? 0xee705e : floorRegion(asset) ? 0xa89e6a : PALETTE[uncertain ? "other" : pipe ? "pipe" : groupOf(asset)];
       const material=new THREE.MeshStandardMaterial({color:colour,roughness:.74,metalness:.05,
-        transparent:envelope,opacity:envelope ? .18 : 1,depthWrite:!envelope});
+        transparent:uncertain || envelope,opacity:uncertain ? (floorRegion(asset) ? .14 : .07) : envelope ? .18 : 1,depthWrite:!uncertain && !envelope});
       let mesh, mainPipe = false;
       if (cylinder?.radius>0) {
         const start=new THREE.Vector3().fromArray(cylinder.start), end=new THREE.Vector3().fromArray(cylinder.end);
@@ -120,21 +149,29 @@ export function createBimRoom({camera, controls, container}) {
       mesh.add(edge);
       mesh.userData.asset=asset;
       equipment.add(mesh);
-      assets.set(asset.id,{asset,mesh,edge,pipe,mainPipe,envelope});
+      assets.set(asset.id,{asset,mesh,edge,pipe,mainPipe,envelope,uncertain});
     }
     refreshLayers();
   }
 
   function refreshLayers() {
     if (section) section.visible=settings.plane.checked;
-    for (const {asset,mesh,edge,pipe,mainPipe,envelope} of assets.values()) {
+    contextPipes.visible=settings.contextPipes.checked;
+    observedFloor.visible=settings.floor.checked;
+    const options={all:settings.all.checked,raised:settings.pipes.checked,floors:settings.floor.checked,selectedId};
+    for (const {asset,mesh,edge,pipe,mainPipe,envelope,uncertain} of assets.values()) {
       const selected=asset.id===selectedId;
-      mesh.visible=asset.is_target || selected || mainPipe ||
+      mesh.visible=asset.source_region_id ? regionVisible(asset,options) : asset.is_target || selected || mainPipe ||
         (pipe || overhead(asset) ? settings.pipes.checked : major(asset) || settings.all.checked);
       edge.material.color.setHex(selected ? 0xc1ffff : asset.is_target ? 0xffad9d : 0xd7eef0);
       edge.material.opacity=selected || asset.is_target ? .95 : envelope ? .5 : .23;
       mesh.material.emissive.setHex(selected ? 0x17454c : 0x000000);
+      if (uncertain) mesh.material.opacity=selected ? .3 : floorRegion(asset) ? .14 : .07;
     }
+    const count=[...assets.values()].filter(a=>a.mesh.visible).length;
+    const summary=layerSummary(displayedAssets || [],options);
+    document.getElementById("bim-counts").textContent=layerSummaryText({...summary,visible:count});
+    document.getElementById("bim-context-counts").textContent=`${settings.walls.checked ? walls.length : 0} wall guides · ${settings.contextPipes.checked ? contextPipes.children.length : 0} / ${contextPipes.children.length} pipe fits. Context is separate from extracted regions.`;
   }
 
   function resetCamera() {
@@ -189,6 +226,24 @@ export function createBimRoom({camera, controls, container}) {
     robot.position.set(nav.x,.035,nav.z);
   }
 
+  const search=document.getElementById("bim-search"), results=document.getElementById("bim-search-results");
+  search.addEventListener("input",()=>{
+    results.replaceChildren();
+    const term=search.value.trim().toLowerCase();if(!term)return;
+    const matches=[...assets.values()].filter(({asset})=>[asset.id,asset.tag,asset.label,asset.class_label].some(v=>String(v || "").toLowerCase().includes(term)));
+    for (const {asset,mesh} of matches.slice(0,6)) {
+      const button=document.createElement("button");button.type="button";
+      button.textContent=`${asset.label || asset.id} · ${asset.tag || asset.id}`;
+      button.addEventListener("click",()=>{
+        selectedId=asset.id;onSelect(asset);refreshLayers();
+        const direction=camera.position.clone().sub(controls.target).normalize();
+        const distance=Math.max(1,Math.hypot(...asset.size)*2);
+        controls.target.fromArray(asset.center);camera.position.copy(controls.target).addScaledVector(direction,distance);controls.update();
+      });results.append(button);
+    }
+    if(!matches.length)results.textContent="No matching region.";
+    else if(matches.length>6) {const note=document.createElement("span");note.textContent=`${matches.length} matches; refine your search.`;results.append(note);}
+  });
   for (const input of Object.values(settings)) input.addEventListener("change",refreshLayers);
   document.getElementById("btn-bim-reset").addEventListener("click",resetCamera);
 

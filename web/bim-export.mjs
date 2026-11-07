@@ -1,5 +1,6 @@
 // IFC4 STEP export of the live room model. The scan is Y-up; IFC uses Z-up.
 import { bimCylinder, mergedVesselEnvelope } from "./bim-geometry.mjs";
+import { visualGeometry } from "./scene-layers.mjs";
 const IFC_TYPES = {
   control_valve: "IFCVALVE", circulation_pump: "IFCPUMP", electric_motor: "IFCELECTRICMOTOR",
   pressure_sensor: "IFCSENSOR", vibration_sensor: "IFCSENSOR", expansion_vessel: "IFCTANK",
@@ -35,8 +36,9 @@ export function roomBimWalls(walls, meta) {
   return ring.map((from,i)=>({name:`Wall ${i+1}`,from,to:ring[(i+1)%ring.length]}));
 }
 
-export function exportRoomIfc(assets, walls, meta, timestamp = new Date()) {
-  const unverified = assets.some(asset => asset.source_region_id) || /unverified/i.test(meta.units || "");
+export function exportRoomIfc(assets, walls, meta, timestamp = new Date(), derivedContext = {}) {
+  const context = derivedContext || {};
+  const unverified = assets.some(asset => asset.source_region_id) || /unverified/i.test(meta.units || "") || Boolean(context.pipe_segments?.length);
   const rows = [];
   const add = (entity,...args) => {
     const ref = `#${rows.length+1}`;
@@ -73,6 +75,12 @@ export function exportRoomIfc(assets, walls, meta, timestamp = new Date()) {
     return [place(parent,xyz,up,direction([Math.cos(angle),Math.sin(angle),0])),
       shape(profile(width,depth),height)];
   }
+  function propertiesFor(item,key,name,values) {
+    const properties=values.filter(([,value])=>value !== undefined && value !== null && value !== "").map(([name,value])=>
+      add("IFCPROPERTYSINGLEVALUE",quoted(name),"$",`IFCLABEL(${quoted(value)})`,"$"));
+    const set=add("IFCPROPERTYSET",guid(`context-properties/${key}`),"$",quoted(name),"$",tuple(properties));
+    add("IFCRELDEFINESBYPROPERTIES",guid(`context-properties-rel/${key}`),"$","$","$",tuple([item]),set);
+  }
 
   const shell = [];
   const boundaries=roomBimWalls(walls,meta);
@@ -80,15 +88,22 @@ export function exportRoomIfc(assets, walls, meta, timestamp = new Date()) {
   const xs=corners.map(([x])=>x), zs=corners.map(([,z])=>z);
   const x0=Math.min(...xs), x1=Math.max(...xs), z0=Math.min(...zs), z1=Math.max(...zs);
   const slab=box(storeyPlace,[(x0+x1)/2,-(z0+z1)/2,-SLAB_THICKNESS],0,x1-x0,z1-z0,SLAB_THICKNESS);
-  shell.push(add("IFCSLAB",guid("slab"),"$","'Room floor'","'Plan envelope with assumed thickness'","$",...slab,"$",".BASESLAB."));
+  const slabItem=add("IFCSLAB",guid("slab"),"$","'Room floor'","'Plan envelope with assumed thickness; not an observed floor reconstruction'","$",...slab,"$",".BASESLAB.");
+  shell.push(slabItem);
+  propertiesFor(slabItem,"slab","FieldAtlas_Assumptions",[["GeometryStatus","Assumed room slab; not measured floor geometry"],
+    ["ThicknessStatus","Assumed"],["ScaleStatus",unverified ? "Unverified source units" : "Source scene units"]]);
   boundaries.forEach(({name,from:[x,z],to:[endX,endZ]},i)=>{
     const geometry=box(storeyPlace,[(x+endX)/2,-(z+endZ)/2,0],Math.atan2(z-endZ,endX-x),
       Math.hypot(endX-x,endZ-z),WALL_THICKNESS,WALL_HEIGHT);
-    shell.push(add("IFCWALL",guid(`wall/${i}`),"$",quoted(name),"'Plan envelope with assumed height and thickness'","$",...geometry,"$",".NOTDEFINED."));
+    const wall=add("IFCWALL",guid(`wall/${i}`),"$",quoted(name),"'Plan envelope with assumed height and thickness'","$",...geometry,"$",".NOTDEFINED.");
+    shell.push(wall);
+    propertiesFor(wall,`wall/${i}`,"FieldAtlas_Assumptions",[["GeometryStatus","Assumed wall guide; not a measured wall"],
+      ["HeightAndThickness","Assumed"],["ScaleStatus",unverified ? "Unverified source units" : "Source scene units"]]);
   });
 
   const products = [];
-  for (const asset of assets) {
+  for (const sourceAsset of assets) {
+    const asset = visualGeometry(sourceAsset);
     const {id,tag,label,center,size} = asset;
     const cylinder=bimCylinder(asset);
     const [x,y,z]=center, [sx,sy,sz]=size;
@@ -124,8 +139,39 @@ export function exportRoomIfc(assets, walls, meta, timestamp = new Date()) {
     const set=add("IFCPROPERTYSET",guid(`properties/${id}`),"$","'FieldAtlas_Asset'","$",tuple(properties));
     add("IFCRELDEFINESBYPROPERTIES",guid(`asset-properties/${id}`),"$","$","$",tuple([item]),set);
   }
+  const contextProducts=[], contextIds=new Set();
+  for (const [index,pipe] of (context.pipe_segments || []).entries()) {
+    const id=String(pipe.id || `segment-${index+1}`);
+    if(contextIds.has(id)) throw new Error(`Duplicate context pipe ID: ${id}`);
+    contextIds.add(id);
+    if(![pipe.start,pipe.end].every(p=>Array.isArray(p)&&p.length===3&&p.every(Number.isFinite)) ||
+       !Number.isFinite(pipe.radius) || pipe.radius<=0) throw new Error(`Invalid context pipe geometry: ${id}`);
+    const start=ifcXYZ(pipe.start),end=ifcXYZ(pipe.end),delta=end.map((value,i)=>value-start[i]);
+    const length=Math.hypot(...delta);
+    if(!(length>0)) throw new Error(`Empty context pipe geometry: ${id}`);
+    const axis=delta.map(value=>value/length);
+    const ref=Math.abs(axis[0])<.99 ? [0,axis[2],-axis[1]] : [axis[2],0,-axis[0]];
+    const section=add("IFCCIRCLEPROFILEDEF",".AREA.","$","$",real(pipe.radius));
+    const geometry=[place(roomPlace,start,direction(axis),direction(ref)),shape(section,length)];
+    // A fit is a geometric hypothesis, not a newly detected or verified IFC pipe asset.
+    const item=add("IFCBUILDINGELEMENTPROXY",guid(`derived-context/pipe/${id}`),"$",quoted(`Unreviewed pipe fit ${id}`),
+      "'Cylindrical scan fit; semantics and physical scale unverified'","'DerivedContextPipeFit'",...geometry,quoted(`context:${id}`),".NOTDEFINED.");
+    contextProducts.push(item);
+    propertiesFor(item,`pipe/${id}`,"FieldAtlas_DerivedContext",[["ContextId",id],["GeometrySource",pipe.source || "Geometric cylinder fit from scan samples"],
+      ["ReviewStatus",pipe.review_status || "unreviewed"],["SemanticStatus","Pipe hypothesis; unverified"],
+      ["OwnershipStatus","Context only; no new asset or Gaussian ownership"],["ScaleStatus","Unverified; source unit assumed as one metre for IFC exchange"],
+      ["SupportingSamples",pipe.support],["RelatedRegionIds",(pipe.region_ids || []).join(", ")],
+      ["AssociationMeaning","Overlap association only; does not assign Gaussian ownership"]]);
+  }
+  if(context.observed_floor) {
+    const floor=context.observed_floor;
+    propertiesFor(room,"observed-floor","FieldAtlas_ObservedFloorEvidence",[["Representation","Sample support mask only; no floor surface reconstruction exported"],
+      ["SupportedCells",floor.cells_xz?.length ?? floor.supported_cells],["CellSizeSourceUnits",floor.res],
+      ["SourceSamples",floor.source_points],["ScaleStatus","Unverified"],["NavigationMeaning","Observed floor samples do not establish walkability"]]);
+  }
   add("IFCRELCONTAINEDINSPATIALSTRUCTURE",guid("shell"),"$","$","$",tuple(shell),storey);
   if (products.length) add("IFCRELCONTAINEDINSPATIALSTRUCTURE",guid("equipment"),"$","$","$",tuple(products),room);
+  if (contextProducts.length) add("IFCRELCONTAINEDINSPATIALSTRUCTURE",guid("derived-context"),"$","'Derived geometry context'","$",tuple(contextProducts),room);
   return [
     "ISO-10303-21;","HEADER;",unverified ? "FILE_DESCRIPTION(('Approximate equipment room; scale unverified'),'2;1');" : "FILE_DESCRIPTION(('Scan-derived equipment room'),'2;1');",
     `FILE_NAME('field-atlas-equipment-room.ifc','${timestamp.toISOString().slice(0,19)}',('Field Atlas'),('Valmet x Since AI'),'Field Atlas','Field Atlas','');`,

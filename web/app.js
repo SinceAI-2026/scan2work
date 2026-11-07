@@ -633,7 +633,7 @@ function applyCameraPreset(preset) {
   });
   if (preset === "bim") {
     setInspectorOpen(false);
-    bimView.setRoom(state.roomAssets,state.twin.scene.walls,state.twin.navigation.grid_meta);
+    bimView.setRoom(state.roomAssets,state.twin.scene.walls,state.twin.navigation.grid_meta,state.twin.scene.derived_context);
   }
   bimView?.setActive(preset === "bim");
 
@@ -1651,7 +1651,7 @@ function applyRoomEdits(snapshot, initial=false, prepared) {
   removedIds = ids;
   foldedRoomParts = parts;
   state.roomAssets = assets;
-  if (bimView?.active) bimView.setRoom(assets,state.twin.scene.walls,navigation.grid_meta);
+  if (bimView?.active) bimView.setRoom(assets,state.twin.scene.walls,navigation.grid_meta,state.twin.scene.derived_context);
   liveRoomAssets = new Map(assets.map(asset=>[asset.id,asset]));
   state.twin.navigation = navigation;
   equipmentObstacles = manualObstacles(assets,navigation.grid_meta.robot_radius_m);
@@ -2087,9 +2087,9 @@ function updateAttractMode(now) {
 function bindUIEvents() {
   bindArView();
   bindRoomEdits();
-  bimView=createBimRoom({camera,controls,container:document.getElementById("canvas-container")});
+  bimView=createBimRoom({camera,controls,container:document.getElementById("canvas-container"),onSelect:asset=>selectAsset(asset,true)});
   semanticPlan=bindSemanticPlan({
-    snapshot:()=>({assets:state.roomAssets,walls:state.twin.scene.walls,navigation:state.twin.navigation,
+    snapshot:()=>({assets:state.roomAssets,walls:state.twin.scene.walls,derived_context:state.twin.scene.derived_context,navigation:state.twin.navigation,
       robot:robotPosition(),journey:state.journey,selected:state.selectedAsset}),
     inspect:asset=>selectAsset(asset,true),
     navigate:dispatchRobotToAsset,
@@ -2154,6 +2154,7 @@ function bindUIEvents() {
     if(!state.navigationAvailable){navigationError(new Error("No supported floor route is available; use Free view to inspect."));return;}
     if(!point){navigationError(new Error("Choose a point inside the room walls."));return;}
     const objects=state.roomAssets.filter(asset=>{
+      if(state.imported && (cellAtPosition(point) || (!asset.mapped && asset.review_status!=="accepted"))) return false;
       if(asset.tier!=="equipment"||asset.center[1]-asset.size[1]/2>1.62||asset.center[1]+asset.size[1]/2<.10)return false;
       const dx=point.x-asset.center[0],dz=point.z-asset.center[2],c=Math.cos(asset.yaw),s=Math.sin(asset.yaw);
       return Math.abs(dx*c+dz*s)<=asset.size[0]/2 && Math.abs(-dx*s+dz*c)<=asset.size[2]/2;

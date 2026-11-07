@@ -120,6 +120,9 @@ export function createGameMap(navigation, reachable, assets=[]) {
   for(const asset of assets) {
     const [cx,cy,cz]=asset.center,[sx,sy,sz]=asset.size;
     if(asset.tier!=="equipment"||cy-sy/2>1.62||cy+sy/2<.10)continue;
+    // Imported boxes are candidate envelopes, not an occupancy mask. Keep only
+    // mapped envelopes as dashed outlines; never paint them as blocked floor.
+    if(asset.source_region_id && !asset.mapped) continue;
     const x=(cx-m.x_min)/m.res*scale,y=canvas.height-(cz-m.z_min)/m.res*scale;
     const w=sx/m.res*scale,h=sz/m.res*scale;
     ctx.save();ctx.translate(x,y);ctx.rotate(-asset.yaw);
@@ -127,7 +130,8 @@ export function createGameMap(navigation, reachable, assets=[]) {
     ctx.fillStyle=asset.mapped?'#253b3be6':prominent?'#263333a8':'#26333322';
     ctx.strokeStyle=asset.mapped?'#bccdc5':'#a0b1a58c';
     ctx.lineWidth=asset.mapped?3:1.5;
-    ctx.fillRect(-w/2,-h/2,w,h);
+    if(asset.source_region_id)ctx.setLineDash([5,4]);
+    else ctx.fillRect(-w/2,-h/2,w,h);
     if(prominent)ctx.strokeRect(-w/2,-h/2,w,h);
     ctx.restore();
   }
