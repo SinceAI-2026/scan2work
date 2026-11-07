@@ -46,3 +46,6 @@
 .rp-fault { margin: 5px 0 0; padding: 4px 6px; border-radius: 6px; font-size: 11px; background: #f7e4df; border: 1px solid #e3a99d; color: #7d2f22; }
 .rp-fault.mate { background: #f6edda; border-color: #e0c48a; color: #6e5014; }
 @media (max-width: 650px) { .rp-dock { top: auto; bottom: 10px; right: 10px; width: calc(100% - 20px); max-height: 45%; } .rp-label { max-width: 140px; font-size: 11px; } }
+
+/* ai3d.mjs: a device drawn as its Higgsfield model */
+.hud-tag.ai3d::after { content: "AI 3D"; margin-left: 6px; padding: 0 4px; border-radius: 3px; background: #f4cf76; color: #1d2a20; font-size: 9px; font-weight: 700; letter-spacing: .04em; }

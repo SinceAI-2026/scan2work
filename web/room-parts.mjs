@@ -20,7 +20,7 @@ const GLIDE_S = 1.1;    // into the technician's eyes before the parts come apar
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => `&#${c.charCodeAt(0)};`);
 
 /** ctx: { scene, camera, renderer, container, state, uniforms(), look (first-person yaw/pitch), eye (m), setPreset(name),
- *  robot() -> {x, z}, walkTo(asset), closeOther(), boxMeshes, setInspector(open) } */
+ *  robot() -> {x, z}, walkTo(asset), closeOther(), boxMeshes, setInspector(open), onStage(asset, on) } */
 export function createRoomParts(ctx) {
   let doc = null, live = null, pending = null, opening = false;
   const ready = fetch(`${DATA}index.json`).then(r => (r.ok ? r.json() : null)).then(d => (doc = d)).catch(() => null);
@@ -166,6 +166,7 @@ export function createRoomParts(ctx) {
     const instance = ctx.state.twin.assets.findIndex(a => a.id === asset.id) + 1;
     const inspectorWas = document.body.classList.contains("inspector-open");
     ctx.setInspector(false);
+    ctx.onStage?.(asset, true);
     document.body.classList.add("parts-mode");
     const setRoom = on => {
       if (!u?.uApart) return;
@@ -363,6 +364,7 @@ export function createRoomParts(ctx) {
       canvas.style.cursor = "";
       ui.remove();
       setRoom(false);
+      ctx.onStage?.(asset, false);
       document.body.classList.remove("parts-mode");
       root.traverse(n => {
         n.geometry?.dispose();

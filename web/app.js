@@ -22,6 +22,7 @@ import { filterShows, onFilterChange } from "./view-filter.mjs";
 import { ICONS } from "./view-icons.mjs";
 import { createTakeApart } from "./take-apart.mjs";
 import { createRoomParts } from "./room-parts.mjs";
+import { createAi3d } from "./ai3d.mjs";
 import { sampleRoute, nearbyAssets, planFromPosition, reachableFloor, floorDestination, assetDestination, planRoomTour, advanceAlongRoute, segmentIsFree } from "./navigation-view.mjs";
 
 const state = {
@@ -77,6 +78,7 @@ const movementKeys = ["w", "a", "s", "d", "arrowup", "arrowdown", "arrowleft", "
 let equipmentObstacles;
 let takeApart = null; // one object alone, the room faded (take-apart.mjs)
 let roomParts = null; // a pump unit apart where it stands, in first person (room-parts.mjs)
+let ai3d = null; // Higgsfield models drawn in place of their devices (ai3d.mjs)
 let updateFillSort;
 let sourceScan, indexedScan, originalNavigation, initialNavigation, walkPoses;
 let editStore, activeEdits = [], removedIds = new Set(), editsOffline = false, editBusy = false;
@@ -123,6 +125,11 @@ async function init() {
     scene, camera, renderer, container: document.getElementById("canvas-container"), state, boxMeshes,
     uniforms: () => splatMaterial?.uniforms, look: firstLook, eye: ROBOT_EYE_M, setPreset: applyCameraPreset,
     robot: robotPosition, walkTo: dispatchRobotToAsset, closeOther: () => takeApart?.close(), setInspector: setInspectorOpen,
+    onStage: (asset, on) => ai3d?.hold(asset, on),
+  });
+  ai3d = createAi3d({
+    scene, renderer, state, hudElements, uniforms: () => splatMaterial?.uniforms, ready: roomParts.ready,
+    roomAsset, removed: id => removedIds.has(id), otherOpen: () => !!takeApart?.isOpen,
   });
   buildRobotAvatar();
   editStore = roomEditStore(id => canRemove(state.assetsByObj.get(id)));
@@ -151,6 +158,7 @@ async function init() {
     stepSimulation(dt, now * 0.001);
     takeApart.frame(boxMeshes);
     roomParts.frame(dt);
+    ai3d.frame();
     bimView.update(state.selectedAsset);
     updateMotionResolution(now);
     maybeTriggerDepthSort();
@@ -395,6 +403,9 @@ async function loadEwaGaussianSplats(url) {
       uFillDebug: {value:0},
       uSplatAxisLimit: { value: 180 },
       uBlur: { value: 0 },   // room-parts.mjs: px² added to every footprint, the room softly blurred around a Take apart
+      uCovered: {value:makeRoomTexture(new Float32Array(256 * explodeUniforms.uInstTableSize.value.y),256,   // ai3d.mjs: objects under an AI 3D model
+        explodeUniforms.uInstTableSize.value.y,THREE.RedFormat)},
+      uHasCovered: {value:0},
     },
     vertexShader: `
       attribute float splatIndex;
@@ -408,7 +419,8 @@ async function loadEwaGaussianSplats(url) {
       uniform vec2 uViewport;
       uniform vec2 uFocal;
 ${SHADER_DECL}      uniform float uSplatAxisLimit;
-      uniform float uBlur;
+      uniform float uBlur, uHasCovered;
+      uniform sampler2D uCovered;
       uniform float uBaseCount, uFillCount, uHasRemoved, uFillDebug;
       uniform sampler2D uRoomFill, uRemoved;
       uniform vec2 uRoomFillSize;
@@ -433,7 +445,11 @@ ${SHADER_DECL}      uniform float uSplatAxisLimit;
           return;
         }
         vec3 center = centerRgba.xyz;
-${SHADER_OFFSET}        vec4 cam = modelViewMatrix * vec4(center, 1.0);
+${SHADER_OFFSET}        if (uHasCovered > 0.5 && instId > 0.5 && texture2D(uCovered, (vec2(mod(instId, uInstTableSize.x), floor(instId / uInstTableSize.x)) + 0.5) / uInstTableSize).x > 0.5) {
+          gl_Position = vec4(0.0, 0.0, 2.0, 1.0);   // under its AI 3D model (ai3d.mjs)
+          return;
+        }
+        vec4 cam = modelViewMatrix * vec4(center, 1.0);
 
         if (cam.z > -0.08) {
           gl_Position = vec4(0.0, 0.0, 2.0, 1.0);
