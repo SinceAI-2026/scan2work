@@ -45,9 +45,8 @@ function instanceColor(id) {
 }
 
 function buildAssetBoundingBoxes() {"""),
-    ("""${a.mapped ? "Excel registry" : "Procedural metadata"}""",
-     """${a.mapped ? "Excel registry" : `Excel profile from ${a.excel_profile_tag || "registry"}`}"""),
-    ("""    if (visibleCount >= 5) continue;""", """    if (visibleCount >= 8) continue;"""),
+    # The label title and budget edits that used to follow are built into app.js's updateHudLabels now
+    # (no borrowed Excel profiles, budget 8 on the floor / 28 in Aerial view).
 ]
 done = 0
 for old, new in edits:

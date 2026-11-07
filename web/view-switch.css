@@ -1,0 +1,75 @@
+/* View switcher (circular button, menu opening to the right) and the Room view panel.
+   Patterns: Silt's icon buttons (Hugeicons, 32px hit area, label = tooltip, pressed state on Surface 3, 12px
+   menu type, 16px icon slot + 8px gap) and Matterport's view switch (inside / dollhouse / floor plan as one
+   control). Colours stay the viewer's own: light chrome, forest green for the active choice. */
+:root{
+  --vs-surface:#f9fbf3f2; --vs-border:#d6dccd; --vs-ink:#24382b; --vs-ink-2:#5d6f60;
+  --vs-hover:#e7ecdf; --vs-active:#254c38; --vs-active-ink:#fff; --vs-shadow:0 4px 18px #0003;
+}
+.view-row{gap:8px;align-items:center}
+.view-icon{display:inline-flex;width:18px;height:18px;flex:none;color:inherit}
+.view-icon svg{width:18px;height:18px}
+
+/* Circular buttons */
+.view-switch{position:relative;display:flex;align-items:center;gap:8px;pointer-events:auto}
+.view-fab{width:44px;height:44px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;
+  border:1px solid var(--vs-border);background:var(--vs-surface);color:var(--vs-ink);box-shadow:var(--vs-shadow);
+  cursor:pointer;pointer-events:auto;transition:background .15s,transform .15s;list-style:none}
+.view-fab::-webkit-details-marker{display:none}
+.view-fab:hover{background:var(--vs-hover)}
+.view-fab[aria-expanded=true]{background:var(--vs-active);color:var(--vs-active-ink);border-color:var(--vs-active)}
+.view-fab-small{width:36px;height:36px}
+.view-fab:focus-visible,.view-item:focus-visible,.layer-seg button:focus-visible,.layer-link:focus-visible{outline:2px solid #62896b;outline-offset:2px}
+
+/* Menu: a pill of round icon buttons sliding out to the right */
+.view-menu{display:flex;align-items:center;gap:4px;padding:4px;border-radius:999px;border:1px solid var(--vs-border);
+  background:var(--vs-surface);box-shadow:var(--vs-shadow);transform-origin:left center;animation:vs-open .16s ease-out}
+.view-menu[hidden]{display:none}
+@keyframes vs-open{from{opacity:0;transform:translateX(-6px) scale(.96)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.view-menu{animation:none}}
+.view-item{width:36px;height:36px;border-radius:50%;border:0;background:transparent;color:var(--vs-ink-2);
+  display:inline-flex;align-items:center;justify-content:center;cursor:pointer}
+.view-item:hover{background:var(--vs-hover);color:var(--vs-ink)}
+.view-item.active{background:var(--vs-active);color:var(--vs-active-ink)}
+
+/* Tooltips from data-tip (the label is also the accessible name) */
+[data-tip]{position:relative}
+[data-tip]:hover::after,[data-tip]:focus-visible::after{content:attr(data-tip);position:absolute;top:calc(100% + 8px);left:50%;
+  transform:translateX(-50%);white-space:nowrap;padding:4px 8px;border-radius:6px;background:#14211b;color:#eef4ea;
+  font-size:12px;line-height:16px;font-weight:500;pointer-events:none;z-index:40;box-shadow:0 2px 8px #0004}
+.display-options summary{list-style:none}
+
+/* Room view panel (Aerial view and Floor plan): layer, what to show, explode, the 2D drawing */
+.layer-panel{position:relative;flex:none;width:248px;display:flex;flex-direction:column;gap:12px;padding:10px;
+  border:1px solid var(--vs-border);border-radius:14px;background:var(--vs-surface);color:var(--vs-ink);
+  box-shadow:var(--vs-shadow);font-size:12px;line-height:16px;pointer-events:auto}
+.layer-seg{display:grid;grid-template-columns:repeat(3,1fr);gap:2px;padding:3px;border-radius:10px;background:#e9eee2}
+.layer-seg button{display:flex;flex-direction:column;align-items:center;gap:3px;padding:7px 2px 6px;border:0;border-radius:8px;
+  background:transparent;color:var(--vs-ink-2);font-size:11px;line-height:14px;cursor:pointer}
+.layer-seg button:hover{color:var(--vs-ink);background:#ffffff80}
+.layer-seg button.active{background:#fff;color:var(--vs-active);box-shadow:0 1px 3px #0002;font-weight:600}
+.layer-seg [data-tip]:hover::after{top:calc(100% + 6px)}
+.layer-group{display:flex;flex-direction:column;gap:2px;padding:0 4px}
+.layer-heading{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--vs-ink-2);margin-bottom:4px}
+.layer-group label{display:flex;align-items:center;gap:8px;min-height:28px;cursor:pointer}
+.layer-group input[type=checkbox]{accent-color:var(--vs-active);width:15px;height:15px;margin:0}
+.layer-explode input[type=range]{flex:1;min-width:0;accent-color:var(--vs-active)}
+.layer-ceiling[hidden]{display:none}
+.layer-link{display:flex;align-items:center;gap:8px;min-height:32px;padding:0 8px;border:1px solid var(--vs-border);border-radius:8px;
+  background:#fff;color:var(--vs-ink);font-size:12px;cursor:pointer}
+.layer-link:hover{background:var(--vs-hover)}
+@media(max-width:650px){.layer-panel{width:210px}.view-tools{flex-direction:column}.view-fab{width:40px;height:40px}}
+/* Tooltips under the round buttons start at the button, so long ones never run off the view's left edge. */
+.view-switch [data-tip]:hover::after,.view-switch [data-tip]:focus-visible::after,
+.display-options [data-tip]:hover::after{left:0;transform:none}
+/* Display settings live in the right panel under the layer selector; the panel shows in every view, its
+   aerial-only parts (layers, Show in room, explode, 2D drawing) only in Aerial view. */
+.layer-panel .layer-aerial[hidden]{display:none}
+.layer-row{display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:28px}
+.layer-select{font:inherit;font-size:12px;padding:3px 6px;border:1px solid var(--vs-border);border-radius:6px;background:#fff;color:var(--vs-ink)}
+.layer-mini-seg{display:flex;gap:2px;padding:2px;border-radius:7px;background:#e9eee2}
+.layer-mini-seg button{border:0;border-radius:5px;background:transparent;color:var(--vs-ink-2);font-size:11px;padding:3px 7px;cursor:pointer}
+.layer-mini-seg button.active{background:#fff;color:var(--vs-active);font-weight:600;box-shadow:0 1px 2px #0002}
+/* Under the view button, on the left: the panel, with the class legend beside it. */
+.view-tools{display:flex;align-items:flex-start;gap:10px;margin-top:10px;pointer-events:none}
+.view-tools .class-legend{margin-top:0}
