@@ -177,12 +177,15 @@ export function floorDestination(navigation, start, point, maxSnap=.30) {
   return {asset_id:null,tag:"Map destination",kind:"floor",waypoints:[{position:[best.x,0,best.z]}]};
 }
 
+// The nearest clear spot 0.35 to 2.5 m from the equipment, preferring about 0.65 m. Equipment with no clear spot
+// close by is inspected from further out (it was 1.5 m, which left VS-002 and M-006 without an inspection stop).
+export const MAX_INSPECTION_DISTANCE_M = 2.5;
 export function assetDestination(navigation,start,asset) {
   const floor=reachableFloor(navigation,start);
   let best,score=Infinity;
   for (const cell of floor) {
     const d=Math.hypot(cell.x-asset.center[0],cell.z-asset.center[2]);
-    if (d<.35 || d>1.5) continue;
+    if (d<.35 || d>MAX_INSPECTION_DISTANCE_M) continue;
     const value=Math.abs(d-.65)+.1/Math.max(.05,cell.clearance);
     if (value<score) {best=cell;score=value;}
   }
