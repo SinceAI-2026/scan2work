@@ -88,6 +88,7 @@ export function createRoomParts(ctx) {
       : near(a) ? "Take the unit apart here, in the room, from the technician's eyes (T; Esc or Done puts it back)"
       : "Walk there and take the unit apart in the room (T)";
     if (btn && btn.title !== title) btn.title = title;
+    if (btn && mine() && btn.textContent !== "Take apart") btn.textContent = "Take apart"; // Wael's label returns on the next selection
   }
 
   function open(asset) {
