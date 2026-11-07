@@ -5,7 +5,8 @@
 // repos tagged the Excel devices onto the scan independently). A pump + motor unit is one model, drawn once.
 // Loaded one by one after the splat; ?ai3d=0 turns it off. The models use their own lit glTF materials under this
 // scene's lights. Hidden while Wael's Take apart is open and in the BIM layer; they follow the explode slider and room
-// explode view. Edited or removed assemblies fall back to their exact scan objects.
+// explode view. Edited or removed assemblies fall back to their exact scan objects, and the unowned scan inside the
+// model's box is cut with them (cutBoxes below).
 // Take apart ported from Mikael Lehtonen's scan2service (web/parts.js) via SinceAI-2026/mvp; UX after Rasmus Mäkinen's
 // pump explode. AI 3D after scan2service's room view and the MVP's src/s2s/room.ts.
 import * as THREE from "three";
@@ -64,7 +65,7 @@ export function createAi3d(ctx) {
         const main = owners.find(a => a.mapped) ?? owners[0];
         node.userData = { name, label: e.label, owners: owners.map(displayAssetTag) };
         root.add(node);
-        drawn.set(name, { node, owners, main });
+        drawn.set(name, { node, owners, main, box: box.clone() });
       } catch (err) {
         skipped[name] = `not loaded: ${err.message}`;
       }
@@ -78,6 +79,14 @@ export function createAi3d(ctx) {
       n.geometry?.dispose();
       for (const m of [].concat(n.material ?? [])) { m.map?.dispose(); m.dispose(); }
     });
+  }
+
+  // A model drawn over the scan hides more than its owners' own splats: the unowned scan behind and inside it
+  // (the rest of the motor, the shaft, the base) never shows while the model stands there. So when one of its
+  // owners is removed or moved, app.js cuts that unowned scan inside the model's box as well (updateRoomCuts).
+  function cutBoxes() {
+    return [...drawn.values()].filter(({ owners }) => owners.some(a => ctx.removed(a.id) || ctx.roomAsset(a)?.transform))
+      .map(({ box }) => ({ min: [box.min.x, Math.max(box.min.y, 0.05), box.min.z], max: box.max.toArray() })); // the floor under it stays
   }
 
   /** Every frame before the room is drawn. */
@@ -104,6 +113,7 @@ export function createAi3d(ctx) {
   window.__ai3d = { drawn: () => [...drawn.values()].map(d => `${d.node.userData.name}: ${d.node.userData.owners.join(" + ")}`), skipped: () => ({ ...skipped }) }; // checks
   return {
     frame,
+    cutBoxes,
     /** The in-room Take apart: the model of the object taken apart steps aside while its parts stand there. */
     hold(asset, on) { if (on) held.add(asset.id); else held.delete(asset.id); },
   };

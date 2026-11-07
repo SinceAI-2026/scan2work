@@ -69,11 +69,9 @@
 .room-change-row time{color:var(--text-muted);font-size:10px}
 .room-edit-actions>*,.room-edit-actions>span>button{width:100%}
 .room-move-form{display:grid;gap:8px;font-size:11px;padding:9px;background:#e8f1ef;border:1px solid #c3d5cf;border-radius:6px}
-.room-move-fields{display:grid;grid-template-columns:1fr 1fr;gap:7px}
-.room-move-fields label{display:grid;gap:3px}.room-move-fields input{width:100%;padding:4px;border:1px solid var(--border);border-radius:3px}
 #room-move-error{color:#80451c}#room-move-error:empty{display:none}
-.placing-object canvas{cursor:crosshair}
-.placing-object .route-map-panel{right:386px;width:min(280px,calc(100% - 402px))}
+.placing-object canvas{cursor:crosshair}.placing-object canvas.over-object{cursor:grab}.dragging-object canvas,.dragging-object canvas.over-object{cursor:grabbing}
+.placing-object .route-map-panel{right:386px;width:min(210px,calc(100% - 402px));top:auto;bottom:96px} /* low, so it never covers the framed object */
 .placing-object .map-expanded .route-map-panel{width:min(500px,calc(100% - 402px))}
 @media(max-width:750px){.placing-object .route-map-panel{display:none}}
 .room-edit-notice,#room-edit-status{color:#7b491c;font-size:11px;line-height:1.45}
