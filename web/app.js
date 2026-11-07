@@ -34,6 +34,7 @@ import { mountInformationSettings, inspectionAction, simpleFrameVisible } from "
 import { bindRoomControls } from "./room-controls.mjs";
 import { createRoomParts } from "./room-parts.mjs";
 import { createAi3d } from "./ai3d.mjs";
+import { mountManualAnnotations } from "./manual-annotations.mjs";
 import { sampleRoute, nearbyAssets, planFromPosition, reachableFloor, floorDestination, assetDestination, planRoomTour, advanceAlongRoute, segmentIsFree } from "./navigation-view.mjs";
 
 const state = {
@@ -95,6 +96,7 @@ const walkKeys = new Set();
 const movementKeys = ["w", "a", "s", "d", "arrowup", "arrowdown", "arrowleft", "arrowright"];
 let equipmentObstacles;
 let proposalReview = null;
+let manualAnnotations = null;
 let takeApart = null; // one object alone, the room faded (take-apart.mjs)
 let roomParts = null; // a pump unit apart where it stands, in first person (room-parts.mjs)
 let ai3d = null; // Higgsfield models drawn in place of their devices (ai3d.mjs)
@@ -121,10 +123,11 @@ function updateInspectionAction(simple=information?.simple) {
 }
 
 async function init() {
-  const [twin, poses, context] = await Promise.all([
+  const [twin, poses, context, manualPayload] = await Promise.all([
     fetch("./data/digital_twin.json").then(res => res.json()),
     fetch("./data/walk_poses.json").then(res => res.ok ? res.json() : null).catch(() => null),
     fetch("./api/scene-context").then(res => res.ok ? res.json() : null).catch(() => null),
+    fetch("./api/manual-annotations").then(res => res.ok ? res.json() : null).catch(() => null),
   ]);
   state.twin = twin;
   sceneContext=context;
@@ -183,21 +186,53 @@ async function init() {
   mountExplodeControls();
   takeApart = createTakeApart({
     camera, controls, state, uniforms: () => splatMaterial?.uniforms, setPreset: applyCameraPreset,
-    setLayer:setViewLayer, setCeilingCut, beforeOpen:()=>{ proposalReview?.close(); roomParts?.close({immediate:true}); },
+    setLayer:setViewLayer, setCeilingCut, beforeOpen:()=>{ manualAnnotations?.close(); proposalReview?.close(); roomParts?.close({immediate:true}); },
     container: document.getElementById("canvas-container"), scene, renderer,
   });
   roomParts = createRoomParts({
     scene, camera, renderer, container: document.getElementById("canvas-container"), state, boxMeshes,
     uniforms: () => splatMaterial?.uniforms, look: firstLook, eye: ROBOT_EYE_M, setPreset: applyCameraPreset,
     roomAsset, removed: id => removedIds.has(id),
-    robot: robotPosition, walkTo: dispatchRobotToAsset, closeOther: () => { takeApart?.close(); proposalReview?.close(); }, setInspector: setInspectorOpen,
+    robot: robotPosition, walkTo: dispatchRobotToAsset, closeOther: () => { manualAnnotations?.close(); takeApart?.close(); proposalReview?.close(); }, setInspector: setInspectorOpen,
     onStage: (asset, on) => ai3d?.hold(asset, on),
   });
   ai3d = createAi3d({
     scene, renderer, state, hudElements, uniforms: () => splatMaterial?.uniforms, ready: roomParts.ready,
-    roomAsset, removed: id => removedIds.has(id), otherOpen: () => !!takeApart?.isOpen || !!proposalReview?.isOpen,
+    roomAsset, removed: id => removedIds.has(id), otherOpen: () => !!takeApart?.isOpen || !!proposalReview?.isOpen || !!manualAnnotations?.isolated,
   });
   buildRobotAvatar();
+  manualAnnotations = mountManualAnnotations({payload:manualPayload,state,count:sourceScan[4],
+    uniforms:()=>splatMaterial.uniforms,container:document.getElementById("canvas-container"),scene,camera,controls,
+    host:{
+      open(){
+        safetyDemo?.stop({takeover:true});proposalReview?.close();takeApart?.close();roomParts?.close({immediate:true});
+        const saved={asset:state.selectedAsset,preset:state.cameraPreset,layer:state.viewLayer,cut:state.ceilingCut,
+          inspector:document.body.classList.contains('inspector-open'),hazards:hazardLayer?.enabled,
+          position:camera.position.clone(),target:controls.target.clone(),explode:explodeState.amount};
+        if(state.journey.phase==='moving')applyJourneyEvent({type:'pause'});
+        walkKeys.clear();setInspectorOpen(false);hazardLayer?.setEnabled(false);
+        explodeState.amount=0;document.getElementById('explode-range').value='0';
+        applyCameraPreset('detail');setCeilingCut(false);
+        return saved;
+      },
+      context(asset){
+        state.selectedAsset=asset;copilotRequestId++;
+        // The shared job card and Ilkka observe this heading. Clear the prior mapped device before publishing it.
+        document.getElementById('detail-health-pill').hidden=true;
+        document.getElementById('detail-title').textContent=asset.label+' · No workbook status linked';
+        document.querySelector('.copilot-block').hidden=true;
+        updateInspectionAction();
+      },
+      focus:asset=>viewRoomLocation(asset),
+      close(saved){
+        if(!saved)return;
+        if(saved.asset)selectAsset(saved.asset,false);
+        applyCameraPreset(saved.preset);setViewLayer(saved.layer);setCeilingCut(saved.cut);
+        explodeState.amount=saved.explode;document.getElementById('explode-range').value=String(saved.explode);
+        camera.position.copy(saved.position);controls.target.copy(saved.target);controls.update();
+        hazardLayer?.setEnabled(saved.hazards);setInspectorOpen(saved.inspector);
+      }
+    }});
   editStore = roomEditStore(id => canRemove(state.assetsByObj.get(id)),state.datasetId,{localOnly:isPublicDemo(twin.runtime)});
   roomPlacements = loadRoomPlacements(state.assetsByObj, canRemove,state.datasetId);
   const savedEdits = await editStore.load();
@@ -211,7 +246,7 @@ async function init() {
     button:document.getElementById("btn-review-proposals"), uniforms:()=>splatMaterial.uniforms,
     count:sourceScan[4], texSize:splatMaterial.uniforms.uTexSize.value,
     onOpen:()=>{
-      takeApart.close(); roomParts?.close({immediate:true}); setInspectorOpen(false);
+      manualAnnotations?.close();takeApart.close(); roomParts?.close({immediate:true}); setInspectorOpen(false);
       if(state.journey.phase==="moving")applyJourneyEvent({type:"pause"});
       const previous={preset:state.cameraPreset,layer:state.viewLayer,cut:state.ceilingCut,
         explode:explodeState.amount,position:camera.position.clone(),target:controls.target.clone()};
@@ -251,11 +286,14 @@ async function init() {
     hazardLayer?.frame();
     if(demoCameraGlide&&!safetyDemo?.state.paused){const g=demoCameraGlide;g.elapsed+=dt;const t=Math.min(1,g.elapsed/g.duration),k=t*t*(3-2*t);camera.position.lerpVectors(g.from,g.to,k);controls.target.lerpVectors(g.aimFrom,g.aimTo,k);controls.update();if(t===1)demoCameraGlide=null;}
     takeApart.frame(boxMeshes);
-    if (proposalReview?.isOpen) for (const entry of boxMeshes.values()) entry.group.visible=false;
+    if (proposalReview?.isOpen || manualAnnotations?.isOpen) for (const entry of boxMeshes.values()) entry.group.visible=false;
     roomParts.frame(dt);
     ai3d.frame();
     updateRoomCuts();
     bimView.update(state.selectedAsset);
+    manualAnnotations?.frame();
+    if(pathLineGroup)pathLineGroup.visible=!manualAnnotations?.isOpen;
+    if(manualAnnotations?.isOpen)robotGroup.visible=false;
     updateMotionResolution(now);
     maybeTriggerDepthSort();
     renderer.render(scene, camera);
@@ -506,6 +544,8 @@ async function loadEwaGaussianSplats(url) {
       uCovered: {value:makeRoomTexture(new Float32Array(256 * explodeUniforms.uInstTableSize.value.y),256,   // ai3d.mjs: objects under an AI 3D model
         explodeUniforms.uInstTableSize.value.y,THREE.RedFormat)},
       uHasCovered: {value:0},
+      uManualMask: {value:makeRoomTexture(new Float32Array(1),1,1,THREE.RedFormat)},
+      uManualActive: {value:0}, uManualOnly: {value:0},
       uCutCount: {value:0},   // updateRoomCuts: unowned scan splats left in a removed / moved object's box
       uCutMin: {value:Array.from({length:MAX_ROOM_CUTS},()=>new THREE.Vector3())},
       uCutMax: {value:Array.from({length:MAX_ROOM_CUTS},()=>new THREE.Vector3())},
@@ -524,6 +564,8 @@ async function loadEwaGaussianSplats(url) {
 ${SHADER_DECL}      uniform float uSplatAxisLimit;
       uniform float uHasCovered;
       uniform sampler2D uCovered;
+      uniform sampler2D uManualMask;
+      uniform float uManualActive, uManualOnly;
       uniform float uBaseCount, uFillCount, uHasRemoved, uFillDebug;
       uniform int uCutCount;
       uniform vec3 uCutMin[${MAX_ROOM_CUTS}], uCutMax[${MAX_ROOM_CUTS}];
@@ -536,6 +578,12 @@ ${SHADER_DECL}      uniform float uSplatAxisLimit;
         vec2 uv = (vec2(col, row) + 0.5) / uTexSize;
 
         bool synthetic = splatIndex >= uBaseCount;
+        float manualId = (!synthetic && uManualActive > 0.5) ? texture2D(uManualMask, uv).x : 0.0;
+        bool manualOwned = abs(manualId) > 0.5;
+        if (manualId < -0.5 || (uManualOnly > 0.5 && abs(manualId - uManualOnly) > 0.5)) {
+          gl_Position = vec4(0.0, 0.0, 2.0, 1.0);
+          return;
+        }
         float fillIndex = splatIndex - uBaseCount;
         if (synthetic && fillIndex >= uFillCount) {
           gl_Position = vec4(0.0, 0.0, 2.0, 1.0);
@@ -554,7 +602,7 @@ ${SHADER_OFFSET}        if (uHasCovered > 0.5 && instId > 0.5 && texture2D(uCove
           gl_Position = vec4(0.0, 0.0, 2.0, 1.0);   // under its AI 3D model (ai3d.mjs)
           return;
         }
-        if (!synthetic && instId < 0.5 && uCutCount > 0) {   // unowned scan left where an object was (updateRoomCuts)
+        if (!synthetic && !manualOwned && instId < 0.5 && uCutCount > 0) {   // unowned scan left where an object was (updateRoomCuts)
           for (int i = 0; i < ${MAX_ROOM_CUTS}; i++) {
             if (i >= uCutCount) break;
             if (all(greaterThanEqual(centerRgba.xyz, uCutMin[i])) && all(lessThanEqual(centerRgba.xyz, uCutMax[i]))) {
@@ -842,6 +890,7 @@ function applyCameraPreset(preset) {
 // splats and frames coloured by class, every object labelled. BIM model: the splat swapped for the BIM
 // geometry (bim-room.mjs), frames kept invisible so labels and clicks still work. Explode works in all three.
 function setViewLayer(layer) {
+  if(layer!=="scan")manualAnnotations?.close();
   state.viewLayer = layer;
   const bim = layer === "bim";
   if (bim && takeApart?.isOpen) takeApart.close();
@@ -1051,7 +1100,7 @@ function setupSceneContext(targetAsset) {
     if(!matchMedia('(prefers-reduced-motion: reduce)').matches){demoCameraGlide={from,aimFrom,to:camera.position.clone(),aimTo:controls.target.clone(),elapsed:0,duration:.85};camera.position.copy(from);controls.target.copy(aimFrom);}
   };
   safetyDemo=mountSafetyDemo({button:play,container:document.getElementById("canvas-container"),host:{
-    capture(){saved={preset:state.cameraPreset,layer:state.viewLayer,cut:state.ceilingCut,boxes:state.boxesMode,hazards:hazardLayer.enabled,inspector:document.body.classList.contains("inspector-open"),position:camera.position.clone(),target:controls.target.clone()};roomParts?.close({immediate:true});proposalReview?.close();takeApart?.close();setInspectorOpen(false);},
+    capture(){manualAnnotations?.close();saved={preset:state.cameraPreset,layer:state.viewLayer,cut:state.ceilingCut,boxes:state.boxesMode,hazards:hazardLayer.enabled,inspector:document.body.classList.contains("inspector-open"),position:camera.position.clone(),target:controls.target.clone()};roomParts?.close({immediate:true});proposalReview?.close();takeApart?.close();setInspectorOpen(false);},
     navigate(){showMissionView();setBoxesMode("selected");dispatchRobotToAsset(targetAsset,{firstPerson:false});},
     caption:phase=>phase==='hazard'?`${targetAsset.tag} · ${energyDescription(sceneContext.devices[targetAsset.id]).reading}. ${energyDescription(sceneContext.devices[targetAsset.id]).source}. The zone illustrates potential energy, not verified isolation or a measured clearance.`:null,
     travel:()=>state.journey.phase,
@@ -1481,6 +1530,7 @@ function renderProposalList(simple=information?.simple) {
     const a = state.assetsByObj.get(card.dataset.obj);
     if (a) selectAsset(a, true);
   });
+  manualAnnotations?.renderSearch(state.searchQuery,state.visualReviewFilter);
 }
 
 function drawDetectionCrop(asset) {
@@ -1547,6 +1597,7 @@ function fmtComma(num) {
 }
 
 function selectAsset(asset, openInspector = false) {
+  manualAnnotations?.close();
   proposalReview?.close();
   if (movePreview && movePreview.asset.id !== asset.id) closeMovePreview();
   asset = roomAsset(asset);
@@ -1934,7 +1985,9 @@ function prepareExactRoomEdits(edits, placements) {
     indexedScan ??= indexRoomScan(...sourceScan);
     for (const asset of assets.filter(a => a.transform)) {
       const owner = instancesById.get(asset.id);
-      placed.push(copyPlacedSplats(indexedScan, indexedScan.owned.get(owner) || [], asset, owner));
+      const originalRows=indexedScan.owned.get(owner) || [];
+      const rows=manualAnnotations?.withoutOwned(originalRows) || originalRows;
+      placed.push(copyPlacedSplats(indexedScan, rows, asset, owner));
       if (asset.center[1] - asset.size[1]/2 < 1.62 && asset.center[1] + asset.size[1]/2 > .10) {
         const c = Math.abs(Math.cos(asset.yaw)), s = Math.abs(Math.sin(asset.yaw));
         navigation = blockBox(navigation, {x:asset.center[0],z:asset.center[2],size:Math.max(asset.size[0]*c+asset.size[2]*s,asset.size[0]*s+asset.size[2]*c)});
@@ -2136,6 +2189,7 @@ function renderRoomEditControls() {
 }
 
 async function changeRoom(action,asset) {
+  manualAnnotations?.close();
   if (editBusy || !canRemove(asset)) return;
   closeMovePreview();
   editBusy=true;
@@ -2320,6 +2374,7 @@ function bindMoveDrag() {
 }
 
 function changePlacement(asset, placement) {
+  manualAnnotations?.close();
   if (editBusy || removedIds.has(asset.id) || !canRemove(asset)) return;
   const next=new Map(roomPlacements);
   if (placement) next.set(asset.id,placement);
@@ -2392,7 +2447,7 @@ function bindViewSwitch() {
   };
   fab.addEventListener("click", () => setOpen(menu.hidden));
   for (const btn of menu.querySelectorAll("[data-cam]")) {
-    btn.addEventListener("click", () => { proposalReview?.close(); endInspectionView(); applyCameraPreset(btn.dataset.cam); setOpen(false); fab.focus(); });
+    btn.addEventListener("click", () => { manualAnnotations?.close(); proposalReview?.close(); endInspectionView(); applyCameraPreset(btn.dataset.cam); setOpen(false); fab.focus(); });
   }
   document.addEventListener("pointerdown", e => { if (!menu.hidden && !e.target.closest("#view-switch")) setOpen(false); });
   document.addEventListener("keydown", e => {
@@ -2569,6 +2624,7 @@ function dispatchRobotToAsset(asset, {firstPerson = true} = {}) {
 }
 
 function showMissionView({inspection=false}={}) {
+  manualAnnotations?.close();
   proposalReview?.close();takeApart?.close();
   const search=document.getElementById("asset-search");
   if(search.value){search.value="";search.dispatchEvent(new Event("input"));}
@@ -2587,7 +2643,7 @@ function registerActivity() {
 function updateAttractMode(now) {
   if (bimView?.active) return;
   if (movePreview) return;
-  if (takeApart?.isOpen || roomParts?.isOpen || state.manualWalk || !attract.enabled || attract.active || document.hidden || now-attract.lastActivity < 20000) return;
+  if (manualAnnotations?.isOpen || takeApart?.isOpen || roomParts?.isOpen || state.manualWalk || !attract.enabled || attract.active || document.hidden || now-attract.lastActivity < 20000) return;
   if (!["idle","arrived"].includes(state.journey.phase)) return;
   const target=state.assetsById.get(state.twin.target_asset_id);
   if (!target) return;
@@ -2624,6 +2680,7 @@ function bindUIEvents() {
   const resumeMission = () => dispatchRobotToAsset(state.assetsById.get(state.twin.target_asset_id));
   document.getElementById("btn-manual-walk").addEventListener("click", resumeMission);
   window.addEventListener("keydown", event => {
+    if(manualAnnotations?.isOpen){if(event.key==='Escape'){event.preventDefault();manualAnnotations.close();}return;}
     if (movePreview) {
       const key=event.key.toLowerCase();
       if (event.key === 'Escape') closeMovePreview();

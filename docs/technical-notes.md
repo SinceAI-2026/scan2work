@@ -541,3 +541,63 @@ passed 33 tests. Read-only checks against both prepared datasets confirmed all
 30 mapped IDs, statuses, centers and asset bindings are preserved and the
 response serializes with strict finite JSON. Browser QA uses an isolated local
 data copy; original assets and shared production jobs are unchanged.
+
+# Manual washing-machine annotation and appearance audit
+
+The original 504-object baseline already labels the washer, but as fragments:
+OBJ-348 contains the control area, OBJ-564 a side fragment, and OBJ-526 an oversized
+side/back region. The existing Linards region `linards-BOX-0001` shows the complete
+front-loader. Its 2,011 original Gaussian rows are all present in the baseline
+render; 1,564 were distributed across 12 original owner IDs and 447 were unowned.
+Deleting those 12 whole owners would also delete surrounding pipes, shelving and
+other objects.
+
+`pipeline/manual_annotations.py` therefore exposes a separate, read-only manual
+annotation through `GET /api/manual-annotations`. The bundled
+`pipeline/annotations/washing-machine.json` records the label, evidence, original
+source hash and explicit native row IDs. It resolves those IDs against the active
+baseline's source-row map only after verifying the recorded render and row-map
+checksums. No canonical object, Excel binding, navigation, source PLY, GSID or
+on-disk twin is changed. Other datasets return an empty annotation collection.
+The browser keeps annotation visibility separate from existing object removals.
+
+Removing the initial 2,011-row region left substantial native washer geometry.
+The adopted mask therefore contains **10,000 explicitly recorded source rows**,
+resolved from a manually inspected, slightly yawed shell volume plus the
+protruding door. Six orthographic point views and native-splat front/back views
+were inspected. Front/side room removal was checked with the adjacent cart,
+cardboard box, bins, broom and pipes retained. The selected volume excludes the
+separate brown patch: it retains 1,821 original seed rows, excludes 190, and adds
+8,179 original native rows, including all 198 rows of `linards-BOX-0151`.
+The volume recipe, evidence and approximate-boundary provenance are bundled with
+the row list; this is a manual refinement, not an automatic model improvement.
+
+The boundary is labelled `manually_reviewed_approximate`. Small contact-edge,
+stand and bottle-base blur remains, and removal cannot reconstruct the occluded
+background. There is no independent segmentation-accuracy claim.
+`GET /api/manual-annotations/MANUAL-WASHER-001/native.ply` downloads only the
+selected native rows without a shared library write or refinement; all 59 original
+Gaussian float properties are preserved. The final HTTP download contains 10,000
+rows, is 2,361,501 bytes, and has SHA-256
+`8743bd9c7473319dc4e257a9b6aaa2dc37f8240466d1dafb1993b8039c8baf85`;
+its native record bytes were independently compared with the original PLY.
+
+The appearance regression was independently traced to generated model `A207.glb`:
+its center-based association hid all 9,270 rows belonging to six original objects,
+including 3,770 rows outside its model bounds. That hid 1,318 of the 2,011 Linards
+washer rows, of which 380 were outside the generated model's bounds. The user's
+three removed objects (CV-001, CV-006 and VS-003), including their generated-model
+cut boxes, intersected none of either washer mask's rows. The native source data was intact;
+the regression was in displayed replacement coverage. This diagnosis supports
+rejecting that replacement while keeping the original scan visible.
+
+Validation: eight focused manual-annotation tests cover exact row selection,
+native bytes, source/order mismatches, incomplete/duplicate/out-of-range rows,
+path escape, public read-only HTTP access, and the actual 10,000-row manual mask
+with all 504 objects and 30 mapped records unchanged. They check the preserved
+neighbour rows, brown-patch exclusion, actual bounds and no intersection with the
+three existing user-removal boxes. The 27 existing public-demo and media-range
+tests also pass. Browser QA separately checked front/side removal and restoration,
+front/back isolation, and manual-mask precedence over removing OBJ-348's mixed
+canonical control-panel fragment. These checks do not establish pixel-perfect
+segmentation or unseen geometry.

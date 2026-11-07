@@ -25,6 +25,7 @@ configure_server_runtime(ROOT)
 from pipeline import asset_export, decisions_client, field_service, retrieval, config as C
 from pipeline.asset_records import asset_for_api, route_for_api, UNMAPPED_NOTICE
 from pipeline.scene_context import build_scene_context
+from pipeline.manual_annotations import load_annotations, export_native as export_manual_annotation
 
 WEB_DIR = ROOT / "web"
 PUBLIC_DEMO = os.environ.get("VALMET_PUBLIC_DEMO") == "1"
@@ -459,6 +460,23 @@ class TwinRequestHandler(SimpleHTTPRequestHandler):
 
         if path == "/api/scene-context":
             return self._send_json(build_scene_context(TWIN_DATA))
+
+        if path == "/api/manual-annotations":
+            return self._send_json(load_annotations(C.OUT_DIR, TWIN_DATA))
+
+        manual_export = re.fullmatch(r"/api/manual-annotations/([A-Z0-9-]+)/native\.ply", path)
+        if manual_export:
+            try:
+                raw = export_manual_annotation(C.OUT_DIR, TWIN_DATA, manual_export.group(1))
+            except (ValueError, OSError) as err:
+                return self._send_json({"error": str(err)}, 404)
+            self.send_response(200)
+            self.send_header("Content-Type", "application/octet-stream")
+            self.send_header("Content-Disposition", f'attachment; filename="{manual_export.group(1)}.ply"')
+            self.send_header("Content-Length", str(len(raw)))
+            self.end_headers()
+            self.wfile.write(raw)
+            return
 
         if path.startswith("/data/") and path.lower().endswith((".mp4", ".webm")):
             if PUBLIC_DEMO and not self._public_static_allowed():

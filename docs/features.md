@@ -71,6 +71,32 @@ The original photo remains above the job checklist. Full evidence is still avail
 Reusable modules, attribution, data-selection decisions and current route checks are in the
 [Rasmus integration guide](rasmus-integration.md).
 
+## Manually identified washing machine
+
+Search for **washing machine**, then choose the **Manually identified** result. It opens a compact panel with
+the source photo, **Focus**, **Isolate item**, and reversible removal/restoration in this browser. This entry is
+available without enabling every extraction tool. It has no workbook binding, device reading or service job.
+Opening it clears the previous device's assistant context so Ilkka cannot mistake it for that device.
+
+The label is manually reviewed against the scan and video. Its boundary contains 10,000 explicit native source
+rows from a visually inspected housing-and-door volume, independently of the fragmented canonical labels.
+Front, side and isolated back views were checked; the adjacent cart, cardboard box, bins and pipes stay visible
+after removal. Contact edges remain approximate, and removing the scan cannot recover unseen background.
+The source/boundary disclosure retains these limits. Removal does not certify an empty floor or modify the navigation grid.
+The original 504 objects, 30 workbook bindings and existing room edits remain intact. Manual visibility is saved
+separately for this dataset and source scan.
+
+**Download original region (.ply)** preserves every original Gaussian property. It does not call an AI model,
+reconstruct unseen surfaces or write to the shared asset library. The reusable backend is
+`pipeline/manual_annotations.py`; the browser modules are `web/manual-annotation-data.mjs` and
+`web/manual-annotations.mjs`. The read-only API is `GET /api/manual-annotations`, with the download URL supplied
+per annotation. Unknown or changed source data fails closed.
+
+The damaged washer appearance came from the imported `A207.glb` replacement hiding native scan points.
+`web/generated-model-policy.mjs` now records its visual rejection. This model cannot load, cover scan points or
+add removal cut boxes; other eligible generated models remain available. The original model archive is retained.
+This restores the captured appearance without claiming a new reconstruction or improved segmentation accuracy.
+
 ## Isolate an object and save it to the library
 
 Select equipment and choose **Isolate item** in Equipment details, or press **T**. The object stays in place and the rest of the room fades. **R** toggles the turntable, **G** shows a faint ghost of the room, and **Esc** returns.
@@ -119,6 +145,9 @@ Away from the pump, the robot walks there first. The view glides into first pers
 The models are AI-generated (Higgsfield) units, split into parts by geometry rules. scan2service fitted them in raw PLY coordinates of the same `Equipment Room.ply`. The viewer only levels them, `(x, 1.185 − y, −z)` as in `pipeline/ingest.py`, so each unit stands exactly where it was fitted. Objects are matched to a unit by **position**: an object belongs to the unit when its box centre lies inside the unit's box. Tags are never used for this, because the two repos tagged the Excel devices onto the scan independently. The faults come from the matched objects' own Excel records, on the part whose fault codes hold the issue, preferring the part the object stands in. For example, M-005's current imbalance is shown on the motor and P-005's fouling on the pump housing. An issue that no part of the model carries is still listed in the dock, if a current workbook binding has an issue that the split geometry cannot represent.
 
 ## AI 3D models in the room
+
+Visual review can override the imported model selection: `A207.glb` is disabled because it obscured the original
+washing machine. The import counts below describe the available archive, not a promise that every model is shown.
 
 Every Higgsfield unit that scan2service shows in its room is drawn where it was fitted, unshifted: 15 models from its own index (`equip_v1/assets_export/hf3d/index.json`), including the big vessel, cabinet and trolley, plus 3 newer ones from the MVP's `index_new.json`: the Grundfos twin pump unit (on P-002 here) and the valves A257 (on CV-007) and A352 (on M-002). The `_r2` redo is used where there is one. Units that scan2service hides, or whose silhouette fit against the photos is below 0.5, are skipped, and the import lists them with the reason. Each model sits on this viewer's objects whose box centres lie inside it. A small model with none sits on the smallest box that holds its centre. A model with no object of this viewer under it is skipped, so the scan never shows through a model (B165 and B169 here; `window.__ai3d.skipped()` lists them). The room models carry 1024 px copies of their textures, written by the import, while the split units for Take apart keep the full 2048 px. That is about 70 MB of video memory for the 13 room models instead of about 290 MB. Their scan splats are hidden under the model, and their room labels get an **AI 3D** badge. A pump and motor unit is one model, drawn once. The models load one by one after the splat. They follow the scene explode slider. Removing, rotating or moving any associated object falls back to the source scan, so the illustrative assembly cannot hide or resurrect edited objects. They are hidden in the BIM layer and while an object is taken apart with Wael's take-apart. `?ai3d=0` turns them off. The code is in `web/ai3d.mjs`.
 

@@ -14,7 +14,7 @@ import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { explodeOffset } from "./explode.mjs";
 import { RAW_FLOOR_Y } from "./parts-data.mjs";
 import { displayAssetTag } from "./asset-presentation.mjs";
-import { canShowGeneratedModel, generatedCoverage } from "./generated-model-policy.mjs";
+import { canShowGeneratedModel, generatedCoverage, generatedModelAllowed, GENERATED_MODEL_REVIEWS } from "./generated-model-policy.mjs";
 
 const DATA = "./data/take_apart/";
 
@@ -40,6 +40,7 @@ export function createAi3d(ctx) {
     if (off || !doc?.ai3d) return;
     const loader = new GLTFLoader(), aniso = ctx.renderer.capabilities.getMaxAnisotropy(), box = new THREE.Box3(), c = new THREE.Vector3();
     for (const [name, e] of Object.entries(doc.ai3d)) {
+      if (!generatedModelAllowed(name)) { skipped[name] = GENERATED_MODEL_REVIEWS[name].reason; continue; }
       try {
         const model = (await loader.loadAsync(DATA + e.file)).scene;
         model.traverse(n => { if (n.material?.map) n.material.map.anisotropy = aniso; });
@@ -85,7 +86,7 @@ export function createAi3d(ctx) {
   // (the rest of the motor, the shaft, the base) never shows while the model stands there. So when one of its
   // owners is removed or moved, app.js cuts that unowned scan inside the model's box as well (updateRoomCuts).
   function cutBoxes() {
-    return [...drawn.values()].filter(({ owners }) => owners.some(a => ctx.removed(a.id) || ctx.roomAsset(a)?.transform))
+    return [...drawn.values()].filter(({ node, owners }) => generatedModelAllowed(node.userData.name) && owners.some(a => ctx.removed(a.id) || ctx.roomAsset(a)?.transform))
       .map(({ box }) => ({ min: [box.min.x, Math.max(box.min.y, 0.05), box.min.z], max: box.max.toArray() })); // the floor under it stays
   }
 
@@ -96,11 +97,11 @@ export function createAi3d(ctx) {
     const u = ctx.uniforms();
     if (u?.uHasCovered) u.uHasCovered.value = show && drawn.size ? 1 : 0;
     for (const { node, owners, main } of drawn.values()) {
-      node.visible = canShowGeneratedModel(owners, { held, removed: ctx.removed, roomAsset: ctx.roomAsset });
+      node.visible = canShowGeneratedModel(owners, { held, removed: ctx.removed, roomAsset: ctx.roomAsset, modelName: node.userData.name });
       const live = ctx.roomAsset(main);
       node.position.set(live.center[0] - main.center[0], live.center[1] - main.center[1], live.center[2] - main.center[2]).add(explodeOffset(live));
     }
-    const next = generatedCoverage([...drawn.values()].map(m => ({ owners: m.owners, visible: m.node.visible })), show);
+    const next = generatedCoverage([...drawn.values()].map(m => ({ name:m.node.userData.name, owners: m.owners, visible: m.node.visible })), show);
     for (const id of new Set([...covered, ...next])) {
       if (covered.has(id) === next.has(id)) continue;
       cover({ id }, next.has(id));

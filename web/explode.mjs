@@ -102,7 +102,7 @@ export const SHADER_DECL = `
       uniform float uAlertPulse;
 `;
 export const SHADER_OFFSET = `
-        float instId = synthetic ? floor(max(0.0, -fillCovB.w)) : texture2D(uInstTex, uv).x;
+        float instId = manualOwned ? 0.0 : synthetic ? floor(max(0.0, -fillCovB.w)) : texture2D(uInstTex, uv).x;
         vec4 instRow = vec4(0.0);
         if (instId > 0.5) {
           vec2 tuv = (vec2(mod(instId, uInstTableSize.x), floor(instId / uInstTableSize.x)) + 0.5) / uInstTableSize;
@@ -115,6 +115,7 @@ export const SHADER_OFFSET = `
         }
 `;
 export const SHADER_COLOR = `
+        if (!manualOwned) {
         if (instId > 0.5 && uSegment > 0.5 && uApart < 0.5 && instRow.w >= 0.0) {
           float p = instRow.w;
           vec3 ic = vec3(mod(p, 256.0), mod(floor(p / 256.0), 256.0), floor(p / 65536.0)) / 255.0;
@@ -130,6 +131,7 @@ export const SHADER_COLOR = `
         if (uProposalId > 0.5 && !synthetic && abs(texture2D(uProposalTex, uv).x - uProposalId) < 0.5) {
           vColor.rgb = mix(vColor.rgb, vec3(1.0, 0.38, 0.13), 0.75);
         }
+        } else if (uApart > 0.5) vColor.a *= uApartRoom;
 `;
 
 // Coloured objects: only objects the predicate accepts take their class colour (the "Show in room" boxes).

@@ -1,9 +1,17 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {canShowGeneratedModel, generatedCoverage} from './generated-model-policy.mjs';
+import {canShowGeneratedModel, generatedCoverage, generatedModelAllowed, GENERATED_MODEL_REVIEWS} from './generated-model-policy.mjs';
 import {unitDevices, faultParts, floorDistance, sizeText} from './parts-data.mjs';
 
 const owners=[{id:'A'},{id:'B'}];
+test('reviewed washing-machine replacement cannot render or suppress native object rows',()=>{
+  assert.equal(generatedModelAllowed('A207.glb'),false);
+  assert.equal(canShowGeneratedModel(owners,{modelName:'A207.glb'}),false);
+  assert.deepEqual([...generatedCoverage([{name:'A207.glb',owners,visible:true}])],[]);
+  assert.equal(generatedModelAllowed('A124.glb'),true);
+  assert.deepEqual([...generatedCoverage([{name:'A124.glb',owners,visible:true}])],['A','B']);
+  assert.match(GENERATED_MODEL_REVIEWS['A207.glb'].evidence,/original video frames/);
+});
 test('removing, moving, or taking apart any member restores its assembly scan',()=>{
   assert.equal(canShowGeneratedModel(owners),true);
   assert.equal(canShowGeneratedModel(owners,{removed:id=>id==='B'}),false);

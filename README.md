@@ -56,11 +56,12 @@ scene changes and exact-source object exports. See
 | Information levels | Simplified technician workspace by default; Settings restores the complete Extended toolset | [View guide](docs/features.md#simplified-and-extended-information) |
 | Guided demo and hazards | Rasmus’s walking service technician, interruptible walkthrough and optional energy illustrations | [Integration and reuse](docs/rasmus-integration.md) |
 | Device summary | Canonical condition, one relevant reading/comparison, recorded time and next check; full evidence remains expandable | [Display decisions](docs/rasmus-integration.md#what-belongs-in-the-default-device-view) |
+| Manual object label | Find the washing machine, inspect its original scan region and test browser-local removal/restoration | [Manual washer](docs/features.md#manually-identified-washing-machine) |
 | Room layers | Scan / Coloured by class / BIM masks of the same view, explode, Show in room filters, floor plan and IFC export | [Features](docs/features.md#room-controls) |
 | AI diagnosis | Grounded triage and LOTO-first verification steps; tested blind on the 13 faulty devices | [Technical notes](docs/technical-notes.md#diagnostics-and-optional-ai) |
 | Technician jobs | **To inspect** queue, checklist with safety-first rules, notes, **Mark done** | [Features](docs/features.md#voice-assistant-elevenlabs-agent-ilkka) |
 | Voice assistant | Ilkka (ElevenLabs) shows equipment, diagnoses and works the job over MCP; enabled on the main hosted demo, opt-in elsewhere | [Voice and MCP](docs/voice-mcp.md) |
-| Take apart and AI 3D | Isolate and save objects (`.ply`, 3DGS, `.glb`); five pump units explode in the room; 18 AI-generated models | [Features](docs/features.md#take-a-pump-apart-in-the-room) |
+| Take apart and AI 3D | Isolate and save objects (`.ply`, 3DGS, `.glb`); five pump units explode in the room; reviewed replacements from 18 imported AI-generated models | [Features](docs/features.md#take-a-pump-apart-in-the-room) |
 | Arduino fault panel | A UNO Q shows the first open fault until its job is fixed; a hold with nothing left starts a simulated emergency. Tiger Data and Snowflake are used only here | [arduino/README.md](arduino/README.md) |
 | AR overlay | The twin drawn over the real walkthrough video | `python -m scripts.render_overlay` |
 | Other datasets | Modular importer and original-data preservation, `VALMET_DATA_DIR` | [Asset import](docs/asset-import-guide.md) |

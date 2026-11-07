@@ -4,8 +4,8 @@ The hosted preview uses a separate prepared release installation. It does not
 expose the author's workstation, editing session, model services or credentials.
 The full installation remains writable; hosted mode is explicit and opt-in.
 
-The current main site runs source snapshot `6840806` with shared inspection jobs,
-Ilkka and the Arduino panel explicitly enabled. The separate extraction review
+The main site receives source updates separately from the immutable 0.1.1 downloads,
+with shared inspection jobs, Ilkka and the Arduino panel explicitly enabled. The separate extraction review
 keeps those features off. The default invocation below remains read-only; see
 the assistant and Arduino options at the end of this document.
 
@@ -37,6 +37,10 @@ Visitors can browse the room, search and inspect objects, navigate, view BIM and
 AR evidence, and download existing library artifacts. Client-side geometry and
 IFC exports remain available. Room edits in the hosted UI are browser-local
 simulations. They are not maintenance updates to the shared model.
+
+The manually identified washer has separate browser-local visibility and a read-only
+native-region download. Its reviewed mask does not rewrite the source scan, canonical
+object catalog, workbook bindings or navigation. See the [manual item guide](features.md#manually-identified-washing-machine).
 
 By default, the server rejects scene-edit, field-job, library-generation and library-removal
 requests with `403 public_demo_read_only`. It serves an empty operator log/edit
