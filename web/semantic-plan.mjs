@@ -261,7 +261,7 @@ export function bindSemanticPlan({snapshot, inspect, navigate, viewModel}) {
     const url=URL.createObjectURL(new Blob([data],{type:"application/step"}));
     const link=document.createElement("a");
     link.href=url;
-    link.download="field-atlas-equipment-room.ifc";
+    link.download="scan2work-equipment-room.ifc";
     link.click();
     setTimeout(()=>URL.revokeObjectURL(url),1000);
   });

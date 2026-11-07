@@ -1,6 +1,6 @@
-# Field Atlas technical notes
+# Scan2Work technical notes
 
-Field Atlas is a local industrial field-service demonstrator. It connects a Gaussian-splat room, framed object proposals, a robot route, synthetic operating records, and a cited service workflow.
+Scan2Work is a local industrial field-service demonstrator. It connects a Gaussian-splat room, framed object proposals, a robot route, synthetic operating records, and a cited service workflow.
 
 ## Inputs and data meaning
 

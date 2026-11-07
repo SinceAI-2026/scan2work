@@ -1,6 +1,6 @@
 # Fault panel (Arduino UNO Q)
 
-The board shows the **first broken item** in the Field Atlas twin until its job is done. It knows nothing about the
+The board shows the **first broken item** in the Scan2Work twin until its job is done. It knows nothing about the
 plant: whatever data the server was built from, the board takes the top of the inspection queue (the viewer's
 "To inspect" list, worst first).
 
@@ -22,7 +22,7 @@ connects to the board, so no port forwarding is needed.
 
 1. Copy `fault-panel/python/board.env.example` to `fault-panel/python/board.env` (git-ignored) and set:
    - `PLANT_API`: the server's address.
-     - **Deployed:** the public HTTPS address, e.g. `https://field-atlas.example.com`. The board can be on any
+     - **Deployed:** the public HTTPS address, e.g. `https://scan2work.example.com`. The board can be on any
        network with internet, such as a phone hotspot.
      - **Laptop:** `http://<laptop IP>:8765`, with the server started as `.venv/bin/python server.py 8765 --lan` and
        the board on the same network. Find the IP with `ipconfig getifaddr en0` (macOS).
@@ -41,7 +41,7 @@ adjust `TOUCH_FACTOR` / `TOUCH_MIN` in the sketch.
 
 ## Tiger Data and Snowflake (optional)
 
-Only the panel uses them (`live/`); the rest of Field Atlas never touches them, and the panel works without them.
+Only the panel uses them (`live/`); the rest of Scan2Work never touches them, and the panel works without them.
 
 - **Tiger Data:** one row per heartbeat in `board_heartbeats`: which fault the board shows, its status and its A0
   touch pad level.

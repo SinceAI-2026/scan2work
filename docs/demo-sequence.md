@@ -1,4 +1,4 @@
-# Record the Field Atlas demo
+# Record the Scan2Work demo
 
 The video is scored on five criteria, so time is spent in proportion to them: extraction 30%, navigation and proximity 25%, AI diagnosis 20%, backend 15%, clarity 10%. Target 4 minutes 30 seconds. Keep the final video below five minutes.
 

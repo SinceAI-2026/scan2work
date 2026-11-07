@@ -35,7 +35,7 @@ def _words(s) -> str:
 def register(x: dict) -> str:
     am, cs, dq = x["Asset_Master"], x["Current_State"].set_index("asset_id"), x["Data_Quality"]
     quality = dq.groupby("asset_id")["issue_type"].apply(lambda s: ", ".join(f"{_words(k)} ({v})" for k, v in Counter(s).most_common()))
-    lines = ["# Field Atlas equipment register: Equipment Room",
+    lines = ["# Scan2Work equipment register: Equipment Room",
              "",
              "Synthetic Valmet builder-pack data for the 30 registered assets. Current state, readings, alarms and "
              "work orders change: get them with the get_equipment_status tool. The condition below is the pack's "
@@ -62,7 +62,7 @@ def troubleshooting(x: dict) -> str:
     docs = x["Knowledge_Docs"].set_index("doc_id")
     cases, tele = x["Historical_Service_Cases"], x["Telemetry_Sample_3d"]
     signal_cols = [c for c in tele.columns if c not in ("timestamp", "asset_id", "tag", "asset_class", "area_id")]
-    lines = ["# Field Atlas troubleshooting by equipment type", "",
+    lines = ["# Scan2Work troubleshooting by equipment type", "",
              "For each equipment type: what to look at, the readings it reports, and every historical service case "
              "by issue code. Cases are synthetic examples from the Valmet builder pack; cite them by case id. "
              f"Every case follows the same workflow: {cases.safe_evidence_workflow.iloc[0]}", ""]
@@ -89,7 +89,7 @@ def troubleshooting(x: dict) -> str:
 def safety(x: dict) -> str:
     docs = x["Knowledge_Docs"].set_index("doc_id")
     return "\n".join([
-        "# Field Atlas safety and evidence rules", "",
+        "# Scan2Work safety and evidence rules", "",
         f"## {docs.loc['DOC-FIELD-SAFETY'].title} (DOC-FIELD-SAFETY)", docs.loc["DOC-FIELD-SAFETY"].content, "",
         "## Rules for every job",
         "- Confirm the equipment's identity first: tag plate, QR or NFC code, and location.",

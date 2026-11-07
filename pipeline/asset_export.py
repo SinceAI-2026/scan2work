@@ -111,7 +111,7 @@ def own_splats(xyz: np.ndarray, idx: np.ndarray):
 def write_ply_rows(src: Path, rows: np.ndarray, dst: Path) -> None:
     n, off, dt = read_ply_header(src)
     raw = np.memmap(src, dtype=dt, mode="r", offset=off, shape=((src.stat().st_size - off) // dt.itemsize,))
-    head = (f"ply\nformat binary_little_endian 1.0\ncomment Field Atlas object cut from {src.name}\n"
+    head = (f"ply\nformat binary_little_endian 1.0\ncomment Scan2Work object cut from {src.name}\n"
             f"element vertex {len(rows)}\n" + "".join(f"property float {k}\n" for k in dt.names) + "end_header\n")
     tmp = dst.with_name(dst.name + ".tmp")
     with open(tmp, "wb") as f:
@@ -160,7 +160,7 @@ def write_glb(path: Path, vertices: np.ndarray, faces: np.ndarray, srgb: np.ndar
     for blob, target in zip(blobs, (34962, 34963, 34962)):
         views.append({"buffer": 0, "byteOffset": off, "byteLength": len(blob), "target": target})
         off += -(-len(blob) // 4) * 4
-    gltf = {"asset": {"version": "2.0", "generator": "Field Atlas asset_export"}, "scene": 0,
+    gltf = {"asset": {"version": "2.0", "generator": "Scan2Work asset_export"}, "scene": 0,
             "scenes": [{"nodes": [0]}], "nodes": [{"mesh": 0}],
             "meshes": [{"primitives": [{"attributes": {"POSITION": 0, "COLOR_0": 2}, "indices": 1, "material": 0}]}],
             "materials": [{"doubleSided": True, "pbrMetallicRoughness": {"metallicFactor": 0.0, "roughnessFactor": 0.9}}],
@@ -358,7 +358,7 @@ def read_library() -> list[dict]:
 
 def _write_library(saved: list[dict]) -> None:
     LIBRARY.mkdir(parents=True, exist_ok=True)
-    doc = {"version": 2, "project": "Field Atlas · Equipment Room", "source": C.PLY_PATH.name,
+    doc = {"version": 2, "project": "Scan2Work · Equipment Room", "source": C.PLY_PATH.name,
            "frame": {"ply": "raw PLY coordinates of the source, every property kept",
                      "gspl_glb_bounds": "levelled frame: x, y = FLOOR_Y_PLY - y_ply, z = -z_ply (y up, floor at 0, m)",
                      "floor_y_ply": FLOOR_Y_PLY},
@@ -411,7 +411,7 @@ def remove(oid: str) -> list[dict]:
 
 
 def main() -> None:
-    ap = argparse.ArgumentParser(description="Save extracted objects to the Field Atlas asset library")
+    ap = argparse.ArgumentParser(description="Save extracted objects to the Scan2Work asset library")
     ap.add_argument("ids", nargs="+", help="object ids, e.g. OBJ-206")
     ap.add_argument("--remove", action="store_true", help="take these objects out of the library")
     args = ap.parse_args()

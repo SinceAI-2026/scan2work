@@ -883,7 +883,7 @@ function getAssetBoxColor(asset) {
   const presentation = assetPresentation(asset);
   if (presentation.frameColor !== null) return presentation.frameColor;
   if (asset.is_target || asset.condition_state === "degraded" || asset.condition_state === "attention_required") {
-    return 0xd94838; // Field Atlas Terracotta Red
+    return 0xd94838; // Scan2Work Terracotta Red
   }
   if (asset.condition_state === "watch") {
     return 0xc97a16; // Warm Amber

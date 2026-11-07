@@ -1,4 +1,4 @@
-// Field Atlas asset library: the Equipment Room objects saved from the Take-apart view, each cut out of the scan
+// Scan2Work asset library: the Equipment Room objects saved from the Take-apart view, each cut out of the scan
 // and refined against the walkthrough frames (pipeline/asset_export.py) into web/data/library/<id>/. Layout after
 // linards-project's library. #<object id> opens that object.
 import * as THREE from "three";

@@ -253,7 +253,7 @@ def library_zip(saved: list[dict]) -> bytes:
                 name = e["files"].get(key)
                 if name and (asset_export.LIBRARY / name).is_file():
                     z.write(asset_export.LIBRARY / name, name)
-        z.writestr("library.json", json.dumps({"source": "Field Atlas asset library · Equipment Room", "saved": saved}, indent=1))
+        z.writestr("library.json", json.dumps({"source": "Scan2Work asset library · Equipment Room", "saved": saved}, indent=1))
     return buf.getvalue()
 
 
@@ -405,7 +405,7 @@ class TwinRequestHandler(SimpleHTTPRequestHandler):
             raw = library_zip(asset_export.read_library())
             self.send_response(200)
             self.send_header("Content-Type", "application/zip")
-            self.send_header("Content-Disposition", 'attachment; filename="field-atlas-library.zip"')
+            self.send_header("Content-Disposition", 'attachment; filename="scan2work-library.zip"')
             self.send_header("Content-Length", str(len(raw)))
             self.end_headers()
             self.wfile.write(raw)

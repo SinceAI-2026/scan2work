@@ -14,7 +14,7 @@ A done task stays done; the board claims the newest fault nobody is working on t
 hold). With none left, a hold starts a simulated emergency: a scripted fault from the pack on a random healthy asset.
 Tap = start the job (technician on site). The job is closed in the app as usual, which turns the board green.
 
-Self-contained: server.py routes /api/live/* here; nothing else in Field Atlas imports live/.
+Self-contained: server.py routes /api/live/* here; nothing else in Scan2Work imports live/.
 """
 from __future__ import annotations
 
