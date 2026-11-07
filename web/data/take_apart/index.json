@@ -1,0 +1,2621 @@
+{
+ "version": 3,
+ "source": "SinceAI-2026/mvp demo/web/public/data/s2s (scan2service, raw PLY coordinates)",
+ "frame": "raw PLY coordinates of equipment_room.ply, as scene.json (GLB vertices too)",
+ "models": {
+  "B013+B013m.glb": {
+   "file": "parts/B013+B013m.glb",
+   "label": "parts split by geometry rules (approximate) \u00b7 AI-generated model",
+   "kind": "inline_pump_unit",
+   "ids": [
+    "B013",
+    "B013m"
+   ],
+   "frame": {
+    "up": [
+     -0.0006,
+     -1.0,
+     -0.0006
+    ],
+    "pipe": [
+     -0.06451,
+     -0.00056,
+     0.99792
+    ],
+    "origin": [
+     -3.73406,
+     0.92433,
+     -1.2481
+    ]
+   },
+   "cuts_mm": {
+    "lantern_top": 385.94,
+    "motor_top": 594.84,
+    "housing_top": 315.62,
+    "base_top": 142.62,
+    "joint_a": -202.5,
+    "joint_b": 201.5
+   },
+   "cut_notes": {
+    "joint_a": {
+     "flange_run_mm": [
+      178.0,
+      214.5
+     ],
+     "colour_step": 0.163
+    },
+    "joint_b": {
+     "flange_run_mm": [
+      177.5,
+      215.0
+     ],
+     "colour_step": 0.431
+    },
+    "a_in_mm": 138,
+    "motor_r_mm": 85.2,
+    "lantern_r_mm": 60.3,
+    "pipe_axis_height_mm": 233.3,
+    "height_mm": 669.9,
+    "tidy_moved_pieces": {
+     "housing -> base": 2,
+     "housing -> lantern": 2,
+     "lantern -> housing": 8
+    }
+   },
+   "knowledge_label": "general engineering knowledge",
+   "size_label": "fitted to the scan",
+   "fault_notes": {
+    "FOULING": "impeller inside the casing: not modelled (needs vendor CAD) \u00b7 fouling builds up on the impeller and in the volute (general engineering knowledge) \u00b7 status synthetic (Valmet pack)",
+    "CAVITATION_RISK": "impeller inside the casing: not modelled (needs vendor CAD) \u00b7 cavitation pits the impeller's suction side; which port is suction is not known from the scan (general engineering knowledge) \u00b7 status synthetic (Valmet pack)",
+    "SEAL_DEGRADATION": "the shaft seal sits under the lantern where the shaft enters the pump cover: not modelled (general engineering knowledge) \u00b7 status synthetic (Valmet pack)",
+    "MISALIGNMENT": "the coupling inside the lantern joins the motor and pump shafts: not modelled (general engineering knowledge) \u00b7 status synthetic (Valmet pack)",
+    "OVERHEATING": "a motor overheats from overload, blocked cooling air or a supply fault (general engineering knowledge) \u00b7 status synthetic (Valmet pack)",
+    "CURRENT_IMBALANCE": "unequal phase currents point at the supply, the terminal connections or the winding (general engineering knowledge) \u00b7 status synthetic (Valmet pack)"
+   },
+   "parts": [
+    {
+     "name": "Fan cover",
+     "node": "fan_cover",
+     "dir": [
+      -0.0006,
+      -1.0,
+      -0.0006
+     ],
+     "dist": 0.321,
+     "order": 1,
+     "what": "Covers the motor's cooling fan on its top end and guides the cooling air down along the motor's fins. A blocked or damaged cover lets the motor run hot.",
+     "fault_codes": [],
+     "serves": "B013m",
+     "size_mm": [
+      75,
+      162,
+      156
+     ],
+     "faces": 2748,
+     "cap_faces": 64,
+     "box": [
+      [
+       -3.81052,
+       0.25437,
+       -1.3293
+      ],
+      [
+       -3.6494,
+       0.32955,
+       -1.16746
+      ]
+     ]
+    },
+    {
+     "name": "Motor",
+     "node": "motor",
+     "dir": [
+      -0.0006,
+      -1.0,
+      -0.0006
+     ],
+     "dist": 0.214,
+     "order": 2,
+     "what": "Drives the pump. On a close-coupled in-line pump it stands on top and its shaft turns the impeller through a coupling; its terminal box takes the supply cable.",
+     "fault_codes": [
+      "OVERHEATING",
+      "CURRENT_IMBALANCE"
+     ],
+     "serves": "B013m",
+     "size_mm": [
+      209,
+      186,
+      168
+     ],
+     "faces": 10227,
+     "cap_faces": 214,
+     "box": [
+      [
+       -3.82216,
+       0.32941,
+       -1.3403
+      ],
+      [
+       -3.65347,
+       0.53843,
+       -1.15428
+      ]
+     ]
+    },
+    {
+     "name": "Lantern and coupling guard",
+     "node": "lantern",
+     "dir": [
+      -0.0006,
+      -1.0,
+      -0.0006
+     ],
+     "dist": 0.107,
+     "order": 3,
+     "what": "Holds the motor on the pump. Inside it: the coupling that joins the motor shaft to the pump shaft, and below it the shaft seal where the shaft enters the pump; the guard covers the turning coupling.",
+     "fault_codes": [
+      "SEAL_DEGRADATION",
+      "MISALIGNMENT"
+     ],
+     "serves": "B013",
+     "size_mm": [
+      98,
+      122,
+      130
+     ],
+     "faces": 1515,
+     "cap_faces": 226,
+     "box": [
+      [
+       -3.80167,
+       0.53834,
+       -1.31107
+      ],
+      [
+       -3.67105,
+       0.63666,
+       -1.18868
+      ]
+     ]
+    },
+    {
+     "name": "Pump cover and volute casing",
+     "node": "housing",
+     "dir": [
+      -0.0006,
+      -1.0,
+      -0.0006
+     ],
+     "dist": 0.0,
+     "order": 4,
+     "what": "The volute casing holds the impeller and turns the flow it throws out into pressure; both ports sit on one axis (in-line). The cover bolted on top closes it. The impeller inside is not modelled: that needs the vendor's CAD.",
+     "fault_codes": [
+      "FOULING",
+      "CAVITATION_RISK"
+     ],
+     "serves": "B013",
+     "size_mm": [
+      178,
+      404,
+      304
+     ],
+     "faces": 7296,
+     "cap_faces": 560,
+     "box": [
+      [
+       -3.88995,
+       0.60353,
+       -1.45541
+      ],
+      [
+       -3.58606,
+       0.78176,
+       -1.04199
+      ]
+     ]
+    },
+    {
+     "name": "Pipe connection, port 1",
+     "node": "pipe_a",
+     "dir": [
+      0.06451,
+      0.00056,
+      -0.99792
+     ],
+     "dist": 0.086,
+     "order": 5,
+     "what": "The connected pipework: a counter-flange bolted to the pump's port flange (gasket between them), a short spool and the next flange joint. Which port is suction and which discharge is not known from the scan.",
+     "fault_codes": [],
+     "serves": "B013",
+     "context": true,
+     "why": "port 1's pipework: its flange joint sits 17.5 mm from the photo's joint line (frame 58); shown in place, not a part",
+     "size_mm": [
+      159,
+      227,
+      157
+     ],
+     "faces": 4431,
+     "cap_faces": 124,
+     "box": [
+      [
+       -3.79981,
+       0.61417,
+       -1.67778
+      ],
+      [
+       -3.63843,
+       0.77312,
+       -1.44526
+      ]
+     ]
+    },
+    {
+     "name": "Pipe connection, port 2",
+     "node": "pipe_b",
+     "dir": [
+      -0.06451,
+      -0.00056,
+      0.99792
+     ],
+     "dist": 0.086,
+     "order": 6,
+     "what": "The connected pipework: a counter-flange bolted to the pump's port flange (gasket between them), a short spool and the next flange joint. Which port is suction and which discharge is not known from the scan.",
+     "fault_codes": [],
+     "serves": "B013",
+     "size_mm": [
+      159,
+      230,
+      158
+     ],
+     "faces": 3913,
+     "cap_faces": 111,
+     "box": [
+      [
+       -3.82978,
+       0.61426,
+       -1.05213
+      ],
+      [
+       -3.6673,
+       0.77303,
+       -0.81832
+      ]
+     ]
+    },
+    {
+     "name": "Pedestal with feet",
+     "node": "base",
+     "dir": [
+      0.0006,
+      1.0,
+      0.0006
+     ],
+     "dist": 0.107,
+     "order": 7,
+     "what": "Carries the pump's weight so the pipework does not have to; bolted down through its feet.",
+     "fault_codes": [],
+     "serves": "B013",
+     "context": true,
+     "why": "pedestal: the AI-inferred box does not match the photos (the real pump stands on a frame of steel bars); shown in place, not a part",
+     "size_mm": [
+      144,
+      337,
+      300
+     ],
+     "faces": 2478,
+     "cap_faces": 73,
+     "box": [
+      [
+       -3.95803,
+       0.78042,
+       -1.42712
+      ],
+      [
+       -3.64847,
+       0.92428,
+       -1.0909
+      ]
+     ]
+    }
+   ],
+   "check": {
+    "views": {
+     "frame_0058.jpg": {
+      "role": "input view",
+      "iou_raw": 0.707,
+      "iou": 0.748,
+      "scale": 1.075,
+      "shift_px": [
+       -4.4,
+       -13.4
+      ],
+      "boundaries": {
+       "fan_cover|motor": {
+        "on_edge": 0.79,
+        "edge_offset_mm": -8.0,
+        "edge_strength": 1.77,
+        "strongest_offset_mm": -9.5,
+        "strongest_strength": 2.08,
+        "match": true,
+        "px": 119,
+        "px_per_mm": 0.75
+       },
+       "motor|lantern": {
+        "on_edge": 0.698,
+        "edge_offset_mm": 2.5,
+        "edge_strength": 5.77,
+        "strongest_offset_mm": 2.5,
+        "strongest_strength": 5.77,
+        "match": true,
+        "px": 86,
+        "px_per_mm": 0.71
+       },
+       "lantern|housing": {
+        "on_edge": 0.925,
+        "edge_offset_mm": -5.0,
+        "edge_strength": 2.04,
+        "strongest_offset_mm": -5.0,
+        "strongest_strength": 2.04,
+        "match": true,
+        "px": 173,
+        "px_per_mm": 0.69
+       },
+       "housing|base": {
+        "on_edge": 0.529,
+        "edge_offset_mm": 1.0,
+        "edge_strength": 1.06,
+        "strongest_offset_mm": 10.0,
+        "strongest_strength": 1.39,
+        "match": false,
+        "px": 223,
+        "px_per_mm": 0.66
+       },
+       "pipe_a|housing": {
+        "on_edge": 0.488,
+        "edge_offset_mm": 6.0,
+        "edge_strength": 1.22,
+        "strongest_offset_mm": -17.5,
+        "strongest_strength": 3.73,
+        "match": false,
+        "px": 129,
+        "px_per_mm": 0.7
+       },
+       "pipe_b|housing": {
+        "on_edge": 1.0,
+        "edge_offset_mm": 1.5,
+        "edge_strength": 1.96,
+        "strongest_offset_mm": 1.5,
+        "strongest_strength": 1.96,
+        "match": true,
+        "px": 101,
+        "px_per_mm": 0.52
+       }
+      },
+      "outline": {
+       "pipe_a": 0.694,
+       "pipe_b": 0.969,
+       "base": 0.662,
+       "housing": 0.676,
+       "lantern": 1.0,
+       "motor": 0.929,
+       "fan_cover": 0.718
+      }
+     },
+     "frame_0036.jpg": {
+      "role": "held out",
+      "iou_raw": 0.168,
+      "iou": 0.242,
+      "scale": 0.83,
+      "shift_px": [
+       -3.7,
+       -2.0
+      ],
+      "boundaries": {
+       "motor|lantern": {
+        "on_edge": 0.9,
+        "edge_offset_mm": 5.5,
+        "edge_strength": 1.12,
+        "strongest_offset_mm": 9.5,
+        "strongest_strength": 1.18,
+        "match": false,
+        "px": 20,
+        "px_per_mm": 0.28
+       },
+       "lantern|housing": {
+        "on_edge": 1.0,
+        "edge_offset_mm": -8.0,
+        "edge_strength": 1.42,
+        "strongest_offset_mm": -12.5,
+        "strongest_strength": 1.48,
+        "match": false,
+        "px": 42,
+        "px_per_mm": 0.28
+       },
+       "pipe_a|housing": {
+        "on_edge": 1.0,
+        "edge_offset_mm": -8.0,
+        "edge_strength": 1.57,
+        "strongest_offset_mm": -19.0,
+        "strongest_strength": 5.58,
+        "match": true,
+        "px": 39,
+        "px_per_mm": 0.28
+       }
+      },
+      "outline": {
+       "pipe_a": 1.0,
+       "base": 0.76,
+       "housing": 0.659,
+       "lantern": 0.864
+      }
+     },
+     "frame_0049.jpg": {
+      "role": "input view",
+      "iou_raw": 0.567,
+      "iou": 0.592,
+      "scale": 0.98,
+      "shift_px": [
+       4.0,
+       -2.0
+      ],
+      "boundaries": {
+       "fan_cover|motor": {
+        "on_edge": 0.468,
+        "edge_offset_mm": 3.5,
+        "edge_strength": 1.0,
+        "strongest_offset_mm": -20.0,
+        "strongest_strength": 3.43,
+        "match": false,
+        "px": 62,
+        "px_per_mm": 0.46
+       },
+       "motor|lantern": {
+        "on_edge": 0.839,
+        "edge_offset_mm": 8.0,
+        "edge_strength": 1.63,
+        "strongest_offset_mm": 15.0,
+        "strongest_strength": 2.53,
+        "match": true,
+        "px": 56,
+        "px_per_mm": 0.45
+       },
+       "lantern|housing": {
+        "on_edge": 1.0,
+        "edge_offset_mm": -3.0,
+        "edge_strength": 1.56,
+        "strongest_offset_mm": -20.0,
+        "strongest_strength": 1.93,
+        "match": true,
+        "px": 95,
+        "px_per_mm": 0.44
+       },
+       "housing|base": {
+        "on_edge": 0.585,
+        "edge_offset_mm": -8.0,
+        "edge_strength": 1.57,
+        "strongest_offset_mm": -10.0,
+        "strongest_strength": 1.64,
+        "match": true,
+        "px": 123,
+        "px_per_mm": 0.43
+       },
+       "pipe_a|housing": {
+        "on_edge": 0.809,
+        "edge_offset_mm": -6.5,
+        "edge_strength": 1.41,
+        "strongest_offset_mm": -6.5,
+        "strongest_strength": 1.41,
+        "match": false,
+        "px": 89,
+        "px_per_mm": 0.42
+       },
+       "pipe_b|housing": {
+        "on_edge": 0.803,
+        "edge_offset_mm": 1.5,
+        "edge_strength": 1.56,
+        "strongest_offset_mm": 1.5,
+        "strongest_strength": 1.56,
+        "match": true,
+        "px": 66,
+        "px_per_mm": 0.37
+       }
+      },
+      "outline": {
+       "pipe_a": 0.761,
+       "pipe_b": 0.92,
+       "base": 0.765,
+       "housing": 0.949,
+       "lantern": 1.0,
+       "motor": 0.526,
+       "fan_cover": 0.606
+      }
+     }
+    },
+    "boundaries": {
+     "fan_cover|motor": {
+      "views": 2,
+      "on_edge": 0.629,
+      "edge_offset_mm": [
+       -8.0,
+       3.5
+      ],
+      "edge_strength": [
+       1.77,
+       1.0
+      ],
+      "matches": 1
+     },
+     "motor|lantern": {
+      "views": 3,
+      "on_edge": 0.812,
+      "edge_offset_mm": [
+       2.5,
+       5.5,
+       8.0
+      ],
+      "edge_strength": [
+       5.77,
+       1.12,
+       1.63
+      ],
+      "matches": 2
+     },
+     "lantern|housing": {
+      "views": 3,
+      "on_edge": 0.975,
+      "edge_offset_mm": [
+       -5.0,
+       -8.0,
+       -3.0
+      ],
+      "edge_strength": [
+       2.04,
+       1.42,
+       1.56
+      ],
+      "matches": 2
+     },
+     "housing|base": {
+      "views": 2,
+      "on_edge": 0.557,
+      "edge_offset_mm": [
+       1.0,
+       -8.0
+      ],
+      "edge_strength": [
+       1.06,
+       1.57
+      ],
+      "matches": 1
+     },
+     "pipe_a|housing": {
+      "views": 3,
+      "on_edge": 0.766,
+      "edge_offset_mm": [
+       6.0,
+       -8.0,
+       -6.5
+      ],
+      "edge_strength": [
+       1.22,
+       1.57,
+       1.41
+      ],
+      "matches": 1
+     },
+     "pipe_b|housing": {
+      "views": 2,
+      "on_edge": 0.901,
+      "edge_offset_mm": [
+       1.5,
+       1.5
+      ],
+      "edge_strength": [
+       1.96,
+       1.56
+      ],
+      "matches": 2
+     }
+    },
+    "tolerance_px": 3.0,
+    "match_mm": 8,
+    "match_rule": "a coherent photo edge (the gradient across the cut averaged along the whole boundary, 1.5x its median or more) within 8 mm",
+    "edges": "Canny on the real 1080p frame",
+    "registration": "2D scale + shift of the whole model's silhouette onto the unit's photo mask (the placement's own error)"
+   },
+   "box": [
+    [
+     -3.95803,
+     0.25437,
+     -1.67778
+    ],
+    [
+     -3.58606,
+     0.92428,
+     -0.81832
+    ]
+   ]
+  },
+  "B019p+A069_r2.glb": {
+   "file": "parts/B019p+A069_r2.glb",
+   "label": "parts split by geometry rules (approximate) \u00b7 AI-generated model",
+   "kind": "inline_pump_unit",
+   "ids": [
+    "B019p",
+    "A069"
+   ],
+   "frame": {
+    "up": [
+     -0.0006,
+     -1.0,
+     -0.0006
+    ],
+    "pipe": [
+     0.06284,
+     -0.00064,
+     0.99802
+    ],
+    "origin": [
+     -3.27518,
+     0.80098,
+     -1.18231
+    ]
+   },
+   "cuts_mm": {
+    "lantern_top": 273.77,
+    "motor_top": 523.0,
+    "housing_top": 195.65,
+    "joint_b": 266.0
+   },
+   "cut_notes": {
+    "joint_b": {
+     "flange_run_mm": [
+      250.0,
+      286.5
+     ],
+     "colour_step": 0.714
+    },
+    "fixed": {
+     "motor_top": {
+      "rule": 519.22,
+      "fixed": 523.0
+     }
+    },
+    "a_in_mm": 224,
+    "motor_r_mm": 139.3,
+    "lantern_r_mm": 80.0,
+    "pipe_axis_height_mm": 133.8,
+    "height_mm": 593.6,
+    "tidy_moved_pieces": {
+     "lantern -> housing": 12,
+     "fan_cover -> motor": 1
+    }
+   },
+   "knowledge_label": "general engineering knowledge",
+   "size_label": "fitted to the scan",
+   "fault_notes": {
+    "FOULING": "impeller inside the casing: not modelled (needs vendor CAD) \u00b7 fouling builds up on the impeller and in the volute (general engineering knowledge) \u00b7 status synthetic (Valmet pack)",
+    "CAVITATION_RISK": "impeller inside the casing: not modelled (needs vendor CAD) \u00b7 cavitation pits the impeller's suction side; which port is suction is not known from the scan (general engineering knowledge) \u00b7 status synthetic (Valmet pack)",
+    "SEAL_DEGRADATION": "the shaft seal sits under the lantern where the shaft enters the pump cover: not modelled (general engineering knowledge) \u00b7 status synthetic (Valmet pack)",
+    "MISALIGNMENT": "the coupling inside the lantern joins the motor and pump shafts: not modelled (general engineering knowledge) \u00b7 status synthetic (Valmet pack)",
+    "OVERHEATING": "a motor overheats from overload, blocked cooling air or a supply fault (general engineering knowledge) \u00b7 status synthetic (Valmet pack)",
+    "CURRENT_IMBALANCE": "unequal phase currents point at the supply, the terminal connections or the winding (general engineering knowledge) \u00b7 status synthetic (Valmet pack)"
+   },
+   "parts": [
+    {
+     "name": "Fan cover",
+     "node": "fan_cover",
+     "dir": [
+      -0.0006,
+      -1.0,
+      -0.0006
+     ],
+     "dist": 0.285,
+     "order": 1,
+     "what": "Covers the motor's cooling fan on its top end and guides the cooling air down along the motor's fins. A blocked or damaged cover lets the motor run hot.",
+     "fault_codes": [],
+     "serves": "A069",
+     "size_mm": [
+      71,
+      195,
+      217
+     ],
+     "faces": 2988,
+     "cap_faces": 148,
+     "box": [
+      [
+       -3.36285,
+       0.20737,
+       -1.27497
+      ],
+      [
+       -3.1456,
+       0.27805,
+       -1.07846
+      ]
+     ]
+    },
+    {
+     "name": "Motor",
+     "node": "motor",
+     "dir": [
+      -0.0006,
+      -1.0,
+      -0.0006
+     ],
+     "dist": 0.19,
+     "order": 2,
+     "what": "Drives the pump. On a close-coupled in-line pump it stands on top and its shaft turns the impeller through a coupling; its terminal box takes the supply cable.",
+     "fault_codes": [
+      "OVERHEATING",
+      "CURRENT_IMBALANCE"
+     ],
+     "serves": "A069",
+     "size_mm": [
+      250,
+      338,
+      295
+     ],
+     "faces": 8396,
+     "cap_faces": 220,
+     "box": [
+      [
+       -3.43475,
+       0.27676,
+       -1.39504
+      ],
+      [
+       -3.14309,
+       0.52725,
+       -1.06037
+      ]
+     ]
+    },
+    {
+     "name": "Lantern and coupling guard",
+     "node": "lantern",
+     "dir": [
+      -0.0006,
+      -1.0,
+      -0.0006
+     ],
+     "dist": 0.095,
+     "order": 3,
+     "what": "Holds the motor on the pump. Inside it: the coupling that joins the motor shaft to the pump shaft, and below it the shaft seal where the shaft enters the pump; the guard covers the turning coupling.",
+     "fault_codes": [
+      "SEAL_DEGRADATION",
+      "MISALIGNMENT"
+     ],
+     "serves": "B019p",
+     "size_mm": [
+      78,
+      171,
+      130
+     ],
+     "faces": 1442,
+     "cap_faces": 260,
+     "box": [
+      [
+       -3.32151,
+       0.52714,
+       -1.29316
+      ],
+      [
+       -3.19081,
+       0.60539,
+       -1.12084
+      ]
+     ]
+    },
+    {
+     "name": "Pump cover and volute casing",
+     "node": "housing",
+     "dir": [
+      -0.0006,
+      -1.0,
+      -0.0006
+     ],
+     "dist": 0.0,
+     "order": 4,
+     "what": "The volute casing holds the impeller and turns the flow it throws out into pressure; both ports sit on one axis (in-line). The cover bolted on top closes it. The impeller inside is not modelled: that needs the vendor's CAD.",
+     "fault_codes": [
+      "FOULING",
+      "CAVITATION_RISK"
+     ],
+     "serves": "B019p",
+     "size_mm": [
+      202,
+      498,
+      315
+     ],
+     "faces": 12680,
+     "cap_faces": 707,
+     "box": [
+      [
+       -3.40227,
+       0.59923,
+       -1.41947
+      ],
+      [
+       -3.08722,
+       0.80093,
+       -0.9137
+      ]
+     ]
+    },
+    {
+     "name": "Pipe connection, port 2",
+     "node": "pipe_b",
+     "dir": [
+      0.06284,
+      -0.00064,
+      0.99802
+     ],
+     "dist": 0.076,
+     "order": 6,
+     "what": "The connected pipework: a counter-flange bolted to the pump's port flange (gasket between them), a short spool and the next flange joint. Which port is suction and which discharge is not known from the scan.",
+     "fault_codes": [],
+     "serves": "B019p",
+     "context": true,
+     "why": "port 2's pipework: no coherent photo edge within 8 mm of its flange joint in any of frames 58, 52, 44; shown in place, not a part",
+     "size_mm": [
+      213,
+      149,
+      192
+     ],
+     "faces": 6659,
+     "cap_faces": 103,
+     "box": [
+      [
+       -3.31759,
+       0.58357,
+       -0.92489
+      ],
+      [
+       -3.1294,
+       0.79674,
+       -0.77148
+      ]
+     ]
+    }
+   ],
+   "check": {
+    "views": {
+     "frame_0058.jpg": {
+      "role": "input view",
+      "iou_raw": 0.85,
+      "iou": 0.862,
+      "scale": 1.0,
+      "shift_px": [
+       -5.2,
+       4.7
+      ],
+      "boundaries": {
+       "fan_cover|motor": {
+        "on_edge": 0.671,
+        "edge_offset_mm": -5.5,
+        "edge_strength": 1.43,
+        "strongest_offset_mm": -20.0,
+        "strongest_strength": 1.77,
+        "match": false,
+        "px": 216,
+        "px_per_mm": 0.81
+       },
+       "motor|lantern": {
+        "on_edge": 0.3,
+        "edge_offset_mm": -8.0,
+        "edge_strength": 3.63,
+        "strongest_offset_mm": -8.5,
+        "strongest_strength": 3.63,
+        "match": true,
+        "px": 130,
+        "px_per_mm": 0.74
+       },
+       "lantern|housing": {
+        "on_edge": 0.822,
+        "edge_offset_mm": -6.0,
+        "edge_strength": 1.42,
+        "strongest_offset_mm": -6.0,
+        "strongest_strength": 1.42,
+        "match": false,
+        "px": 353,
+        "px_per_mm": 0.73
+       },
+       "pipe_b|housing": {
+        "on_edge": 0.857,
+        "edge_offset_mm": 8.0,
+        "edge_strength": 1.17,
+        "strongest_offset_mm": 16.5,
+        "strongest_strength": 3.21,
+        "match": false,
+        "px": 182,
+        "px_per_mm": 0.5
+       }
+      },
+      "outline": {
+       "pipe_b": 0.719,
+       "housing": 0.593,
+       "lantern": 0.661,
+       "motor": 0.608,
+       "fan_cover": 0.696
+      }
+     },
+     "frame_0052.jpg": {
+      "role": "input view",
+      "iou_raw": 0.827,
+      "iou": 0.837,
+      "scale": 1.0,
+      "shift_px": [
+       -3.6,
+       5.2
+      ],
+      "boundaries": {
+       "fan_cover|motor": {
+        "on_edge": 0.832,
+        "edge_offset_mm": -5.5,
+        "edge_strength": 1.19,
+        "strongest_offset_mm": -18.5,
+        "strongest_strength": 1.71,
+        "match": false,
+        "px": 173,
+        "px_per_mm": 0.61
+       },
+       "motor|lantern": {
+        "on_edge": 0.62,
+        "edge_offset_mm": -4.0,
+        "edge_strength": 2.45,
+        "strongest_offset_mm": -4.0,
+        "strongest_strength": 2.45,
+        "match": true,
+        "px": 100,
+        "px_per_mm": 0.58
+       },
+       "lantern|housing": {
+        "on_edge": 0.927,
+        "edge_offset_mm": -7.5,
+        "edge_strength": 1.85,
+        "strongest_offset_mm": -7.5,
+        "strongest_strength": 1.85,
+        "match": true,
+        "px": 220,
+        "px_per_mm": 0.58
+       },
+       "pipe_b|housing": {
+        "on_edge": 1.0,
+        "edge_offset_mm": 4.5,
+        "edge_strength": 1.02,
+        "strongest_offset_mm": -15.0,
+        "strongest_strength": 1.35,
+        "match": false,
+        "px": 129,
+        "px_per_mm": 0.44
+       }
+      },
+      "outline": {
+       "pipe_b": 0.892,
+       "housing": 0.705,
+       "lantern": 0.878,
+       "motor": 0.637,
+       "fan_cover": 0.646
+      }
+     },
+     "frame_0044.jpg": {
+      "role": "input view",
+      "iou_raw": 0.812,
+      "iou": 0.826,
+      "scale": 1.015,
+      "shift_px": [
+       -4.0,
+       3.6
+      ],
+      "boundaries": {
+       "fan_cover|motor": {
+        "on_edge": 0.828,
+        "edge_offset_mm": 3.5,
+        "edge_strength": 1.37,
+        "strongest_offset_mm": 20.0,
+        "strongest_strength": 2.18,
+        "match": false,
+        "px": 134,
+        "px_per_mm": 0.48
+       },
+       "motor|lantern": {
+        "on_edge": 0.527,
+        "edge_offset_mm": -7.5,
+        "edge_strength": 2.25,
+        "strongest_offset_mm": -17.5,
+        "strongest_strength": 2.35,
+        "match": true,
+        "px": 74,
+        "px_per_mm": 0.46
+       },
+       "lantern|housing": {
+        "on_edge": 1.0,
+        "edge_offset_mm": -5.0,
+        "edge_strength": 1.39,
+        "strongest_offset_mm": -11.5,
+        "strongest_strength": 1.59,
+        "match": false,
+        "px": 157,
+        "px_per_mm": 0.46
+       },
+       "pipe_b|housing": {
+        "on_edge": 0.75,
+        "edge_offset_mm": 8.0,
+        "edge_strength": 1.17,
+        "strongest_offset_mm": 18.5,
+        "strongest_strength": 2.27,
+        "match": false,
+        "px": 92,
+        "px_per_mm": 0.46
+       }
+      },
+      "outline": {
+       "pipe_b": 0.818,
+       "housing": 0.613,
+       "lantern": 1.0,
+       "motor": 0.71,
+       "fan_cover": 1.0
+      }
+     }
+    },
+    "boundaries": {
+     "fan_cover|motor": {
+      "views": 3,
+      "on_edge": 0.777,
+      "edge_offset_mm": [
+       -5.5,
+       -5.5,
+       3.5
+      ],
+      "edge_strength": [
+       1.43,
+       1.19,
+       1.37
+      ],
+      "matches": 0
+     },
+     "motor|lantern": {
+      "views": 3,
+      "on_edge": 0.482,
+      "edge_offset_mm": [
+       -8.0,
+       -4.0,
+       -7.5
+      ],
+      "edge_strength": [
+       3.63,
+       2.45,
+       2.25
+      ],
+      "matches": 3
+     },
+     "lantern|housing": {
+      "views": 3,
+      "on_edge": 0.916,
+      "edge_offset_mm": [
+       -6.0,
+       -7.5,
+       -5.0
+      ],
+      "edge_strength": [
+       1.42,
+       1.85,
+       1.39
+      ],
+      "matches": 1
+     },
+     "pipe_b|housing": {
+      "views": 3,
+      "on_edge": 0.869,
+      "edge_offset_mm": [
+       8.0,
+       4.5,
+       8.0
+      ],
+      "edge_strength": [
+       1.17,
+       1.02,
+       1.17
+      ],
+      "matches": 0
+     }
+    },
+    "tolerance_px": 3.0,
+    "match_mm": 8,
+    "match_rule": "a coherent photo edge (the gradient across the cut averaged along the whole boundary, 1.5x its median or more) within 8 mm",
+    "edges": "Canny on the real 1080p frame",
+    "registration": "2D scale + shift of the whole model's silhouette onto the unit's photo mask (the placement's own error)"
+   },
+   "box": [
+    [
+     -3.43475,
+     0.20737,
+     -1.41947
+    ],
+    [
+     -3.08722,
+     0.80093,
+     -0.77148
+    ]
+   ]
+  },
+  "B156+B156m_r2.glb": {
+   "file": "parts/B156+B156m_r2.glb",
+   "label": "parts split by geometry rules (approximate) \u00b7 AI-generated model",
+   "kind": "inline_circulator",
+   "ids": [
+    "B156",
+    "B156m"
+   ],
+   "frame": {
+    "up": [
+     -0.0006,
+     -1.0,
+     -0.0006
+    ],
+    "pipe": [
+     -0.91423,
+     0.00079,
+     -0.4052
+    ],
+    "origin": [
+     4.05039,
+     0.18392,
+     -2.84519
+    ]
+   },
+   "cuts_mm": {
+    "joint_top": 347.18,
+    "joint_bottom": 128.33,
+    "motor_joint": 82.0
+   },
+   "cut_notes": {
+    "joint_top": {
+     "hint": 346,
+     "face": 346.78
+    },
+    "joint_bottom": {
+     "hint": 129.5,
+     "face": 128.73
+    },
+    "motor_joint": {
+     "hint": 110,
+     "face": 106.86
+    },
+    "fixed": {
+     "motor_joint": {
+      "rule": 107.26,
+      "fixed": 82.0
+     }
+    },
+    "height_mm": 516.5,
+    "tidy_moved_pieces": {
+     "motor_head -> pipe_b": 1,
+     "pipe_a -> pump_housing": 1,
+     "pipe_b -> pump_housing": 2,
+     "pump_housing -> motor_head": 1
+    }
+   },
+   "knowledge_label": "general engineering knowledge",
+   "size_label": "fitted to the scan",
+   "fault_notes": {
+    "FOULING": "impeller inside the casing: not modelled (needs vendor CAD) \u00b7 fouling builds up on the impeller and in the volute (general engineering knowledge) \u00b7 status synthetic (Valmet pack)",
+    "CAVITATION_RISK": "impeller inside the casing: not modelled (needs vendor CAD) \u00b7 cavitation pits the impeller's suction side; which port is suction is not known from the scan (general engineering knowledge) \u00b7 status synthetic (Valmet pack)",
+    "SEAL_DEGRADATION": "the shaft seal sits under the lantern where the shaft enters the pump cover: not modelled (general engineering knowledge) \u00b7 status synthetic (Valmet pack)",
+    "MISALIGNMENT": "the coupling inside the lantern joins the motor and pump shafts: not modelled (general engineering knowledge) \u00b7 status synthetic (Valmet pack)",
+    "OVERHEATING": "a motor overheats from overload, blocked cooling air or a supply fault (general engineering knowledge) \u00b7 status synthetic (Valmet pack)",
+    "CURRENT_IMBALANCE": "unequal phase currents point at the supply, the terminal connections or the winding (general engineering knowledge) \u00b7 status synthetic (Valmet pack)"
+   },
+   "parts": [
+    {
+     "name": "Motor head",
+     "node": "motor_head",
+     "dir": [
+      -0.91423,
+      0.00079,
+      -0.4052
+     ],
+     "dist": 0.166,
+     "order": 1,
+     "what": "The circulator's motor with its control box in one head, bolted onto the side of the pump housing; the control box takes the supply cable. On a wet-rotor circulator the rotor runs in the pumped water (no coupling, no shaft seal), so the head comes off as one piece.",
+     "fault_codes": [
+      "OVERHEATING",
+      "CURRENT_IMBALANCE"
+     ],
+     "serves": "B156m",
+     "size_mm": [
+      244,
+      187,
+      256
+     ],
+     "faces": 11427,
+     "cap_faces": 347,
+     "box": [
+      [
+       3.79457,
+       -0.18523,
+       -3.07123
+      ],
+      [
+       4.04612,
+       0.05901,
+       -2.82546
+      ]
+     ]
+    },
+    {
+     "name": "Pump housing",
+     "node": "pump_housing",
+     "dir": [
+      -0.0006,
+      -1.0,
+      -0.0006
+     ],
+     "dist": 0.0,
+     "order": 2,
+     "what": "The in-line pump housing: both ports on one axis (here the pipe runs up through it, flanged above and below). It holds the impeller and turns its flow into pressure, and stays in the pipework when the motor head is changed. The impeller inside is not modelled: that needs the vendor's CAD.",
+     "fault_codes": [
+      "FOULING",
+      "CAVITATION_RISK"
+     ],
+     "serves": "B156",
+     "size_mm": [
+      220,
+      208,
+      289
+     ],
+     "faces": 9455,
+     "cap_faces": 885,
+     "box": [
+      [
+       3.9587,
+       -0.16377,
+       -3.03036
+      ],
+      [
+       4.1761,
+       0.05591,
+       -2.74252
+      ]
+     ]
+    },
+    {
+     "name": "Pipe connection, top",
+     "node": "pipe_a",
+     "dir": [
+      -0.0006,
+      -1.0,
+      -0.0006
+     ],
+     "dist": 0.066,
+     "order": 3,
+     "what": "The connected pipework above the pump: the counter-flange bolted to the housing's flange (gasket between them) and the fitting above it.",
+     "fault_codes": [],
+     "serves": "B156",
+     "context": true,
+     "why": "the pipework above: its flange joint meets a coherent photo edge in frame 0006 (-3.5 mm) and held-out 0311 but not in input frame 0319 (1.31x, under 1.5x); shown in place, not a part",
+     "size_mm": [
+      169,
+      207,
+      211
+     ],
+     "faces": 7992,
+     "cap_faces": 351,
+     "box": [
+      [
+       3.96846,
+       -0.33269,
+       -2.94846
+      ],
+      [
+       4.17199,
+       -0.16319,
+       -2.75151
+      ]
+     ]
+    },
+    {
+     "name": "Pipe connection, bottom",
+     "node": "pipe_b",
+     "dir": [
+      0.0006,
+      1.0,
+      0.0006
+     ],
+     "dist": 0.066,
+     "order": 4,
+     "what": "The connected pipework below the pump: the counter-flange bolted to the housing's flange (gasket between them) and what hangs below it.",
+     "fault_codes": [],
+     "serves": "B156",
+     "context": true,
+     "why": "the pipework below: its flange joint meets a coherent photo edge only in frame 0006 (-3.5 mm), not in 0319 or held-out 0311; shown in place, not a part",
+     "size_mm": [
+      128,
+      149,
+      185
+     ],
+     "faces": 3913,
+     "cap_faces": 415,
+     "box": [
+      [
+       3.96767,
+       0.05558,
+       -2.9635
+      ],
+      [
+       4.11129,
+       0.18391,
+       -2.79303
+      ]
+     ]
+    }
+   ],
+   "check": {
+    "views": {
+     "frame_0319.jpg": {
+      "role": "input view",
+      "iou_raw": 0.657,
+      "iou": 0.661,
+      "scale": 1.04,
+      "shift_px": [
+       -0.8,
+       -0.8
+      ],
+      "boundaries": {
+       "motor_head|pump_housing": {
+        "on_edge": 0.388,
+        "edge_offset_mm": -7.0,
+        "edge_strength": 1.69,
+        "strongest_offset_mm": -7.0,
+        "strongest_strength": 1.69,
+        "match": true,
+        "px": 273,
+        "px_per_mm": 0.77
+       },
+       "pipe_a|pump_housing": {
+        "on_edge": 0.336,
+        "edge_offset_mm": -1.5,
+        "edge_strength": 1.31,
+        "strongest_offset_mm": 9.5,
+        "strongest_strength": 2.78,
+        "match": false,
+        "px": 152,
+        "px_per_mm": 0.81
+       },
+       "pipe_b|pump_housing": {
+        "on_edge": 0.029,
+        "edge_offset_mm": -8.0,
+        "edge_strength": 1.15,
+        "strongest_offset_mm": 20.0,
+        "strongest_strength": 1.42,
+        "match": false,
+        "px": 69,
+        "px_per_mm": 0.78
+       }
+      },
+      "outline": {
+       "motor_head": 0.83,
+       "pipe_a": 0.184,
+       "pipe_b": 0.362,
+       "pump_housing": 0.073
+      }
+     },
+     "frame_0006.jpg": {
+      "role": "input view",
+      "iou_raw": 0.611,
+      "iou": 0.673,
+      "scale": 0.865,
+      "shift_px": [
+       19.4,
+       -6.3
+      ],
+      "boundaries": {
+       "motor_head|pump_housing": {
+        "on_edge": 0.567,
+        "edge_offset_mm": 1.5,
+        "edge_strength": 1.7,
+        "strongest_offset_mm": 1.5,
+        "strongest_strength": 1.7,
+        "match": true,
+        "px": 97,
+        "px_per_mm": 0.38
+       },
+       "pipe_a|pump_housing": {
+        "on_edge": 0.576,
+        "edge_offset_mm": -3.5,
+        "edge_strength": 1.78,
+        "strongest_offset_mm": -3.5,
+        "strongest_strength": 1.78,
+        "match": true,
+        "px": 59,
+        "px_per_mm": 0.39
+       },
+       "pipe_b|pump_housing": {
+        "on_edge": 0.792,
+        "edge_offset_mm": -3.5,
+        "edge_strength": 1.98,
+        "strongest_offset_mm": -3.5,
+        "strongest_strength": 1.98,
+        "match": true,
+        "px": 53,
+        "px_per_mm": 0.38
+       }
+      },
+      "outline": {
+       "motor_head": 0.803,
+       "pipe_a": 0.348,
+       "pipe_b": 0.517,
+       "pump_housing": 0.237
+      }
+     },
+     "frame_0311.jpg": {
+      "role": "held out",
+      "iou_raw": 0.534,
+      "iou": 0.546,
+      "scale": 0.975,
+      "shift_px": [
+       -7.5,
+       -5.2
+      ],
+      "boundaries": {
+       "motor_head|pump_housing": {
+        "on_edge": 0.616,
+        "edge_offset_mm": -3.5,
+        "edge_strength": 1.16,
+        "strongest_offset_mm": -3.5,
+        "strongest_strength": 1.16,
+        "match": false,
+        "px": 159,
+        "px_per_mm": 0.42
+       },
+       "pipe_a|pump_housing": {
+        "on_edge": 0.323,
+        "edge_offset_mm": -7.0,
+        "edge_strength": 1.86,
+        "strongest_offset_mm": -7.0,
+        "strongest_strength": 1.86,
+        "match": true,
+        "px": 62,
+        "px_per_mm": 0.48
+       },
+       "pipe_b|pump_housing": {
+        "on_edge": 0.111,
+        "edge_offset_mm": 3.5,
+        "edge_strength": 0.89,
+        "strongest_offset_mm": -19.0,
+        "strongest_strength": 2.34,
+        "match": false,
+        "px": 18,
+        "px_per_mm": 0.47
+       }
+      },
+      "outline": {
+       "motor_head": 0.926,
+       "pipe_a": 0.628,
+       "pipe_b": 0.598,
+       "pump_housing": 0.079
+      }
+     }
+    },
+    "boundaries": {
+     "motor_head|pump_housing": {
+      "views": 3,
+      "on_edge": 0.524,
+      "edge_offset_mm": [
+       -7.0,
+       1.5,
+       -3.5
+      ],
+      "edge_strength": [
+       1.69,
+       1.7,
+       1.16
+      ],
+      "matches": 2
+     },
+     "pipe_a|pump_housing": {
+      "views": 3,
+      "on_edge": 0.412,
+      "edge_offset_mm": [
+       -1.5,
+       -3.5,
+       -7.0
+      ],
+      "edge_strength": [
+       1.31,
+       1.78,
+       1.86
+      ],
+      "matches": 2
+     },
+     "pipe_b|pump_housing": {
+      "views": 3,
+      "on_edge": 0.311,
+      "edge_offset_mm": [
+       -8.0,
+       -3.5,
+       3.5
+      ],
+      "edge_strength": [
+       1.15,
+       1.98,
+       0.89
+      ],
+      "matches": 1
+     }
+    },
+    "tolerance_px": 3.0,
+    "match_mm": 8,
+    "match_rule": "a coherent photo edge (the gradient across the cut averaged along the whole boundary, 1.5x its median or more) within 8 mm",
+    "edges": "Canny on the real 1080p frame",
+    "registration": "2D scale + shift of the whole model's silhouette onto the unit's photo mask (the placement's own error)"
+   },
+   "box": [
+    [
+     3.79457,
+     -0.33269,
+     -3.07123
+    ],
+    [
+     4.1761,
+     0.18391,
+     -2.74252
+    ]
+   ]
+  },
+  "B149+B149m.glb": {
+   "file": "parts/B149+B149m.glb",
+   "label": "parts split by geometry rules (approximate) \u00b7 AI-generated model",
+   "kind": "inline_circulator",
+   "ids": [
+    "B149",
+    "B149m"
+   ],
+   "frame": {
+    "up": [
+     -0.0006,
+     -1.0,
+     -0.0006
+    ],
+    "pipe": [
+     -0.99075,
+     0.00051,
+     0.13566
+    ],
+    "origin": [
+     4.04301,
+     0.13198,
+     -2.03169
+    ]
+   },
+   "cuts_mm": {
+    "joint_top": 289.73,
+    "joint_bottom": 83.91,
+    "motor_joint": 28.72
+   },
+   "cut_notes": {
+    "joint_top": {
+     "hint": 290,
+     "face": 289.33
+    },
+    "joint_bottom": {
+     "hint": 88,
+     "face": 84.31
+    },
+    "motor_joint": {
+     "hint": 30,
+     "face": 28.32
+    },
+    "height_mm": 364.9,
+    "tidy_moved_pieces": {
+     "motor_head -> pipe_b": 1,
+     "motor_head -> pipe_a": 1,
+     "motor_head -> pump_housing": 1
+    }
+   },
+   "knowledge_label": "general engineering knowledge",
+   "size_label": "fitted to the scan",
+   "fault_notes": {
+    "FOULING": "impeller inside the casing: not modelled (needs vendor CAD) \u00b7 fouling builds up on the impeller and in the volute (general engineering knowledge) \u00b7 status synthetic (Valmet pack)",
+    "CAVITATION_RISK": "impeller inside the casing: not modelled (needs vendor CAD) \u00b7 cavitation pits the impeller's suction side; which port is suction is not known from the scan (general engineering knowledge) \u00b7 status synthetic (Valmet pack)",
+    "SEAL_DEGRADATION": "the shaft seal sits under the lantern where the shaft enters the pump cover: not modelled (general engineering knowledge) \u00b7 status synthetic (Valmet pack)",
+    "MISALIGNMENT": "the coupling inside the lantern joins the motor and pump shafts: not modelled (general engineering knowledge) \u00b7 status synthetic (Valmet pack)",
+    "OVERHEATING": "a motor overheats from overload, blocked cooling air or a supply fault (general engineering knowledge) \u00b7 status synthetic (Valmet pack)",
+    "CURRENT_IMBALANCE": "unequal phase currents point at the supply, the terminal connections or the winding (general engineering knowledge) \u00b7 status synthetic (Valmet pack)"
+   },
+   "parts": [
+    {
+     "name": "Motor head",
+     "node": "motor_head",
+     "dir": [
+      -0.99075,
+      0.00051,
+      0.13566
+     ],
+     "dist": 0.116,
+     "order": 1,
+     "what": "The circulator's motor with its control box in one head, bolted onto the side of the pump housing; the control box takes the supply cable. On a wet-rotor circulator the rotor runs in the pumped water (no coupling, no shaft seal), so the head comes off as one piece.",
+     "fault_codes": [
+      "OVERHEATING",
+      "CURRENT_IMBALANCE"
+     ],
+     "serves": "B149m",
+     "size_mm": [
+      199,
+      319,
+      351
+     ],
+     "faces": 12592,
+     "cap_faces": 252,
+     "box": [
+      [
+       3.70029,
+       -0.14364,
+       -2.25916
+      ],
+      [
+       4.02565,
+       0.05578,
+       -1.9016
+      ]
+     ]
+    },
+    {
+     "name": "Pump housing",
+     "node": "pump_housing",
+     "dir": [
+      -0.0006,
+      -1.0,
+      -0.0006
+     ],
+     "dist": 0.0,
+     "order": 2,
+     "what": "The in-line pump housing: both ports on one axis (here the pipe runs up through it, flanged above and below). It holds the impeller and turns its flow into pressure, and stays in the pipework when the motor head is changed. The impeller inside is not modelled: that needs the vendor's CAD.",
+     "fault_codes": [
+      "FOULING",
+      "CAVITATION_RISK"
+     ],
+     "serves": "B149",
+     "size_mm": [
+      206,
+      163,
+      484
+     ],
+     "faces": 13409,
+     "cap_faces": 580,
+     "box": [
+      [
+       3.99227,
+       -0.15784,
+       -2.2909
+      ],
+      [
+       4.18067,
+       0.04809,
+       -1.81454
+      ]
+     ]
+    },
+    {
+     "name": "Pipe connection, top",
+     "node": "pipe_a",
+     "dir": [
+      -0.0006,
+      -1.0,
+      -0.0006
+     ],
+     "dist": 0.046,
+     "order": 3,
+     "what": "The connected pipework above the pump: the counter-flange bolted to the housing's flange (gasket between them) and the fitting above it.",
+     "fault_codes": [],
+     "serves": "B149",
+     "size_mm": [
+      75,
+      160,
+      138
+     ],
+     "faces": 3105,
+     "cap_faces": 207,
+     "box": [
+      [
+       4.01793,
+       -0.23304,
+       -2.07309
+      ],
+      [
+       4.17417,
+       -0.15774,
+       -1.93464
+      ]
+     ]
+    },
+    {
+     "name": "Pipe connection, bottom",
+     "node": "pipe_b",
+     "dir": [
+      0.0006,
+      1.0,
+      0.0006
+     ],
+     "dist": 0.046,
+     "order": 4,
+     "what": "The connected pipework below the pump: the counter-flange bolted to the housing's flange (gasket between them) and what hangs below it.",
+     "fault_codes": [],
+     "serves": "B149",
+     "size_mm": [
+      84,
+      163,
+      142
+     ],
+     "faces": 2687,
+     "cap_faces": 181,
+     "box": [
+      [
+       4.01526,
+       0.04778,
+       -2.07469
+      ],
+      [
+       4.17422,
+       0.13195,
+       -1.93337
+      ]
+     ]
+    }
+   ],
+   "check": {
+    "views": {
+     "frame_0319.jpg": {
+      "role": "input view",
+      "iou_raw": 0.705,
+      "iou": 0.756,
+      "scale": 1.01,
+      "shift_px": [
+       15.5,
+       -0.5
+      ],
+      "boundaries": {
+       "motor_head|pump_housing": {
+        "on_edge": 0.726,
+        "edge_offset_mm": -4.0,
+        "edge_strength": 1.34,
+        "strongest_offset_mm": -4.0,
+        "strongest_strength": 1.34,
+        "match": false,
+        "px": 555,
+        "px_per_mm": 0.23
+       },
+       "pipe_a|pump_housing": {
+        "on_edge": 0.715,
+        "edge_offset_mm": -4.5,
+        "edge_strength": 3.34,
+        "strongest_offset_mm": -4.5,
+        "strongest_strength": 3.34,
+        "match": true,
+        "px": 130,
+        "px_per_mm": 0.99
+       },
+       "pipe_b|pump_housing": {
+        "on_edge": 0.581,
+        "edge_offset_mm": -5.5,
+        "edge_strength": 4.18,
+        "strongest_offset_mm": -5.5,
+        "strongest_strength": 4.18,
+        "match": true,
+        "px": 105,
+        "px_per_mm": 0.95
+       }
+      },
+      "outline": {
+       "motor_head": 0.574,
+       "pipe_a": 0.659,
+       "pipe_b": 0.719,
+       "pump_housing": 0.706
+      }
+     },
+     "frame_0228.jpg": {
+      "role": "held out",
+      "iou_raw": 0.451,
+      "iou": 0.643,
+      "scale": 0.83,
+      "shift_px": [
+       25.7,
+       -3.0
+      ],
+      "boundaries": {
+       "motor_head|pump_housing": {
+        "on_edge": 0.882,
+        "edge_offset_mm": -8.0,
+        "edge_strength": 4.08,
+        "strongest_offset_mm": -13.5,
+        "strongest_strength": 4.89,
+        "match": true,
+        "px": 76,
+        "px_per_mm": 0.25
+       },
+       "pipe_a|pump_housing": {
+        "on_edge": 0.552,
+        "edge_offset_mm": 2.0,
+        "edge_strength": 1.64,
+        "strongest_offset_mm": 2.0,
+        "strongest_strength": 1.64,
+        "match": true,
+        "px": 29,
+        "px_per_mm": 0.29
+       },
+       "pipe_b|pump_housing": {
+        "on_edge": 1.0,
+        "edge_offset_mm": -5.0,
+        "edge_strength": 3.54,
+        "strongest_offset_mm": -5.0,
+        "strongest_strength": 3.54,
+        "match": true,
+        "px": 46,
+        "px_per_mm": 0.28
+       }
+      },
+      "outline": {
+       "motor_head": 0.608,
+       "pipe_a": 0.782,
+       "pipe_b": 0.903,
+       "pump_housing": 0.82
+      }
+     },
+     "frame_0011.jpg": {
+      "role": "input view",
+      "iou_raw": 0.624,
+      "iou": 0.741,
+      "scale": 0.975,
+      "shift_px": [
+       37.0,
+       -5.2
+      ],
+      "boundaries": {
+       "motor_head|pump_housing": {
+        "on_edge": 0.835,
+        "edge_offset_mm": 4.0,
+        "edge_strength": 1.62,
+        "strongest_offset_mm": 4.0,
+        "strongest_strength": 1.62,
+        "match": true,
+        "px": 272,
+        "px_per_mm": 0.42
+       },
+       "pipe_a|pump_housing": {
+        "on_edge": 0.868,
+        "edge_offset_mm": -5.5,
+        "edge_strength": 1.71,
+        "strongest_offset_mm": 17.5,
+        "strongest_strength": 1.78,
+        "match": true,
+        "px": 76,
+        "px_per_mm": 0.62
+       },
+       "pipe_b|pump_housing": {
+        "on_edge": 1.0,
+        "edge_offset_mm": -2.0,
+        "edge_strength": 2.6,
+        "strongest_offset_mm": -15.5,
+        "strongest_strength": 2.74,
+        "match": true,
+        "px": 72,
+        "px_per_mm": 0.6
+       }
+      },
+      "outline": {
+       "motor_head": 0.514,
+       "pipe_a": 0.846,
+       "pipe_b": 0.872,
+       "pump_housing": 0.614
+      }
+     }
+    },
+    "boundaries": {
+     "motor_head|pump_housing": {
+      "views": 3,
+      "on_edge": 0.814,
+      "edge_offset_mm": [
+       -4.0,
+       -8.0,
+       4.0
+      ],
+      "edge_strength": [
+       1.34,
+       4.08,
+       1.62
+      ],
+      "matches": 2
+     },
+     "pipe_a|pump_housing": {
+      "views": 3,
+      "on_edge": 0.712,
+      "edge_offset_mm": [
+       -4.5,
+       2.0,
+       -5.5
+      ],
+      "edge_strength": [
+       3.34,
+       1.64,
+       1.71
+      ],
+      "matches": 3
+     },
+     "pipe_b|pump_housing": {
+      "views": 3,
+      "on_edge": 0.86,
+      "edge_offset_mm": [
+       -5.5,
+       -5.0,
+       -2.0
+      ],
+      "edge_strength": [
+       4.18,
+       3.54,
+       2.6
+      ],
+      "matches": 3
+     }
+    },
+    "tolerance_px": 3.0,
+    "match_mm": 8,
+    "match_rule": "a coherent photo edge (the gradient across the cut averaged along the whole boundary, 1.5x its median or more) within 8 mm",
+    "edges": "Canny on the real 1080p frame",
+    "registration": "2D scale + shift of the whole model's silhouette onto the unit's photo mask (the placement's own error)"
+   },
+   "box": [
+    [
+     3.70029,
+     -0.23304,
+     -2.2909
+    ],
+    [
+     4.18067,
+     0.13195,
+     -1.81454
+    ]
+   ]
+  },
+  "A101+G071.glb": {
+   "file": "parts/A101+G071.glb",
+   "label": "parts split by geometry rules (approximate) \u00b7 AI-generated model",
+   "kind": "inline_circulator",
+   "ids": [
+    "A101",
+    "G071"
+   ],
+   "frame": {
+    "up": [
+     -0.0006,
+     -1.0,
+     -0.0006
+    ],
+    "pipe": [
+     0.27712,
+     0.00041,
+     -0.96084
+    ],
+    "origin": [
+     -2.61548,
+     0.57744,
+     -0.10229
+    ]
+   },
+   "cuts_mm": {
+    "joint_top": 471.07,
+    "joint_bottom": 267.02,
+    "motor_joint": 2.0,
+    "window": [
+     305,
+     445,
+     25
+    ]
+   },
+   "cut_notes": {
+    "joint_top": {
+     "hint": 471,
+     "face": 470.67
+    },
+    "joint_bottom": {
+     "hint": 268,
+     "face": 267.42
+    },
+    "motor_joint": {
+     "hint": 21,
+     "face": 19.25
+    },
+    "fixed": {
+     "motor_joint": {
+      "rule": 19.65,
+      "fixed": 2.0
+     }
+    },
+    "motor_window_mm": {
+     "lo": 305,
+     "hi": 445,
+     "out": 25
+    },
+    "height_mm": 579.5,
+    "tidy_moved_pieces": {
+     "pipe_a -> pump_housing": 1,
+     "motor_head -> pipe_a": 1
+    }
+   },
+   "knowledge_label": "general engineering knowledge",
+   "size_label": "fitted to the scan",
+   "fault_notes": {
+    "FOULING": "impeller inside the casing: not modelled (needs vendor CAD) \u00b7 fouling builds up on the impeller and in the volute (general engineering knowledge) \u00b7 status synthetic (Valmet pack)",
+    "CAVITATION_RISK": "impeller inside the casing: not modelled (needs vendor CAD) \u00b7 cavitation pits the impeller's suction side; which port is suction is not known from the scan (general engineering knowledge) \u00b7 status synthetic (Valmet pack)",
+    "SEAL_DEGRADATION": "the shaft seal sits under the lantern where the shaft enters the pump cover: not modelled (general engineering knowledge) \u00b7 status synthetic (Valmet pack)",
+    "MISALIGNMENT": "the coupling inside the lantern joins the motor and pump shafts: not modelled (general engineering knowledge) \u00b7 status synthetic (Valmet pack)",
+    "OVERHEATING": "a motor overheats from overload, blocked cooling air or a supply fault (general engineering knowledge) \u00b7 status synthetic (Valmet pack)",
+    "CURRENT_IMBALANCE": "unequal phase currents point at the supply, the terminal connections or the winding (general engineering knowledge) \u00b7 status synthetic (Valmet pack)"
+   },
+   "parts": [
+    {
+     "name": "Motor head",
+     "node": "motor_head",
+     "dir": [
+      0.27712,
+      0.00041,
+      -0.96084
+     ],
+     "dist": 0.186,
+     "order": 1,
+     "what": "The circulator's motor with its control box in one head, bolted onto the side of the pump housing; the control box takes the supply cable. On a wet-rotor circulator the rotor runs in the pumped water (no coupling, no shaft seal), so the head comes off as one piece.",
+     "fault_codes": [
+      "OVERHEATING",
+      "CURRENT_IMBALANCE"
+     ],
+     "serves": "G071",
+     "size_mm": [
+      196,
+      207,
+      173
+     ],
+     "faces": 13896,
+     "cap_faces": 1477,
+     "box": [
+      [
+       -2.70078,
+       0.07599,
+       -0.30773
+      ],
+      [
+       -2.48891,
+       0.27247,
+       -0.0865
+      ]
+     ]
+    },
+    {
+     "name": "Pump housing",
+     "node": "pump_housing",
+     "dir": [
+      -0.0006,
+      -1.0,
+      -0.0006
+     ],
+     "dist": 0.0,
+     "order": 2,
+     "what": "The in-line pump housing: both ports on one axis (here the pipe runs up through it, flanged above and below). It holds the impeller and turns its flow into pressure, and stays in the pipework when the motor head is changed. The impeller inside is not modelled: that needs the vendor's CAD.",
+     "fault_codes": [
+      "FOULING",
+      "CAVITATION_RISK"
+     ],
+     "serves": "A101",
+     "size_mm": [
+      204,
+      145,
+      182
+     ],
+     "faces": 11487,
+     "cap_faces": 1443,
+     "box": [
+      [
+       -2.70857,
+       0.10605,
+       -0.1344
+      ],
+      [
+       -2.53843,
+       0.31046,
+       0.03073
+      ]
+     ]
+    },
+    {
+     "name": "Pipe connection, top",
+     "node": "pipe_a",
+     "dir": [
+      -0.0006,
+      -1.0,
+      -0.0006
+     ],
+     "dist": 0.074,
+     "order": 3,
+     "what": "The connected pipework above the pump: the counter-flange bolted to the housing's flange (gasket between them) and the fitting above it.",
+     "fault_codes": [],
+     "serves": "A101",
+     "size_mm": [
+      108,
+      131,
+      135
+     ],
+     "faces": 5205,
+     "cap_faces": 273,
+     "box": [
+      [
+       -2.69948,
+       -0.0021,
+       -0.13447
+      ],
+      [
+       -2.5652,
+       0.1064,
+       -0.00298
+      ]
+     ]
+    },
+    {
+     "name": "Pipe connection, bottom",
+     "node": "pipe_b",
+     "dir": [
+      0.0006,
+      1.0,
+      0.0006
+     ],
+     "dist": 0.074,
+     "order": 4,
+     "what": "The connected pipework below the pump: the counter-flange bolted to the housing's flange (gasket between them) and what hangs below it.",
+     "fault_codes": [],
+     "serves": "A101",
+     "size_mm": [
+      267,
+      138,
+      129
+     ],
+     "faces": 2549,
+     "cap_faces": 137,
+     "box": [
+      [
+       -2.70109,
+       0.31035,
+       -0.12879
+      ],
+      [
+       -2.57213,
+       0.57741,
+       0.00883
+      ]
+     ]
+    }
+   ],
+   "check": {
+    "views": {
+     "frame_0115.jpg": {
+      "role": "input view",
+      "iou_raw": 0.787,
+      "iou": 0.816,
+      "scale": 1.01,
+      "shift_px": [
+       -0.8,
+       14.9
+      ],
+      "boundaries": {
+       "motor_head|pump_housing": {
+        "on_edge": 0.891,
+        "edge_offset_mm": -1.5,
+        "edge_strength": 2.54,
+        "strongest_offset_mm": -1.5,
+        "strongest_strength": 2.54,
+        "match": true,
+        "px": 248,
+        "px_per_mm": 0.82
+       },
+       "pipe_a|pump_housing": {
+        "on_edge": 0.821,
+        "edge_offset_mm": -2.5,
+        "edge_strength": 3.45,
+        "strongest_offset_mm": -2.5,
+        "strongest_strength": 3.45,
+        "match": true,
+        "px": 168,
+        "px_per_mm": 0.97
+       },
+       "pipe_b|pump_housing": {
+        "on_edge": 0.487,
+        "edge_offset_mm": -4.5,
+        "edge_strength": 3.31,
+        "strongest_offset_mm": 12.0,
+        "strongest_strength": 3.98,
+        "match": true,
+        "px": 39,
+        "px_per_mm": 0.91
+       }
+      },
+      "outline": {
+       "pipe_a": 0.872,
+       "pipe_b": 0.346,
+       "pump_housing": 0.639,
+       "motor_head": 0.844
+      }
+     },
+     "frame_0051.jpg": {
+      "role": "held out",
+      "iou_raw": 0.278,
+      "iou": 0.407,
+      "scale": 0.83,
+      "shift_px": [
+       -9.4,
+       -46.8
+      ],
+      "boundaries": {
+       "motor_head|pump_housing": {
+        "on_edge": 0.438,
+        "edge_offset_mm": -8.0,
+        "edge_strength": 1.19,
+        "strongest_offset_mm": -20.0,
+        "strongest_strength": 1.49,
+        "match": false,
+        "px": 210,
+        "px_per_mm": 0.11
+       },
+       "pipe_b|pump_housing": {
+        "on_edge": 0.368,
+        "edge_offset_mm": -8.0,
+        "edge_strength": 3.36,
+        "strongest_offset_mm": -14.0,
+        "strongest_strength": 5.97,
+        "match": true,
+        "px": 19,
+        "px_per_mm": 0.46
+       }
+      },
+      "outline": {
+       "pump_housing": 0.98,
+       "motor_head": 0.892
+      }
+     },
+     "frame_0067.jpg": {
+      "role": "input view",
+      "iou_raw": 0.554,
+      "iou": 0.709,
+      "scale": 0.875,
+      "shift_px": [
+       -23.7,
+       -15.4
+      ],
+      "boundaries": {
+       "motor_head|pump_housing": {
+        "on_edge": 0.597,
+        "edge_offset_mm": -1.5,
+        "edge_strength": 1.21,
+        "strongest_offset_mm": -1.5,
+        "strongest_strength": 1.21,
+        "match": false,
+        "px": 412,
+        "px_per_mm": 0.42
+       },
+       "pipe_a|pump_housing": {
+        "on_edge": 0.832,
+        "edge_offset_mm": -0.5,
+        "edge_strength": 2.13,
+        "strongest_offset_mm": -10.5,
+        "strongest_strength": 2.15,
+        "match": true,
+        "px": 95,
+        "px_per_mm": 0.96
+       },
+       "pipe_b|pump_housing": {
+        "on_edge": 0.607,
+        "edge_offset_mm": -6.0,
+        "edge_strength": 1.9,
+        "strongest_offset_mm": -15.0,
+        "strongest_strength": 2.55,
+        "match": true,
+        "px": 219,
+        "px_per_mm": 0.88
+       }
+      },
+      "outline": {
+       "pipe_a": 0.76,
+       "pipe_b": 0.494,
+       "pump_housing": 0.764,
+       "motor_head": 0.282
+      }
+     },
+     "frame_0110.jpg": {
+      "role": "input view",
+      "iou_raw": 0.728,
+      "iou": 0.757,
+      "scale": 0.985,
+      "shift_px": [
+       5.7,
+       8.6
+      ],
+      "boundaries": {
+       "motor_head|pump_housing": {
+        "on_edge": 0.735,
+        "edge_offset_mm": -8.0,
+        "edge_strength": 2.58,
+        "strongest_offset_mm": -9.0,
+        "strongest_strength": 2.58,
+        "match": true,
+        "px": 234,
+        "px_per_mm": 0.71
+       },
+       "pipe_a|pump_housing": {
+        "on_edge": 0.529,
+        "edge_offset_mm": -6.5,
+        "edge_strength": 3.04,
+        "strongest_offset_mm": -6.5,
+        "strongest_strength": 3.04,
+        "match": true,
+        "px": 170,
+        "px_per_mm": 0.94
+       },
+       "pipe_b|pump_housing": {
+        "on_edge": 0.962,
+        "edge_offset_mm": -2.5,
+        "edge_strength": 3.3,
+        "strongest_offset_mm": -2.5,
+        "strongest_strength": 3.3,
+        "match": true,
+        "px": 53,
+        "px_per_mm": 0.88
+       }
+      },
+      "outline": {
+       "pipe_a": 0.85,
+       "pipe_b": 0.618,
+       "pump_housing": 0.41,
+       "motor_head": 0.748
+      }
+     }
+    },
+    "boundaries": {
+     "motor_head|pump_housing": {
+      "views": 4,
+      "on_edge": 0.665,
+      "edge_offset_mm": [
+       -1.5,
+       -8.0,
+       -1.5,
+       -8.0
+      ],
+      "edge_strength": [
+       2.54,
+       1.19,
+       1.21,
+       2.58
+      ],
+      "matches": 2
+     },
+     "pipe_a|pump_housing": {
+      "views": 3,
+      "on_edge": 0.727,
+      "edge_offset_mm": [
+       -2.5,
+       -0.5,
+       -6.5
+      ],
+      "edge_strength": [
+       3.45,
+       2.13,
+       3.04
+      ],
+      "matches": 3
+     },
+     "pipe_b|pump_housing": {
+      "views": 4,
+      "on_edge": 0.606,
+      "edge_offset_mm": [
+       -4.5,
+       -8.0,
+       -6.0,
+       -2.5
+      ],
+      "edge_strength": [
+       3.31,
+       3.36,
+       1.9,
+       3.3
+      ],
+      "matches": 4
+     }
+    },
+    "tolerance_px": 3.0,
+    "match_mm": 8,
+    "match_rule": "a coherent photo edge (the gradient across the cut averaged along the whole boundary, 1.5x its median or more) within 8 mm",
+    "edges": "Canny on the real 1080p frame",
+    "registration": "2D scale + shift of the whole model's silhouette onto the unit's photo mask (the placement's own error)"
+   },
+   "box": [
+    [
+     -2.70857,
+     -0.0021,
+     -0.30773
+    ],
+    [
+     -2.48891,
+     0.57741,
+     0.03073
+    ]
+   ]
+  }
+ },
+ "ai3d": {
+  "A096.glb": {
+   "file": "ai3d/A096.glb",
+   "unit": "A096",
+   "ids": [
+    "A096"
+   ],
+   "label": "AI-generated from 2 real photos (Higgsfield)",
+   "silhouette_iou": 0.918
+  },
+  "A101+G071.glb": {
+   "file": "ai3d/A101+G071.glb",
+   "unit": "A101+G071",
+   "ids": [
+    "A101",
+    "G071"
+   ],
+   "label": "AI-generated pump unit (P-006 pump + M-001 motor) from 3 real photos (Higgsfield)",
+   "silhouette_iou": 0.693
+  },
+  "A124.glb": {
+   "file": "ai3d/A124.glb",
+   "unit": "A124",
+   "ids": [
+    "A124"
+   ],
+   "label": "AI-generated from 2 real photos (Higgsfield)",
+   "silhouette_iou": 0.647
+  },
+  "A158.glb": {
+   "file": "ai3d/A158.glb",
+   "unit": "A158",
+   "ids": [
+    "A158"
+   ],
+   "label": "AI-generated from 3 real photos (Higgsfield)",
+   "silhouette_iou": 0.629
+  },
+  "A207.glb": {
+   "file": "ai3d/A207.glb",
+   "unit": "A207",
+   "ids": [
+    "A207"
+   ],
+   "label": "AI-generated from 2 real photos (Higgsfield)",
+   "silhouette_iou": 0.829
+  },
+  "A290_r2.glb": {
+   "file": "ai3d/A290_r2.glb",
+   "unit": "A290_r2",
+   "ids": [
+    "A290"
+   ],
+   "label": "AI-generated from 1 real photo (Higgsfield)",
+   "silhouette_iou": 0.883
+  },
+  "B013+B013m.glb": {
+   "file": "ai3d/B013+B013m.glb",
+   "unit": "B013+B013m",
+   "ids": [
+    "B013",
+    "B013m"
+   ],
+   "label": "AI-generated pump unit (P-005 pump + M-006 motor) from 2 real photos (Higgsfield)",
+   "silhouette_iou": 0.636
+  },
+  "B019p+A069_r2.glb": {
+   "file": "ai3d/B019p+A069_r2.glb",
+   "unit": "B019p+A069_r2",
+   "ids": [
+    "B019p",
+    "A069"
+   ],
+   "label": "AI-generated pump unit (P-004 pump + A069 motor) from 3 real photos (Higgsfield)",
+   "silhouette_iou": 0.829
+  },
+  "B138.glb": {
+   "file": "ai3d/B138.glb",
+   "unit": "B138",
+   "ids": [
+    "B138"
+   ],
+   "label": "AI-generated from 3 real photos (Higgsfield)",
+   "silhouette_iou": 0.901
+  },
+  "B147.glb": {
+   "file": "ai3d/B147.glb",
+   "unit": "B147",
+   "ids": [
+    "B147"
+   ],
+   "label": "AI-generated from 2 real photos (Higgsfield)",
+   "silhouette_iou": 0.657
+  },
+  "B149+B149m.glb": {
+   "file": "ai3d/B149+B149m.glb",
+   "unit": "B149+B149m",
+   "ids": [
+    "B149",
+    "B149m"
+   ],
+   "label": "AI-generated pump unit (P-003 pump + M-005 motor) from 2 real photos (Higgsfield)",
+   "silhouette_iou": 0.668
+  },
+  "B156+B156m_r2.glb": {
+   "file": "ai3d/B156+B156m_r2.glb",
+   "unit": "B156+B156m_r2",
+   "ids": [
+    "B156",
+    "B156m"
+   ],
+   "label": "AI-generated pump unit (P-002 pump + M-004 motor) from 2 real photos (Higgsfield)",
+   "silhouette_iou": 0.639
+  },
+  "B165.glb": {
+   "file": "ai3d/B165.glb",
+   "unit": "B165",
+   "ids": [
+    "B165"
+   ],
+   "label": "AI-generated from 1 real photo (Higgsfield)",
+   "silhouette_iou": 0.858
+  },
+  "B169.glb": {
+   "file": "ai3d/B169.glb",
+   "unit": "B169",
+   "ids": [
+    "B169"
+   ],
+   "label": "AI-generated from 2 real photos (Higgsfield)",
+   "silhouette_iou": 0.634
+  },
+  "G528.glb": {
+   "file": "ai3d/G528.glb",
+   "unit": "G528",
+   "ids": [
+    "G528"
+   ],
+   "label": "AI-generated from 2 real photos (Higgsfield)",
+   "silhouette_iou": 0.814
+  },
+  "A110p2+A110m2+A110p1+A110m1.glb": {
+   "file": "ai3d/A110p2+A110m2+A110p1+A110m1.glb",
+   "unit": "A110p2+A110m2+A110p1+A110m1",
+   "ids": [
+    "A110p2",
+    "A110m2",
+    "A110p1",
+    "A110m1"
+   ],
+   "label": "AI-generated twin pump unit (P-001 pump and its motor, with the twin pump beside it) from 2 real photos (Higgsfield)",
+   "silhouette_iou": 0.641
+  },
+  "A257.glb": {
+   "file": "ai3d/A257.glb",
+   "unit": "A257",
+   "ids": [
+    "A257"
+   ],
+   "label": "AI-generated from 2 real photos (Higgsfield)",
+   "silhouette_iou": 0.794
+  },
+  "A352.glb": {
+   "file": "ai3d/A352.glb",
+   "unit": "A352",
+   "ids": [
+    "A352"
+   ],
+   "label": "AI-generated from 1 real photo (Higgsfield)",
+   "silhouette_iou": 0.83
+  }
+ }
+}
