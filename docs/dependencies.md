@@ -16,7 +16,7 @@
 | joblib / cloudpickle | 1.6.0 / 3.1.2 | scikit-learn's execution/serialization support |
 | threadpoolctl / narwhals | 3.8.0 / 2.28.0 | scikit-learn transitive dependencies |
 | python-dateutil / tzdata | 4.0.0 / 2026.6 | pandas date/time dependencies |
-| Three.js + OrbitControls + GLTFLoader | r170, bundled locally | WebGL 2 scan/geometry rendering and camera controls |
+| Three.js + OrbitControls + TransformControls + GLTFLoader | r170, bundled locally | WebGL 2 scan/geometry rendering and camera controls |
 | Hugeicons | inline SVG subset | Viewer controls; no icon CDN request |
 | Browser | WebGL 2 | Room rendering, IFC text export and user interaction |
 

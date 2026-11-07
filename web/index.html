@@ -154,10 +154,10 @@
         <!-- no visible button: Navigate here replaces it; field-jobs.mjs still clicks it to frame a job's device -->
         <button id="btn-room-location" hidden>View location</button>
         <form id="room-move-form" class="room-move-form" hidden>
-          <p>Drag the object across the floor, or click the floor or map to drop it there. Q / E turn it.</p>
+          <p>Drag the red or blue arrow, or the square between them, to move it. Click the floor or map to send it there; Q / E turn it. Each move applies at once.</p>
           <div class="room-edit-actions"><button id="btn-rotate-left" type="button" class="btn-outline-full" title="Turn 15° left (Q)">↺ Turn</button><button id="btn-rotate-right" type="button" class="btn-outline-full" title="Turn 15° right (E)">Turn ↻</button></div>
           <p id="room-move-error" role="status"></p>
-          <div class="room-edit-actions"><button id="btn-cancel-move" type="button" class="btn-outline-full">Cancel move</button><button id="btn-place-object" class="btn-outline-full" type="submit">Place object</button></div>
+          <div class="room-edit-actions"><button id="btn-done-move" class="btn-outline-full" type="submit">Done</button></div>
         </form>
         <p id="room-edit-notice" class="room-edit-notice" role="status" hidden></p>
         <div id="active-asset-details" class="active-asset-details">
