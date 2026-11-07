@@ -1,0 +1,3 @@
+name: Field Atlas Fault Panel
+icon: 🚨
+description: Shows the first broken item of the Field Atlas twin on the LED matrix and RGB LED until its job is done. Tap = acknowledge (the job starts), hold = take the newest fault.

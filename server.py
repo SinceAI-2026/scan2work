@@ -325,9 +325,20 @@ class TwinRequestHandler(SimpleHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(raw)
 
+    def _live(self, method: str, path: str, body: dict):
+        """The Arduino fault panel (with Tiger Data and Snowflake): all of it lives in live/, imported on first use."""
+        try:
+            from live import board as live_board
+        except Exception as err:  # noqa: BLE001 - the panel is optional; the twin works without it
+            return self._send_json({"error": f"fault panel unavailable: {err}"}, 503)
+        out = live_board.handle(method, path, body, FIELD, (self.headers.get("X-Live-Token") or "").strip())
+        return self._send_json(*(out or ({"error": "Unknown endpoint"}, 404)))
+
     def do_GET(self):
         parsed = urlparse(self.path)
         path = parsed.path
+        if path.startswith("/api/live/"):
+            return self._live("GET", path, {})
         qs = parse_qs(parsed.query)
 
         if path == "/api/scene/edits":
@@ -407,6 +418,9 @@ class TwinRequestHandler(SimpleHTTPRequestHandler):
         length = int(self.headers.get("Content-Length", "0"))
         body = json.loads(self.rfile.read(length).decode("utf-8") or "{}") if length > 0 else {}
 
+        if parsed.path.startswith("/api/live/"):
+            return self._live("POST", parsed.path, body)
+
         if parsed.path == "/api/copilot/diagnose":
             aid = body.get("asset_id") or TWIN_DATA["target_asset_id"]
             q = body.get("question") or ""
@@ -461,18 +475,20 @@ class TwinRequestHandler(SimpleHTTPRequestHandler):
         return self._send_json({"error": "Unknown endpoint"}, 404)
 
 
-def run_server(port: int = 8765):
+def run_server(port: int = 8765, host: str = "127.0.0.1"):
     mimetypes.add_type("application/octet-stream", ".bin")
     mimetypes.add_type("application/octet-stream", ".gspl")
     mimetypes.add_type("application/octet-stream", ".ply")
     mimetypes.add_type("model/gltf-binary", ".glb")
     load_data()
-    server = ThreadingHTTPServer(("127.0.0.1", port), TwinRequestHandler)
-    print(f"Valmet Industrial Metaverse Digital Twin server listening on http://127.0.0.1:{port}")
+    server = ThreadingHTTPServer((host, port), TwinRequestHandler)
+    print(f"Valmet Industrial Metaverse Digital Twin server listening on http://{host}:{port}")
     server.serve_forever()
 
 
 if __name__ == "__main__":
     import sys
-    p = int(sys.argv[1]) if len(sys.argv) > 1 else 8765
-    run_server(p)
+    args = [a for a in sys.argv[1:] if a != "--lan"]
+    p = int(args[0]) if args else 8765
+    # --lan: listen on every interface so an Arduino on the same network can reach the server (arduino/README.md)
+    run_server(p, "0.0.0.0" if "--lan" in sys.argv else "127.0.0.1")

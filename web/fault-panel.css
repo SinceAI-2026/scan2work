@@ -1,0 +1,38 @@
+/* Arduino fault panel (fault-panel.mjs): a round icon in the room toolbar that morphs into a card */
+.fault-panel-switch{position:relative;pointer-events:auto}
+.fault-panel-switch[hidden]{display:none}
+.fault-panel-fab{position:relative;display:inline-flex;align-items:center;justify-content:center;width:40px;height:40px;padding:0;border:1px solid var(--vs-border,#d6dccd);border-radius:50%;background:var(--vs-surface,#f9fbf3f5);color:var(--vs-ink,#24382b);box-shadow:var(--vs-shadow,0 4px 18px #0003);cursor:pointer;transition:background .15s,color .15s}
+.fault-panel-fab:hover{background:var(--vs-hover,#e7ecdf)}
+.fault-panel-fab[aria-expanded=true]{background:var(--vs-active,#254c38);color:#fff;border-color:var(--vs-active,#254c38)}
+.fault-panel-dot{position:absolute;top:5px;right:5px;width:8px;height:8px;border-radius:50%;background:#9aa69c;box-shadow:0 0 0 2px var(--vs-surface,#f9fbf3)}
+.fault-panel-switch[data-status=fault] .fault-panel-dot{background:var(--terracotta,#c64c38);animation:fp-blink 1s steps(2,start) infinite}
+.fault-panel-switch[data-status=in_progress] .fault-panel-dot{background:var(--amber,#b27624)}
+.fault-panel-switch[data-status=done] .fault-panel-dot,.fault-panel-switch[data-status=clear] .fault-panel-dot{background:var(--forest,#245b42)}
+
+/* The card grows out of the button: it starts as a circle the button's size and scales up, rounding off its corners. */
+.fault-panel{position:absolute;top:0;left:0;width:280px;display:flex;flex-direction:column;gap:9px;padding:12px;border:1px solid var(--vs-border,#d6dccd);background:#f9fbf3;color:var(--vs-ink,#24382b);box-shadow:var(--vs-shadow,0 4px 18px #0003);font-size:12px;line-height:16px;z-index:32;transform-origin:20px 20px;border-radius:12px;transition:transform .28s cubic-bezier(.2,.9,.25,1),opacity .18s ease,border-radius .28s ease,visibility 0s}
+.fault-panel[data-open=false]{transform:scale(.143,.17);opacity:0;border-radius:140px;visibility:hidden;pointer-events:none;transition:transform .22s ease-in,opacity .18s ease-in .04s,border-radius .22s ease,visibility 0s .22s}
+.fault-panel>*{transition:opacity .15s ease .1s}
+.fault-panel[data-open=false]>*{opacity:0;transition:none}
+.fault-panel-head{display:flex;align-items:center;gap:8px}.fault-panel-head strong{font-size:13px;margin-right:auto}
+.fault-panel-close{width:28px;height:28px;border:0;border-radius:6px;background:var(--vs-hover,#e7ecdf);color:var(--vs-ink,#24382b);font-size:19px;cursor:pointer}
+.fault-panel-pill{padding:2px 8px;border-radius:999px;font-size:11px;font-weight:600;background:#e4eee2;color:var(--forest,#245b42)}
+.fault-panel-switch[data-status=fault] .fault-panel{border-color:var(--terracotta,#c64c38)}
+.fault-panel-switch[data-status=fault] .fault-panel-pill{background:var(--terracotta,#c64c38);color:#fff}
+.fault-panel-switch[data-status=in_progress] .fault-panel-pill{background:#f3e7d3;color:var(--amber,#b27624)}
+.fault-panel-switch[data-status=waiting] .fault-panel-pill{background:#e7e9e4;color:var(--text-muted,#69766c)}
+.fault-panel-task{font-weight:600;color:var(--text-main,#1c2a22)}
+.fault-panel-bars{display:flex;flex-direction:column;gap:4px}.fault-panel-bars[hidden]{display:none}
+.fault-panel-bar{display:grid;grid-template-columns:46px 1fr 44px;align-items:center;gap:6px;font-size:11px;color:var(--vs-ink-2,#5d6f60)}
+.fault-panel-bar i{height:6px;border-radius:3px;background:#e4e8dd;overflow:hidden}
+.fault-panel-bar b{display:block;height:100%;background:#9fb59a;transition:width .3s}
+.fault-panel-bar.now b{background:var(--forest,#245b42)}
+.fault-panel-switch[data-status=fault] .fault-panel-bar.now b{background:var(--terracotta,#c64c38)}
+.fault-panel-bar em{font-style:normal;font-family:var(--mono,ui-monospace,Menlo,monospace);text-align:right;color:var(--text-main,#1c2a22)}
+.fault-panel-meta{font-size:10.5px;line-height:1.45;color:var(--vs-ink-2,#5d6f60)}
+.fault-panel-actions{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.fault-panel-actions button{min-height:30px;padding:4px 6px;border:1px solid var(--vs-border,#d6dccd);border-radius:7px;background:#fff;color:var(--vs-active,#254c38);font:inherit;font-size:11px;font-weight:600;cursor:pointer}
+.fault-panel-actions button:hover{background:var(--vs-hover,#e7ecdf)}
+@keyframes fp-blink{to{opacity:.35}}
+@media (prefers-reduced-motion:reduce){.fault-panel,.fault-panel[data-open=false],.fault-panel>*{transition:none}.fault-panel-dot{animation:none!important}}
+@media (max-width:650px){.fault-panel{position:fixed;top:110px;left:auto;right:12px;width:min(280px,calc(100vw - 24px));transform-origin:top right}}

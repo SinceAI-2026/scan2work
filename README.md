@@ -183,6 +183,10 @@ Use the browser to verify that arrival reveals the correct report and that closi
 
 The slide outline and recording sequence are preparation documents. A final deck and a recorded demo still need to be produced.
 
+## Arduino fault panel with Tiger Data and Snowflake (optional)
+
+An Arduino UNO Q shows the first broken item in the twin (the top of "To inspect") until its job is closed as fixed, then turns green. It works on whatever data the server runs on. It reaches the server over HTTP(S), so it works with a deployed server as well as a laptop. Tiger Data (the board's heartbeats) and Snowflake (its event log) are used only here, in `live/`. The rest of the app never imports them and runs the same without them. Setup and demo script: [arduino/README.md](arduino/README.md).
+
 ## Two pipelines: heuristic + Gemini, or local open models
 
 The objects can come from two segmenters. The Excel mapping, navigation, diagnostics and viewer that follow are the same for both. Choose with `VALMET_SEGMENTER`:
