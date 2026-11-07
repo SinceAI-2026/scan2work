@@ -141,4 +141,4 @@ a model ran ([generated artifact status](docs/technical-notes.md#generated-artif
 - [Rasmus integration and reusable modules](docs/rasmus-integration.md)
 - [Asset import](docs/asset-import-guide.md) · [Original-data audit](docs/original-data-audit.md)
 - Releases: [0.1.1](docs/release-0.1.1.md), [0.1.0](docs/release-0.1.0.md), [packaging audit](docs/packaging-audit.md)
-- Submission prep: [demo sequence](docs/demo-sequence.md), [slides outline](docs/slides-outline.md)
+- Submission: [slides (PDF, 8 slides)](docs/slides/scan2work-slides.pdf) · [demo recording script](docs/demo-sequence.md)

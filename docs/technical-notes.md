@@ -46,7 +46,7 @@ The checks below are in `tests/` and run against hand-labelled ground truth, not
   | Decisions API on point crops | 31% |
   | Decisions API on splat renders | 56% |
   | Gemini on splat renders | 85% (33/39) |
-  | Gemini on real video photos | **[refresh: `tests/ab_photos.py`]** |
+  | Gemini on real video photos (current default) | 85% (`tests.scorecard`, 7 Nov 2026) |
 
   Movable objects are found in 9/10 cases.
 - **2D→3D lifting** (`tests/validate_lifting.py`): every object is projected into the views and the synthetic boxes are lifted back. The fused centre falls inside the original box in 92% of cases.
@@ -156,7 +156,7 @@ Browser verification on the same date confirmed that selecting P-001 while trave
 
 Repeat the browser check after changes. Complete a route to equipment and confirm that the matching diagnosis, evidence, and inspection steps open. Then select another object during a route and confirm that arrival still resolves to the route destination. A floor destination or room tour must not show an unrelated equipment diagnosis.
 
-The challenge submission also requires a runnable demo, source and setup instructions, five to eight slides, and a demo video below five minutes. The [slide outline](slides-outline.md) and [recording sequence](demo-sequence.md) are preparation documents. They are not the final slide deck or recorded video.
+The challenge submission also requires a runnable demo, source and setup instructions, five to eight slides, and a demo video below five minutes. The slides are in [docs/slides/scan2work-slides.pdf](slides/scan2work-slides.pdf); the [recording sequence](demo-sequence.md) is the script for the video.
 
 ## Expanded Field Atlas import (offline)
 

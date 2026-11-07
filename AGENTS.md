@@ -18,7 +18,7 @@ The pipeline writes `web/data/digital_twin.json`, which the web viewer and `serv
 | --- | --- | --- |
 | `pipeline/`, `server.py`, `tests/`, `scripts/` | pipeline agent | read only |
 | `web/` (viewer, `*.mjs`, `index.html`, `styles.css`) | viewer agent | read only |
-| `docs/technical-notes.md`, `docs/demo-sequence.md`, `docs/slides-outline.md` | pipeline agent | suggest changes |
+| `docs/technical-notes.md`, `docs/demo-sequence.md`, `docs/slides/` | pipeline agent | suggest changes |
 | `docs/screenshots/`, `docs/render-comparison/` | viewer agent | read only |
 
 `scripts/patch_proximity_frames.py` and `scripts/patch_explode_view.py` patch `web/app.js` idempotently via anchor lines. After editing `app.js`, run both and confirm they print `0 edit(s)` with no "anchor not found".
