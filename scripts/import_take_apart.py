@@ -27,7 +27,7 @@ ROOT = Path(__file__).resolve().parents[1]
 SRC = Path(sys.argv[1]) if len(sys.argv) > 1 else Path.home() / "sinceai-mvp/demo/web/public/data/s2s"
 OUT = ROOT / "web" / "data" / "take_apart"
 UNITS = {"B019p+A069_r2.glb", "B013+B013m.glb", "B156+B156m_r2.glb", "B149+B149m.glb", "A101+G071.glb"}  # split units checked here
-# AI 3D: scan2service's own Higgsfield index (read only), every unit it fitted in place
+# AI 3D: scan2service's own Higgsfield index (read only), every unit it fitted in place, plus the MVP's index_new.json
 HF3D = Path.home() / "sinceai-2026/data/private/out/equip_v1/assets_export/hf3d"
 MIN_IOU = 0.5  # silhouette fit against the real photos; below it the shape is not trusted
 ROOM_TEXTURE_PX = 1024  # AI 3D models in the room get their texture at this size (GPU memory on an 8 GB machine);
@@ -91,11 +91,12 @@ def shrink_glb(src: Path, dst: Path, px: int):
                     + struct.pack("<I4s", len(js), b"JSON") + js + struct.pack("<I4s", len(out), b"BIN\0") + bytes(out))
 
 
-def pick_ai3d(index: dict) -> tuple[dict, dict]:
+def pick_ai3d(index: dict, base: Path) -> tuple[dict, dict]:
     """The units scan2service shows (its objects' units: a pump + motor once, the _r2 redo where there is one), minus
     hidden ones and poor silhouette fits. Returns ({file name: entry}, {unit: why skipped})."""
     units, skipped = index["units"], {}
-    for name, why in {**index.get("skipped", {}), **index.get("hidden", {})}.items():
+    hidden = index.get("hidden") or {}
+    for name, why in {**(index.get("skipped") or {}), **hidden}.items():
         skipped[name] = why
     for name in units:
         redo = f"{name}_r2"
@@ -104,14 +105,14 @@ def pick_ai3d(index: dict) -> tuple[dict, dict]:
     out = {}
     for name in sorted({o["unit"] for o in index["objects"].values()}):
         u = units[name]
-        if name in index.get("hidden", {}):
+        if name in hidden:
             continue
         if (u.get("silhouette_iou") or 0) < MIN_IOU:
             skipped[name] = f"silhouette IoU {u.get('silhouette_iou')} < {MIN_IOU}"
             continue
         file = Path(u["file"]).name
         out[file] = {"file": f"ai3d/{file}", "unit": name, "ids": u.get("parts", []), "label": u.get("label"),
-                     "silhouette_iou": u.get("silhouette_iou"), "src": file}
+                     "silhouette_iou": u.get("silhouette_iou"), "src": str(base / file)}
     for name, u in units.items():  # redos the index has but does not show (hidden or below the bar)
         if name not in skipped and Path(u["file"]).name not in out and name not in {o["unit"] for o in index["objects"].values()}:
             skipped[name] = "not shown by scan2service" + (f" (IoU {u.get('silhouette_iou')})" if u.get("silhouette_iou") else "")
@@ -132,9 +133,16 @@ def main():
         boxes = glb_boxes(OUT / "parts" / name)
         parts = [{**p, "box": boxes[p["node"]]} for p in entry["parts"] if p["node"] in boxes]
         models[name] = {**entry, "file": f"parts/{name}", "box": boxes["*"], "parts": parts}
-    ai3d, skipped = pick_ai3d(json.loads((HF3D / "index.json").read_text()))
+    ai3d, skipped = pick_ai3d(json.loads((HF3D / "index.json").read_text()), HF3D)
+    new = SRC / "assets/hf3d/index_new.json"  # newer units made after scan2service's index (same shape)
+    if new.exists():
+        more, why = pick_ai3d(json.loads(new.read_text()), new.parent)
+        ai3d.update(more)
+        skipped.update(why)
+    drawn = {e["unit"] for e in ai3d.values()}
+    skipped = {k: v for k, v in skipped.items() if k not in drawn}  # an older "skipped" for a unit made since
     for e in ai3d.values():
-        shrink_glb(HF3D / e.pop("src"), OUT / e["file"], ROOM_TEXTURE_PX)
+        shrink_glb(Path(e.pop("src")), OUT / e["file"], ROOM_TEXTURE_PX)
     doc = {"version": 3, "source": "SinceAI-2026/mvp demo/web/public/data/s2s (scan2service, raw PLY coordinates)",
            "frame": cards.get("frame"), "models": models, "ai3d": ai3d}
     (OUT / "index.json").write_text(json.dumps(doc, indent=1))
