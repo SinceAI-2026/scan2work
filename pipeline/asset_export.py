@@ -21,6 +21,7 @@ The entry in web/data/library/library.json is written last. No AI calls.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import re
 import shutil
@@ -222,7 +223,10 @@ class SceneCutter:
 
     def __init__(self):
         self.twin_mtime = (DATA / "digital_twin.json").stat().st_mtime
-        self.assets = json.loads((DATA / "digital_twin.json").read_text())["assets"]
+        twin = json.loads((DATA / "digital_twin.json").read_text())
+        self.assets = twin["assets"]
+        self.exact = twin.get("scene", {}).get("membership_mode") == "exact-source-rows"
+        self.source = DATA / twin["scene"]["source_ply"] if self.exact else C.PLY_PATH
         raw = (DATA / "boiler_room_points.bin").read_bytes()
         n_bin, stride = struct.unpack_from("<II", raw, 8)
         if stride != GSPL.itemsize:
@@ -235,7 +239,34 @@ class SceneCutter:
         inst = np.frombuffer(inst_raw, dtype="<u2", count=n_inst, offset=12)
         self.order = np.argsort(inst, kind="stable")
         self.bounds = np.searchsorted(inst[self.order], np.arange(len(self.assets) + 1))
-        self.rows = source_rows(C.PLY_PATH, n_bin, self.packed["xyz"])
+        if self.exact:
+            digest = hashlib.sha256()
+            with self.source.open('rb') as stream:
+                for block in iter(lambda: stream.read(4 * 1024 * 1024), b''):
+                    digest.update(block)
+            if digest.hexdigest() != twin['scene']['source_sha256']:
+                raise RuntimeError('Imported source PLY SHA256 changed; exact export refused')
+            self.rows = np.load(DATA / twin["scene"]["source_rows_file"], allow_pickle=False)
+            if len(self.rows) != n_bin or len(np.unique(self.rows)) != n_bin:
+                raise RuntimeError("Imported source row map is missing, duplicated or misaligned")
+            n, off, dt = read_ply_header(self.source)
+            if np.any(self.rows >= n):
+                raise RuntimeError("Imported source row index out of bounds")
+            native = np.memmap(self.source, dtype=dt, mode="r", offset=off, shape=(n,))
+            xyz = np.stack([native[k][self.rows] for k in ('x','y','z')], 1)
+            xyz = xyz * [1,-1,-1] + [0,FLOOR_Y_PLY,0]
+            if not np.allclose(xyz, self.packed['xyz'], atol=1e-5):
+                raise RuntimeError("Imported source row order does not match viewer geometry")
+            with np.load(DATA / twin['scene']['members_file'], allow_pickle=False) as membership:
+                if membership['object_ids'].tolist() != [a['id'] for a in self.assets]:
+                    raise RuntimeError('Imported membership object order changed')
+                for i in range(len(self.assets)):
+                    expected = membership['source_rows'][membership['offsets'][i]:membership['offsets'][i+1]]
+                    found = self.rows[self.order[self.bounds[i]:self.bounds[i+1]]]
+                    if not np.array_equal(np.sort(expected), np.sort(found)):
+                        raise RuntimeError(f"Imported ownership mismatch for {self.assets[i]['id']}")
+        else:
+            self.rows = source_rows(self.source, n_bin, self.packed["xyz"])
         self.by_id = {a["id"]: i for i, a in enumerate(self.assets)}
 
     def stale(self) -> bool:
@@ -245,6 +276,11 @@ class SceneCutter:
         if oid not in self.by_id:
             raise KeyError(f"no object {oid!r} in digital_twin.json")
         i = self.by_id[oid]
+        if self.exact:
+            idx = np.sort(self.order[self.bounds[i]:self.bounds[i + 1]])
+            if len(idx) != self.assets[i]['n_gaussians']:
+                raise ValueError("Exact imported object ownership is incomplete")
+            return i, idx, 0, 0
         idx, n_floor, n_float = own_splats(self.packed["xyz"], np.sort(self.order[self.bounds[i]:self.bounds[i + 1]]))
         if len(idx) < 20:
             raise ValueError(f"{oid} has only {len(idx)} splats of its own: nothing to keep")
@@ -253,15 +289,34 @@ class SceneCutter:
     def cut(self, oid: str, out: Path) -> dict:
         """Write the object's files into out and return its library entry (without saved_at). The model is
         refined against the walkthrough frames; with no frame that sees the object it is the scan splats."""
-        from . import object_refine  # torch loads on the first save, not at server start
         i, idx, n_floor, n_float = self._object(oid)
         a = self.assets[i]
         out.mkdir(parents=True, exist_ok=True)
         packed = self.packed[idx]
+        if self.exact:
+            # Never expand exact source ownership using a box, remove floor samples,
+            # or synthesize an apparent reconstruction when exporting an imported region.
+            write_ply_rows(self.source, self.rows[idx], out / f"{oid}.ply")
+            write_gspl(packed, out / f"{oid}.scan.gspl")
+            write_gspl(packed, out / f"{oid}.gspl")
+            np.save(out / 'source_rows.npy', self.rows[idx], allow_pickle=False)
+            thumbnail(packed, out / 'thumb.jpg')
+            p = packed['xyz']; lo, hi = p.min(0), p.max(0)
+            return {"id": oid, "index": i, **{k:a.get(k) for k in EXPORT_KEYS},
+                    "splats":len(idx), "left_to_room":{"floor":0,"floaters":0},
+                    "centroid":p.mean(0).tolist(),"bounds":{"min":lo.tolist(),"max":hi.tolist()},
+                    "radius":float(np.linalg.norm(hi-lo)/2), "membership_mode":"exact-source-rows",
+                    "source_sha256":json.loads((DATA/'digital_twin.json').read_text())['scene']['source_sha256'],
+                    "provenance":a.get('provenance'),"review_status":a.get('review_status'),"scale_verified":False,
+                    "model":{"status":"exact-source-export","refined":False,"note":"Original Gaussian rows; no new geometry or image-based reconstruction"},
+                    "files":{"ply":f'{oid}/{oid}.ply',"gspl":f'{oid}/{oid}.gspl',"scan_gspl":f'{oid}/{oid}.scan.gspl',
+                             "source_rows":f'{oid}/source_rows.npy',"thumb":f'{oid}/thumb.jpg',"model_ply":None,"glb":None},
+                    "source":self.source.name}
+        from . import object_refine  # legacy opt-in pipeline only
         model, stats = object_refine.refine(self, oid)
         if model is None:
             model = packed
-        write_ply_rows(C.PLY_PATH, self.rows[idx], out / f"{oid}.ply")
+        write_ply_rows(self.source, self.rows[idx], out / f"{oid}.ply")
         write_gspl(packed, out / f"{oid}.scan.gspl")
         write_gspl(model, out / f"{oid}.gspl")
         object_refine.write_3dgs_ply(model, out / f"{oid}_model.ply")
@@ -312,6 +367,9 @@ def _write_library(saved: list[dict]) -> None:
                           "over 4x the object's median gap), which stay with the room"),
            "credits": "separation after Scan2Service viewer/asset_export.py (SinceAI-2026/scan2service)",
            "saved": saved}
+    if any(s.get('membership_mode') == 'exact-source-rows' for s in saved):
+        doc.update(source='source_scan.ply', membership='Exact imported original source rows. No floor removal, expansion, filling or refinement.')
+        doc['frame']['gspl_glb_bounds'] = 'Levelled frame; source units and physical scale unverified. Native PLY preserves original frame and attributes.'
     tmp = LIBRARY_JSON.with_name(LIBRARY_JSON.name + ".tmp")
     tmp.write_text(json.dumps(doc, indent=1))
     tmp.replace(LIBRARY_JSON)

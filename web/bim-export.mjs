@@ -36,6 +36,7 @@ export function roomBimWalls(walls, meta) {
 }
 
 export function exportRoomIfc(assets, walls, meta, timestamp = new Date()) {
+  const unverified = assets.some(asset => asset.source_region_id) || /unverified/i.test(meta.units || "");
   const rows = [];
   const add = (entity,...args) => {
     const ref = `#${rows.length+1}`;
@@ -52,7 +53,7 @@ export function exportRoomIfc(assets, walls, meta, timestamp = new Date()) {
   const model = add("IFCGEOMETRICREPRESENTATIONCONTEXT","$","'Model'",3,"0.00001",origin,"$");
   const body = add("IFCGEOMETRICREPRESENTATIONSUBCONTEXT","'Body'","'Model'","*","*","*","*",model,"$",".MODEL_VIEW.","$");
   const units = add("IFCUNITASSIGNMENT",tuple([add("IFCSIUNIT","*",".LENGTHUNIT.","$",".METRE.")]));
-  const project = add("IFCPROJECT",guid("project"),"$","'Field Atlas'","$","$","$","$",tuple([model]),units);
+  const project = add("IFCPROJECT",guid("project"),"$","'Field Atlas'",unverified ? quoted("Approximate envelopes only. Physical scale unverified; IFC metres are an assumed unit convention, not measured dimensions.") : "$","$","$","$",tuple([model]),units);
   const sitePlace=place("$"), buildingPlace=place(sitePlace), storeyPlace=place(buildingPlace), roomPlace=place(storeyPlace);
   const site=add("IFCSITE",guid("site"),"$","'Valmet'","$","$",sitePlace,"$","$",".ELEMENT.","$","$","$","$","$");
   const building=add("IFCBUILDING",guid("building"),"$","'Equipment room building'","$","$",buildingPlace,"$","$",".ELEMENT.","$","$","$");
@@ -115,6 +116,8 @@ export function exportRoomIfc(assets, walls, meta, timestamp = new Date()) {
       ["ObjectId",id],["AssetId",asset.asset_id],["AssetTag",tag],["Category",asset.class_label || asset.class],
       ["LabelSource",asset.label_source],["GeometrySource",method],
     ];
+    if (unverified) values.push(["ScaleStatus","Unverified; source unit assumed as one metre for IFC exchange"],
+      ["GeometryStatus","Approximate envelope; not a measured BIM object"], ["ReviewStatus",asset.review_status || "unreviewed"]);
     if (asset.mapped) values.push(["Condition",asset.condition_state],["Registry","Valmet Excel builder pack"]);
     const properties=values.filter(([,value])=>value).map(([name,value])=>
       add("IFCPROPERTYSINGLEVALUE",quoted(name),"$",`IFCLABEL(${quoted(value)})`,"$"));
@@ -124,7 +127,7 @@ export function exportRoomIfc(assets, walls, meta, timestamp = new Date()) {
   add("IFCRELCONTAINEDINSPATIALSTRUCTURE",guid("shell"),"$","$","$",tuple(shell),storey);
   if (products.length) add("IFCRELCONTAINEDINSPATIALSTRUCTURE",guid("equipment"),"$","$","$",tuple(products),room);
   return [
-    "ISO-10303-21;","HEADER;","FILE_DESCRIPTION(('Scan-derived equipment room'),'2;1');",
+    "ISO-10303-21;","HEADER;",unverified ? "FILE_DESCRIPTION(('Approximate equipment room; scale unverified'),'2;1');" : "FILE_DESCRIPTION(('Scan-derived equipment room'),'2;1');",
     `FILE_NAME('field-atlas-equipment-room.ifc','${timestamp.toISOString().slice(0,19)}',('Field Atlas'),('Valmet x Since AI'),'Field Atlas','Field Atlas','');`,
     "FILE_SCHEMA(('IFC4'));","ENDSEC;","DATA;",...rows,"ENDSEC;","END-ISO-10303-21;","",
   ].join("\n");

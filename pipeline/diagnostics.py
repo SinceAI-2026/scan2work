@@ -241,7 +241,7 @@ def ai_triage(asset: dict, observations: list, retrieved: list, all_cases: list,
     }
 
 
-def generate_diagnostic_report(asset: dict, global_docs: dict, retriever=None, all_cases=None) -> dict:
+def generate_diagnostic_report(asset: dict, global_docs: dict, retriever=None, all_cases=None, *, allow_ai=True) -> dict:
     """Create a complete grounded AI diagnostic dossier for an asset."""
     aid = asset["asset_id"]
     tag = asset["tag"]
@@ -264,7 +264,7 @@ def generate_diagnostic_report(asset: dict, global_docs: dict, retriever=None, a
     retrieved = []
     if retriever is not None:
         retrieved = retriever.search(evidence_query(asset, observations), scope=acls)
-    triage = ai_triage(asset, observations, retrieved, all_cases or []) if state != "healthy" else None
+    triage = ai_triage(asset, observations, retrieved, all_cases or []) if allow_ai and not C.OFFLINE and state != "healthy" else None
 
     # Build grounded hypotheses linking telemetry + historical service cases + knowledge doc
     hypotheses = []
@@ -394,7 +394,8 @@ def generate_diagnostic_report(asset: dict, global_docs: dict, retriever=None, a
         ])),
         "confidence_note": (
             f"Effective AI confidence {int(asset['effective_confidence']*100)}% "
-            f"(model {int(asset['model_confidence']*100)}%, 3D mapping {int(asset['mapping_confidence']*100)}%"
+            f"(model {int(asset['model_confidence']*100)}%, 3D mapping "
+            + (f"{int(asset['mapping_confidence']*100)}%" if asset.get('mapping_confidence') is not None else "procedural, unverified")
             + (f", minus {int(asset['dq_penalty']*100)}% data-quality penalty from {[d['issue_id'] for d in dq]}" if dq else "")
             + ")."
         ),

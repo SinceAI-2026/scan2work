@@ -153,3 +153,90 @@ Browser verification on the same date confirmed that selecting P-001 while trave
 Repeat the browser check after changes. Complete a route to equipment and confirm that the matching diagnosis, evidence, and inspection steps open. Then select another object during a route and confirm that arrival still resolves to the route destination. A floor destination or room tour must not show an unrelated equipment diagnosis.
 
 The challenge submission also requires a runnable demo, source and setup instructions, five to eight slides, and a demo video below five minutes. The [slide outline](slides-outline.md) and [recording sequence](demo-sequence.md) are preparation documents. They are not the final slide deck or recorded video.
+
+## Expanded Field Atlas import (offline)
+
+`pipeline/import_field_atlas.py` is a separate adapter, not another detection pipeline.
+It accepts an extracted shared asset package or the original Field Atlas repository:
+
+```sh
+VALMET_OFFLINE=1 .venv/bin/python -m pipeline.import_field_atlas \
+  --bundle-root /path/to/Field-Atlas-assets-2026-11-07 \
+  --workbook /path/to/Valmet_SinceAI_2026_Synthetic_Industrial_Metaverse_Builder_Pack.xlsx
+```
+
+The package's `model1/demo/data/scene-extraction/room.ply` is the default scan;
+`--source '/path/to/Equipment Room.ply'` supports the original checkout. `--output`
+selects a different data directory. Stop the server before reimporting. Generation
+happens in a temporary staging directory; validation failures do not overwrite the
+active artifacts, and the new `digital_twin.json` manifest is published last.
+Library saves, technician logs, edits and the upstream Decisions cache are preserved.
+
+Integrity checks validate the full source PLY SHA256, payload size, declared row
+count, raw ownership SHA256, object ordering, owner IDs, disjoint row indices and
+per-object counts. A rigid transform maps source `[x,y,z]` to `[x,1.185-y,-z]`.
+It changes neither scale nor object membership. The physical scale is unverified.
+
+The imported scene contains 1,933 unreviewed regions, with exactly 711,568 owned
+source Gaussians. All 415 baseline regions and their 103,378 rows remain. Regions
+are proposals/partial surfaces, not a claim that 1,933 physical objects were
+recognized correctly. 964,913 source rows remain unassigned. Recognition accuracy
+is not measured by these coverage counts, and upstream gold labels/scorecards
+must not be reused for these new region IDs.
+
+`boiler_room_points.bin` (GSPL v3, stride40) and `splat_instance.bin` (GSID v1)
+share exactly the same row ordering; GSID values are zero-based asset indices,
+with 65535 denoting unassigned context. `splat_source_rows.npy` maps every rendered
+row back to the original scan. The existing Wael renderer uses original anisotropic
+covariance and DC colour; it does not render higher-order SH. `source_scan.ply`
+retains every original attribute. `source_members.npz` preserves exact region rows.
+The library export rechecks source SHA256, all source positions and every region's
+membership before exporting native PLY, GSPL, a thumbnail and original row IDs.
+No box filling, floor deletion, geometric expansion, training, or synthetic mesh is
+performed on imported regions.
+
+Only 30 procedural equipment bindings receive the provided Excel telemetry,
+alarms and maintenance records. Other regions have unique `REGION-...` IDs,
+`mapped=false`, unknown condition, no health score and empty telemetry. Their
+copilot response states that service data is missing. Native video evidence is
+copied where present; automatic regions retain rendered proposal evidence, which
+is labelled separately. These photos are identification evidence, not calibrated
+photogrammetric reconstruction.
+
+The CV-003 demo preserves Wael's physical anchor: `linards-BOX-0173`, the orange
+actuator visible in its native walkthrough crop. Its imported upstream region
+boundary is still unreviewed. The prior Field Atlas CV-003 binding to
+`linards-BOX-0262` is retained in source provenance and explicitly overridden for
+this demonstration; BOX-0262 receives no invented replacement telemetry.
+
+Navigation uses 37,687 observed floor samples and 188,536 obstacle samples from
+the original scan. Region boxes are not treated as solid objects. Unknown floor
+is blocked; robot clearance and lengths are simulation assumptions in source
+units. All generated segments are collision-checked against this occupancy grid,
+which does not prove real-world safety or completeness of the scan. The supplied
+import produces 28 available routes, including the CV-003 target (4.619 source
+units), and two unavailable destinations (CV-011, P-006) with explicit reasons.
+The viewer calculates proximity across all assets live; saved routes carry a
+compact 16-item summary per waypoint with the full nearby count preserved.
+
+Both the importer and the default server disable external inference explicitly.
+`VALMET_OFFLINE=1` bypasses keychain/secret loading, model downloads and Decisions
+API calls, even if the shell already contains an API key. Copilot text is a
+deterministic explanation of synthetic Excel records, with TF-IDF document
+retrieval. Confidence values inherited from Excel are synthetic dataset values,
+not newly measured recognition accuracy. Legacy training/AI pipeline entry points
+remain separate; the offline import never invokes them.
+
+Verification:
+
+```sh
+VALMET_OFFLINE=1 .venv/bin/python -m unittest discover -s tests -p 'test_*.py' -v
+node tests/test_navigation_view.mjs
+```
+
+The new tests cover swapped owner IDs, reordered manifests, overlapping/foreign
+rows, wrong source hashes, coordinate transforms, offline credentials, safe
+unmapped diagnostics, failed-import isolation, all real ownership counts, exact
+native PLY export bytes and route traversal against the saved occupancy grid.
+The two legacy OBJ-206/refinement tests are skipped without their legacy scan
+layout; the imported target has a separate exact-export integration test.

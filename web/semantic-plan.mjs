@@ -183,7 +183,7 @@ export function bindSemanticPlan({snapshot, inspect, navigate, viewModel}) {
     svg.append(robot);
     const y=frame.y+frame.height+22;
     svg.append(svgNode("line",{x1:frame.x,y1:y,x2:frame.x+scale,y2:y,stroke:"#23383e","stroke-width":2}),
-      svgNode("text",{x:frame.x+scale+8,y:y+4,"font-size":13},"1 m"),
+      svgNode("text",{x:frame.x+scale+8,y:y+4,"font-size":13},current.navigation.scale_verified === false ? "1 scan unit (unverified)" : "1 m"),
       svgNode("text",{x:frame.x+frame.width,y:y+4,"text-anchor":"end","font-size":13},"+Z ↑"));
     lastRoute=null;
     update(current.robot,current.journey);

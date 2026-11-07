@@ -6,7 +6,7 @@ import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { loadGspl, createSplatObject } from "./splat-object.mjs";
 
 const LIB = "./data/library/";
-const TARGET_DEMO = "OBJ-206"; // CV-003, the faulty control valve of the Equipment Room scenario
+let TARGET_DEMO = "OBJ-206"; // CV-003, the faulty control valve of the Equipment Room scenario
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 const plural = (n, w) => `${n.toLocaleString()} ${w}${n === 1 ? "" : "s"}`;
 const words = s => String(s ?? "").replace(/_/g, " ");
@@ -33,6 +33,7 @@ async function load() {
 }
 
 async function main() {
+  try { const twin = await fetch("./data/digital_twin.json").then(r => r.json()); TARGET_DEMO = twin.target_object_id || TARGET_DEMO; } catch {}
   await load();
   render();
   document.getElementById("q").addEventListener("input", filter);
@@ -64,8 +65,7 @@ function render() {
     <div id="empty">
       <h3>Your library is empty</h3>
       <p>Objects get here from the room: select equipment, choose <b>Take apart</b> (or press <b>T</b>), then
-      <b>Save to library</b>. The server cuts that object out of the Equipment Room scan and refines it against the
-      walkthrough photos.</p>
+      <b>Save to library</b>. The server exports its source Gaussians. Imported regions retain exact membership; missing geometry is not generated.</p>
       <a class="btn primary" href="./index.html#apart=${TARGET_DEMO}">Take apart the faulty valve CV-003</a>
     </div>`;
   filter();
@@ -84,13 +84,15 @@ function filter() {
 
 function status(e) {
   if (e.movable) return "movable object · no telemetry";
+  if (e.membership_mode === "exact-source-rows" || e.condition_state === "unknown") return "unreviewed region · scale unverified";
   if (!e.tag) return "facility item · no device record";
   return `health ${e.health_score ?? "–"} · ${words(e.condition_state)}${e.issue_code && e.issue_code !== "NORMAL" ? ` · ${words(e.issue_code)}` : ""}`;
 }
 
 function card(e) {
+  const photo = typeof e.photo === "string" ? e.photo : e.photo?.url;
   return `<div class="card" data-id="${esc(e.id)}" data-text="${esc(cardText(e))}">
-    <img src="${LIB}${e.files.thumb}" alt="" loading="lazy" ${e.photo ? `data-photo="./${esc(e.photo)}"` : ""}>
+    <img src="${LIB}${e.files.thumb}" alt="" loading="lazy" ${photo ? `data-photo="./${esc(photo)}"` : ""}>
     <div class="body">
       <div class="name"><span class="dot ${stateOf(e)}"></span>${esc(e.tag || e.label || className(e))}${e.tag ? ' <span class="badge">SYNTHETIC</span>' : ""}</div>
       <div class="sub">${esc(e.label || className(e))}</div>
@@ -119,7 +121,7 @@ function focus(id) {
       ${e.tag ? `<dt>Tag</dt><dd>${esc(e.tag)} · ${esc(e.asset_id)}</dd>` : ""}
       <dt>Status</dt><dd>${esc(status(e))}</dd>
       <dt>Gaussians</dt><dd>${e.splats.toLocaleString()}</dd>
-      <dt>Size</dt><dd>${size} m</dd>
+      <dt>Size</dt><dd>${size} ${e.membership_mode === "exact-source-rows" || e.source_region_id ? "scan units (unverified)" : "m"}</dd>
       <dt>Position</dt><dd>${e.centroid.map(v => v.toFixed(2)).join(", ")}</dd>
       ${e.mesh_faces ? `<dt>Mesh</dt><dd>${e.mesh_faces.toLocaleString()} faces</dd>` : ""}
       ${e.model?.splats ? `<dt>Refined</dt><dd>${plural(e.model.splats, "Gaussian")} fitted to ${plural(e.model.frames.length, "frame")} (${e.model.frames.map(f => `${f.video_t_s} s`).join(", ")})</dd>` : ""}
@@ -129,7 +131,8 @@ function focus(id) {
     <div class="row">
       ${e.model?.splats ? `<button class="btn ${showScan ? "on" : ""}" data-scan>Scan only</button>` : ""}
       <a class="btn" href="${LIB}${e.files.ply}" download>Scan .ply</a>
-      <a class="btn" href="${LIB}${e.files.model_ply}" download>Model .ply</a>
+      ${e.files.source_rows ? `<a class="btn" href="${LIB}${e.files.source_rows}" download>Source row IDs</a>` : ""}
+      ${e.files.model_ply ? `<a class="btn" href="${LIB}${e.files.model_ply}" download>Model .ply</a>` : ""}
       ${e.files.glb ? `<a class="btn" href="${LIB}${e.files.glb}" download>.glb</a>` : ""}
       <a class="btn" href="./index.html#apart=${encodeURIComponent(e.id)}">In the room</a>
       <button class="btn danger" data-remove="${esc(e.id)}">Remove</button>
@@ -223,7 +226,7 @@ const model = (() => {
         camera.position.set(d * 0.7, d * 0.45, d * 0.7);
         controls.target.set(0, 0, 0);
         controls.update();
-        statusEl.textContent = `${e.id} · ${showScan ? "scan" : "refined model"} · ${plural(data.count, "Gaussian")} · drag to orbit`;
+        statusEl.textContent = `${e.id} · ${showScan || e.membership_mode === "exact-source-rows" ? "source region" : "refined model"} · ${plural(data.count, "Gaussian")} · drag to orbit`;
       } catch (err) {
         if (my === token) statusEl.textContent = `Could not load ${e.id}: ${err.message}`;
       }

@@ -3,6 +3,7 @@
 // centre (splats in the shader, frames and tags in JS). Wired into app.js by scripts/patch_explode_view.py.
 import * as THREE from "three";
 import { assetPresentation } from "./asset-presentation.mjs";
+import { decodeInstanceIds } from "./imported-assets.mjs";
 
 export const explodeState = { amount: 0, segment: false };
 const offsets = new Map();
@@ -36,26 +37,17 @@ function floatTex(data, w, h, format) {
   return t;
 }
 
-// Returns shader uniforms. Missing file -> harmless dummy textures (feature simply does nothing).
+// Fail closed: a different scan's ownership must never select or edit an object.
 export async function loadInstanceUniforms(url, count, texW, texH, assets) {
   computeOffsets(assets);
   const instData = new Float32Array(texW * texH);
   let complete = false;
   const tableW = 256, tableH = Math.ceil((assets.length + 1) / tableW);
   const table = new Float32Array(tableW * tableH * 4);
-  try {
-    const res = await fetch(url);
-    if (res.ok) {
-      const buf = await res.arrayBuffer();
-      const n = new DataView(buf).getUint32(8, true);
-      const ids = new Uint16Array(buf, 12, Math.min(n, count));
-      complete = n === count;
-      for (let i = 0; i < ids.length; i++) {
-        if (ids[i] < assets.length) instData[i] = ids[i] + 1;
-        else if (ids[i] !== 65535) complete = false;
-      }
-    }
-  } catch (e) { console.warn("explode view: no splat_instance.bin", e); }
+  const res = await fetch(url);
+  if (!res.ok) throw new Error("Object membership is unavailable. Re-import the scene before selecting objects.");
+  instData.set(decodeInstanceIds(await res.arrayBuffer(), count, assets.length));
+  complete = true;
   assets.forEach((a, i) => {
     const o = offsets.get(a.id), c = objectColor(a.id), k = (i + 1) * 4;
     table[k] = o.x; table[k + 1] = o.y; table[k + 2] = o.z;
@@ -122,7 +114,8 @@ export function applyExplode(boxMeshes, splatMaterial) {
     if (!active) continue;
     const passiveColor = assetPresentation(a).frameColor;
     const c = passiveColor !== null ? new THREE.Color(passiveColor) : a.is_target ? new THREE.Color(0xd94838) : objectColor(a.id);
-    entry.group.visible = true;
+    // Keep the current selected/nearby/off policy; dense segmentation already colours the splats.
+    if (!entry.group.visible) continue;
     entry.lineMat.color.copy(c);
     entry.fillMat.color.copy(c);
     entry.lineMat.opacity = 0.9;

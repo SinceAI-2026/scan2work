@@ -16,7 +16,15 @@ function selectedTag() {
   return /^[A-Z]{1,4}-\d{2,4}$/.test(tag) ? tag : "none";
 }
 
-function mount() {
+async function mount() {
+  // Offline imports must not load an external widget or start an external model session.
+  let runtime;
+  try { runtime = (await fetch("./data/digital_twin.json").then(res => res.json())).runtime; }
+  catch { return; }
+  if (runtime?.offline || runtime?.external_models_enabled === false) {
+    mountFieldJobs(selectedTag);
+    return;
+  }
   const widget = document.createElement("elevenlabs-convai");
   widget.setAttribute("agent-id", AGENT_ID);
   widget.setAttribute("action-text", "Call Ilkka for support");

@@ -83,6 +83,7 @@ export function createTakeApart(ctx) {
 
   function describe(entry) {
     const m = entry.model;
+    if (entry.membership_mode === "exact-source-rows" || api.active?.asset.source_region_id) return `<p class="apart-facts">Exact region export: ${plural(entry.splats, "source Gaussian")}. Original membership retained; no new geometry or photo refinement. Scale and boundaries remain unverified.</p>`;
     if (!m?.splats) return `<p class="apart-facts">In your library: the scan's ${plural(entry.splats, "Gaussian")} (no walkthrough frame saw it clearly enough to refine).</p>`;
     return `<p class="apart-facts">${api.showScan ? "Showing the scan as it is." : "Refined from photos:"} ` +
       `${m.scan_splats.toLocaleString()} scan and ${m.faint_added.toLocaleString()} faint splats fitted to ` +
@@ -96,12 +97,13 @@ export function createTakeApart(ctx) {
     const busy = api.busy === asset.id;
     const files = entry?.files || {};
     const tag = asset.tag ? `${esc(asset.tag)} · ${esc(asset.asset_id)} · ${esc(asset.condition_state)}` : "Not in the Excel pack";
-    const facts = entry ? describe(entry)
+    const exact = Boolean(asset.source_region_id);
+    const facts = exact && !entry ? `<p class="apart-facts">${plural(asset.n_gaussians || 0, "source Gaussian")} · ${esc(asset.review_status || "unreviewed")}. Save exports this exact region for your team. It does not rebuild missing geometry.</p>` : entry ? describe(entry)
       : busy ? `<p class="apart-facts">Cutting ${esc(asset.id)} out of the scan and fitting it to the walkthrough photos. This takes 1 to 3 minutes.</p>`
       : `<p class="apart-facts">Showing the scan. Save to library cuts this object out and refines it against the walkthrough photos (1 to 3 minutes).</p>`;
     card.innerHTML = `
       <div class="apart-head">
-        <span class="apart-kicker">Taken apart</span>
+        <span class="apart-kicker">Isolated region</span>
         <button class="apart-x" data-act="close" aria-label="Back to the room">×</button>
       </div>
       <h3>${esc(asset.label || asset.class_label || asset.id)}</h3>
@@ -113,6 +115,7 @@ export function createTakeApart(ctx) {
         ${entry ? `<span class="apart-save saved">Saved to library ✓</span>`
           : `<button class="apart-save" data-act="save" ${busy ? "disabled" : ""}>${busy ? "Saving…" : "Save to library"}</button>`}
         ${files.ply ? `<a class="apart-btn" href="${LIBRARY}${files.ply}" download>Scan .ply</a>` : ""}
+        ${files.source_rows ? `<a class="apart-btn" href="${LIBRARY}${files.source_rows}" download>Source row IDs</a>` : ""}
         ${files.model_ply ? `<a class="apart-btn" href="${LIBRARY}${files.model_ply}" download>Model .ply</a>` : ""}
         ${files.glb ? `<a class="apart-btn" href="${LIBRARY}${files.glb}" download>.glb</a>` : ""}
         ${entry ? `<a class="apart-btn" href="./library.html#${encodeURIComponent(asset.id)}">Open in library</a>` : ""}
@@ -195,7 +198,7 @@ export function createTakeApart(ctx) {
       };
       ctx.setPreset("apart");
       Object.assign(c, { enabled: true, minDistance: 0.05, maxDistance: 8, minPolarAngle: 0.05,
-        maxPolarAngle: Math.PI * 0.95, autoRotate: true, autoRotateSpeed: 1.6 });
+        maxPolarAngle: Math.PI * 0.95, autoRotate: false, autoRotateSpeed: 1.6 });
       document.body.classList.add("apart-mode");
     }
     const changed = api.active?.asset !== asset;

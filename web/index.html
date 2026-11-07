@@ -24,14 +24,15 @@
   </header>
   <main class="workspace">
     <aside class="sidebar left-sidebar">
-      <div class="sidebar-header"><h1>Explore the room</h1><p id="sidebar-stats-text" class="sidebar-stats">Loading room…</p></div>
+      <div class="sidebar-header"><h1>Explore the room</h1><p id="sidebar-stats-text" class="sidebar-stats">Loading room…</p><p id="dataset-note" class="dataset-note" role="status"></p></div>
       <div class="mission-box">
         <button class="btn-walk primary" id="btn-room-tour" disabled>Tour the room</button>
         <button class="btn-walk" id="btn-go-target" disabled>Inspect faulty device</button>
-        <p class="navigation-help">Click a walkable point on the map to go there.</p>
+        <p class="navigation-help">Free view: drag to orbit, right-drag to pan, scroll to zoom. Click the map to walk.</p>
       </div>
       <div class="filter-group"><label for="asset-search" class="field-label">Find equipment</label><input id="asset-search" class="clean-input" placeholder="Search tag or equipment…" type="search" /></div>
-      <select id="select-visual-review" class="clean-select" aria-label="Equipment filter"><option value="mapped">Registered equipment</option><option value="alerts">Needs attention</option><option value="all">All detected objects</option></select>
+      <select id="select-visual-review" class="clean-select" aria-label="Equipment filter"><option value="all">All extracted regions</option><option value="mapped">Excel-linked equipment</option><option value="alerts">Needs attention</option><option value="baseline">Linards baseline regions</option><option value="new">New candidate regions</option><option value="floor">Floor patches</option></select>
+      <p id="asset-result-count" class="asset-result-count" aria-live="polite"></p>
       <div class="proposal-list" id="asset-list"></div>
       <details class="room-changes" id="room-changes"><summary>Room changes <span id="room-change-count"></span></summary>
         <p id="room-edit-status" role="status" hidden></p><div id="room-edit-list"></div>
@@ -44,7 +45,7 @@
           <div class="vp-row">
             <button class="vp-btn active" data-cam="walk">Follow robot</button>
             <button class="vp-btn" data-cam="first">First person</button>
-            <button class="vp-btn" data-cam="overview">Free view</button>
+            <button class="vp-btn" data-cam="overview" title="Drag to orbit · right-drag to pan · scroll to zoom · WASD to walk">Free view</button>
             <button class="vp-btn" data-cam="inside">Target view</button>
             <button class="vp-btn" id="btn-bim-back" data-cam="overview" hidden>Scan view</button>
             <button class="vp-btn" data-cam="bim">BIM 3D</button>
@@ -54,8 +55,8 @@
             <button class="vp-btn manual-walk-chip" id="btn-manual-walk" hidden>Manual walk · M = resume mission</button>
             <details class="display-options"><summary class="vp-btn">Display</summary><div class="display-options-body">
               <label for="select-splat-mode">Render quality</label><select id="select-splat-mode" class="vp-select"><option value="high">High detail</option><option value="balanced">Balanced</option></select>
-              <span>Equipment frames</span><div class="vp-row"><button class="vp-btn active" id="btn-boxes-mode" data-bmode="proximity">Nearby</button><button class="vp-btn" id="btn-all-boxes" data-bmode="all">All</button><button class="vp-btn" id="btn-no-boxes" data-bmode="off">Off</button></div>
-              <label class="room-fill-toggle"><input type="checkbox" id="room-fill-debug"> Tint synthetic fill</label>
+              <span>Equipment frames</span><div class="vp-row"><button class="vp-btn" data-bmode="selected">Selected</button><button class="vp-btn active" id="btn-boxes-mode" data-bmode="proximity">Nearby</button><button class="vp-btn" id="btn-all-boxes" data-bmode="all">All</button><button class="vp-btn" id="btn-no-boxes" data-bmode="off">Off</button></div>
+              <label id="btn-room-fill-label" class="room-fill-toggle"><input type="checkbox" id="room-fill-debug"> Tint synthetic fill</label>
             </div></details>
           </div>
         </div>
@@ -123,7 +124,7 @@
         </figure>
         <p id="detail-match-note" hidden></p>
         <div class="action-bar-inline">
-          <button class="btn-outline-full" id="btn-navigate-selected">Navigate here</button><button class="btn-outline-full" id="btn-take-apart" title="Show this object alone (T)">Take apart</button><button class="btn-outline-full" id="btn-draft-wo">Draft work order</button>
+          <button class="btn-outline-full" id="btn-navigate-selected">Navigate here</button><button class="btn-outline-full" id="btn-take-apart" title="Hide the room and show this region alone (T)">Isolate region</button><button class="btn-outline-full" id="btn-draft-wo">Draft work order</button>
         </div>
 
         <p id="movable-notice" class="movable-notice" hidden>Movable object (not instrumented)</p>

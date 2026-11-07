@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { isImportedScene, firstNavigationPoint, regionSummary, escapeHtml as esc } from "./imported-assets.mjs";
 import { inspectionCameraPose } from "./inspection-camera.mjs";
 import { assetPresentation } from "./asset-presentation.mjs";
 import { renderAssetPhoto } from "./asset-photo.mjs";
@@ -34,7 +35,10 @@ const state = {
   splatMode: "ewa",        // "ewa" | "semantic"
   cameraPreset: "walk",
   boxesMode: "proximity",  // "proximity" | "all" | "off"
-  visualReviewFilter: "mapped",
+  visualReviewFilter: "all",
+  listLimit: 100,
+  imported: false,
+  navigationAvailable: true,
   classFilter: "all",
   searchQuery: "",
 };
@@ -57,7 +61,7 @@ let previousRouteLine;
 const boxMeshes = new Map();
 const hudElements = new Map();
 const imageCache = new Map();
-const attract = {enabled:new URLSearchParams(location.search).get("attract") !== "0",active:false,lastActivity:0};
+const attract = {enabled:new URLSearchParams(location.search).get("attract") === "1",active:false,lastActivity:0};
 const walkKeys = new Set();
 const movementKeys = ["w", "a", "s", "d", "arrowup", "arrowdown", "arrowleft", "arrowright"];
 let equipmentObstacles;
@@ -77,9 +81,24 @@ async function init() {
     fetch("./data/walk_poses.json").then(res => res.ok ? res.json() : null).catch(() => null),
   ]);
   state.twin = twin;
+  state.imported = isImportedScene(twin);
+  if (state.imported) {
+    state.boxesMode = "selected";
+    document.querySelectorAll("[data-bmode]").forEach(b => b.classList.toggle("active", b.dataset.bmode === "selected"));
+    document.getElementById("dataset-note").textContent = "Expanded extraction · regions need review · scale unverified";
+    document.getElementById("btn-room-fill-label").hidden = true;
+    document.querySelector("[data-cam=bim]").textContent = "Geometry preview";
+    document.getElementById("semantic-plan-model").textContent = "Geometry preview";
+    document.getElementById("semantic-plan-export").textContent = "Approximate IFC";
+    document.querySelector(".bim-panel > strong").textContent = "Approximate geometry · scale unverified";
+    document.querySelector("#bim-plane").parentNode.lastChild.textContent = " 1.1-unit section plane";
+    document.querySelectorAll(".technical-details .field-label").forEach(el => { el.textContent = el.textContent.replace("scan units (m)", "scan units (unverified)"); });
+    document.querySelector("#arrival-evidence .field-label").textContent = "Synthetic workbook telemetry";
+    document.querySelectorAll(".room-move-fields label").forEach(el => { el.firstChild.textContent = el.firstChild.textContent.replace("(m)", "(scan units)"); });
+  }
   state.roomAssets = twin.assets;
   originalNavigation = twin.navigation;
-  walkPoses = Array.isArray(poses) ? poses : [];
+  walkPoses = !state.imported && Array.isArray(poses) ? poses : [];
   if (walkPoses.length) twin.navigation = withWalkthroughPassages(twin.navigation, twin.assets, walkPoses);
   initialNavigation = twin.navigation;
   equipmentObstacles = manualObstacles(state.twin.assets, state.twin.navigation.grid_meta.robot_radius_m);
@@ -90,7 +109,9 @@ async function init() {
   }
   state.twin.assets.forEach((asset, i) => instancesById.set(asset.id, i + 1));
 
-  const first = state.twin.navigation.primary_route.waypoints[0];
+  const availableStart = firstNavigationPoint(state.twin.navigation);
+  state.navigationAvailable = Boolean(availableStart);
+  const first = availableStart || {position:[0,0,0],t:0,distance_m:0,yaw:0,clearance_m:0};
   state.journey = createJourney({asset_id:null,tag:"Explore the room",kind:"idle",duration_s:0,total_distance_m:0,waypoints:[first],validated:true});
   const targetAsset = state.assetsById.get(state.twin.target_asset_id) || state.twin.assets[0];
   state.selectedAsset = targetAsset;
@@ -147,6 +168,7 @@ function updateSidebarStats() {
   const mapped = assets.filter((a) => a.mapped).length;
   const alerts = assets.filter((a) => a.mapped && assetPresentation(a).needsAttention).length;
   document.getElementById("sidebar-stats-text").textContent =
+    state.imported ? `${assets.length.toLocaleString()} regions · ${mapped} Excel records · ${alerts} alerts` :
     `${mapped} registered assets · ${alerts} need attention`;
 }
 
@@ -245,10 +267,14 @@ function updateSplatViewportUniforms() {
 
 async function loadEwaGaussianSplats(url) {
   const res = await fetch(url);
+  if (!res.ok) throw new Error("Scene data is unavailable. Run the offline asset importer.");
   const buf = await res.arrayBuffer();
+  if (buf.byteLength < 16) throw new Error("Scan file is truncated.");
   const header = new DataView(buf, 0, 16);
+  if (String.fromCharCode(...new Uint8Array(buf,0,4)) !== "GSPL") throw new Error("Unsupported scan file format.");
   const count = header.getUint32(8, true);
   const stride = header.getUint32(12, true) || 40;
+  if (!count || ![16,40].includes(stride) || buf.byteLength !== 16 + count*stride) throw new Error("Scan file size does not match its header.");
 
   const TEX_W = 2048;
   const TEX_H = Math.ceil(count / TEX_W);
@@ -775,7 +801,7 @@ function rebuildReachableOverlay() {
   const floor=reachableFloor(navigation,cell ? position : {x,z});
   mapBackground=createGameMap(navigation,floor,state.roomAssets);
   const legend = document.getElementById("map-coverage");
-  legend.textContent = navigation.walkthrough_passages ? "Teal · Walkthrough passages" : "Outlined objects block movement";
+  legend.textContent = state.imported ? "Grid simulation · physical scale unverified" : navigation.walkthrough_passages ? "Teal · Walkthrough passages" : "Outlined objects block movement";
   legend.classList.toggle("walkthrough-legend", !!navigation.walkthrough_passages);
 }
 
@@ -836,10 +862,10 @@ function drawRouteMap(nav) {
   ctx.fillStyle="#79e2ef";ctx.strokeStyle="#10242e";ctx.lineWidth=3;
   ctx.beginPath();ctx.moveTo(0,-16);ctx.lineTo(-11,11);ctx.lineTo(0,7);ctx.lineTo(11,11);ctx.closePath();ctx.fill();ctx.stroke();ctx.restore();
   ctx.restore();
-  // A true one-metre scale, independent of map panel size.
+  // One source unit; the imported scan has no verified physical scale.
   const length=frame.width/(m.nx*m.res),x=frame.x+frame.width-length,y=canvas.height-12;
   ctx.strokeStyle="#b0c8ce";ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(x,y-5);ctx.lineTo(x,y);ctx.lineTo(x+length,y);ctx.lineTo(x+length,y-5);ctx.stroke();
-  ctx.font="15px sans-serif";ctx.fillStyle="#b0c8ce";ctx.textAlign="center";ctx.fillText("1 m",x+length/2,y-9);
+  ctx.font="15px sans-serif";ctx.fillStyle="#b0c8ce";ctx.textAlign="center";ctx.fillText(state.imported || state.twin.navigation.scale_verified === false ? "1 unit" : "1 m",x+length/2,y-9);
 }
 
 function rebuildRouteGeometry() {
@@ -900,7 +926,7 @@ function stepSimulation(dt, elapsedSec) {
   robotGroup.rotation.y = yaw;
   if (lidarRing) lidarRing.rotation.y = elapsedSec * 5.0;
 
-  robotGroup.visible = state.cameraPreset !== "first";
+  robotGroup.visible = state.navigationAvailable && state.cameraPreset !== "first";
   if (state.cameraPreset === "first" || (state.cameraPreset === "walk" && state.manualWalk)) {
     updateWalkCamera(nav);
   } else if (state.cameraPreset === "walk") {
@@ -934,11 +960,13 @@ function stepSimulation(dt, elapsedSec) {
     let vis = false;
     if (state.boxesMode === "off") {
       vis = false;
+    } else if (state.boxesMode === "selected") {
+      vis = isSel;
     } else if (state.boxesMode === "all") {
       vis = true;
     } else {
       // "proximity" mode: show selected, target, and up to nearby canonical Valmet assets
-      vis = isSel || a.is_target || isNear;
+      vis = isSel || a.is_target || (isNear && (!state.imported || a.mapped));
     }
 
     entry.group.visible = vis;
@@ -1035,8 +1063,9 @@ function updateHudLabels() {
       continue;
     }
 
-    el.textContent = `${a.tag} · ${dist.toFixed(1)} m · ${a.condition_state.replaceAll("_", " ")}`;
-    el.title = `${a.label} · ${a.mapped ? "Excel registry" : `Excel profile from ${a.excel_profile_tag || "registry"}`} · ${a.health_score == null ? "Movable object" : `Health ${a.health_score}%`}`;
+    el.textContent = `${a.tag || a.label} · ${dist.toFixed(1)} ${state.imported ? "units" : "m"} · ${a.source_region_id ? a.review_status : a.condition_state.replaceAll("_", " ")}`;
+    if (state.imported) el.title = `${a.label} · ${regionSummary(a)}${a.mapped ? " · Synthetic Excel mapping" : " · No assigned device data"}`;
+    else el.title = `${a.label} · ${a.mapped ? "Excel registry" : `Excel profile from ${a.excel_profile_tag || "registry"}`} · ${a.health_score == null ? "Movable object" : `Health ${a.health_score}%`}`;
     if (assetPresentation(a).notice) el.title = `${a.label} · ${assetPresentation(a).notice}`;
     const prio = isSel ? 0 : a.is_target ? 1 : assetPresentation(a).needsAttention ? 2 : a.mapped ? 3 : 4;
     candidates.push({ el, x, y, dist, prio, isSel });
@@ -1084,7 +1113,7 @@ function renderProximityStream(mappedNearby) {
   const key = mappedNearby.map(n => `${n.id}:${n.distance_m.toFixed(1)}`).join("|");
   if (key === proximityKey) return;
   proximityKey = key;
-  listEl.innerHTML = mappedNearby
+  listEl.innerHTML = mappedNearby.slice(0, 30)
     .map((n) => {
       const a = state.assetsByObj.get(n.id);
       const cls = n.is_target ? "target" : n.condition_state;
@@ -1093,7 +1122,7 @@ function renderProximityStream(mappedNearby) {
       return `
         <div class="prox-row ${cls}" data-obj="${n.id}">
           <span>${n.tag} · ${a ? a.label : ""}</span>
-          <span>${n.distance_m.toFixed(1)}m · ${status}</span>
+          <span>${n.distance_m.toFixed(1)} ${state.imported ? "units" : "m"} · ${status}</span>
         </div>
       `;
     })
@@ -1110,47 +1139,33 @@ function renderProximityStream(mappedNearby) {
 function renderProposalList() {
   const listEl = document.getElementById("asset-list");
   const q = state.searchQuery.trim().toLowerCase();
-
-  const filtered = state.roomAssets.filter((a) => {
+  const filtered = state.roomAssets.filter(a => {
     if (state.visualReviewFilter === "alerts" && !(a.mapped && assetPresentation(a).needsAttention)) return false;
     if (state.visualReviewFilter === "mapped" && !a.mapped) return false;
+    const baseline = String(a.source_region_id || a.id).startsWith("linards-");
+    const floor = a.structure_role === "floor" || a.id.startsWith("floor-");
+    if (state.visualReviewFilter === "new" && (baseline || floor)) return false;
+    if (state.visualReviewFilter === "baseline" && !baseline) return false;
+    if (state.visualReviewFilter === "floor" && !floor) return false;
     if (state.classFilter !== "all" && a.class !== state.classFilter) return false;
-    if (!q) return true;
-    return (
-      a.tag.toLowerCase().includes(q) ||
-      a.asset_id.toLowerCase().includes(q) ||
-      a.id.toLowerCase().includes(q) ||
-      a.label.toLowerCase().includes(q)
-    );
+    return !q || [a.tag,a.asset_id,a.id,a.label,a.class_label].some(v => String(v || "").toLowerCase().includes(q));
   });
-
-  listEl.innerHTML = filtered
-    .map((a) => {
-      const sel = state.selectedAsset && state.selectedAsset.id === a.id ? "selected" : "";
-      const stateCls =
-        a.condition_state === "degraded" || a.condition_state === "attention_required"
-          ? "prop-badge-degraded"
-          : a.condition_state === "watch"
-          ? "prop-badge-watch"
-          : "";
-      return `
-        <div class="proposal-card ${sel}" data-obj="${a.id}">
-          <div class="prop-class">${a.label}</div>
-          <div class="prop-meta">
-            <span>${a.tag} · ${a.asset_id}</span>
-            <span class="${stateCls}">${assetPresentation(a).notice || (a.health_score == null ? "No health reading" : `Health ${a.health_score}%`)} · ${a.condition_state}</span>
-          </div>
-        </div>
-      `;
-    })
-    .join("");
-
-  for (const card of listEl.querySelectorAll(".proposal-card")) {
-    card.addEventListener("click", () => {
-      const a = state.assetsByObj.get(card.dataset.obj);
-      if (a) selectAsset(a, true);
-    });
-  }
+  const shown = filtered.slice(0, state.listLimit);
+  document.getElementById("asset-result-count").textContent = `${shown.length.toLocaleString()} of ${filtered.length.toLocaleString()} ${state.imported ? "regions" : "objects"}`;
+  listEl.innerHTML = shown.map(a => {
+    const selected = state.selectedAsset?.id === a.id;
+    const status = a.source_region_id ? regionSummary(a) : assetPresentation(a).notice || a.condition_state;
+    return `<button class="proposal-card ${selected ? "selected" : ""}" data-obj="${esc(a.id)}" aria-pressed="${selected}">
+      <span class="prop-class">${esc(a.label || a.id)}</span>
+      <span class="prop-meta"><span>${esc(a.tag ? a.tag + " · " + a.id : a.id)}</span>
+      <span>${esc(status)}</span>${a.mapped ? '<span class="prop-mapping">Synthetic Excel mapping</span>' : ""}</span></button>`;
+  }).join("") || '<p class="list-empty">No matching regions. Try a name or source ID.</p>';
+  if (filtered.length > shown.length) listEl.insertAdjacentHTML("beforeend", '<button id="show-more-regions" class="btn-outline-full">Show next 100 regions</button>');
+  listEl.querySelector("#show-more-regions")?.addEventListener("click", () => { state.listLimit += 100; renderProposalList(); });
+  for (const card of listEl.querySelectorAll(".proposal-card")) card.addEventListener("click", () => {
+    const a = state.assetsByObj.get(card.dataset.obj);
+    if (a) { selectAsset(a, true); if (!takeApart?.isOpen) viewRoomLocation(a); }
+  });
 }
 
 function drawDetectionCrop(asset) {
@@ -1247,7 +1262,7 @@ function selectAsset(asset, openInspector = false) {
   renderProposalList();
 
   const navigateButton = document.getElementById("btn-navigate-selected");
-  navigateButton.disabled = false;
+  navigateButton.disabled = !state.navigationAvailable;
   navigateButton.textContent = "Navigate here";
   if (openInspector) setInspectorOpen(true);
 
@@ -1259,14 +1274,16 @@ function selectAsset(asset, openInspector = false) {
   hp.textContent = uninstrumented ? presentation.notice : `${asset.health_score == null ? "Movable object" : `Health ${asset.health_score}%`}`;
 
   document.getElementById("detail-title").textContent = `${asset.label} · ${asset.tag}`;
-  document.getElementById("service-guidance-title").textContent = `Service guidance for ${asset.tag}`;
+  document.getElementById("service-guidance-title").textContent = `${state.twin.runtime?.offline ? "Workbook guidance" : "Service guidance"} for ${asset.tag}`;
   document.getElementById("detail-subtitle").textContent =
     presentation.category;
 
-  const effPct = Math.round((asset.effective_confidence || 0.8) * 100);
+  const effPct = Number.isFinite(asset.effective_confidence) ? Math.round(asset.effective_confidence * 100) : null;
   const dqTxt = asset.dq_penalty ? ` (includes -${Math.round(asset.dq_penalty * 100)}% data quality penalty)` : "";
   document.getElementById("detail-match-note").textContent =
-    `Original box: ${asset.label}. Best visual match: ${asset.label}. Effective AI confidence: ${effPct}%${dqTxt}.`;
+    asset.source_region_id ? `${regionSummary(asset)}. Labels and boundaries are unverified.${asset.mapped ? " Device readings are synthetic Excel data mapped procedurally." : ""}` :
+    `Original box: ${asset.label}. Effective AI confidence: ${effPct === null ? "not measured" : effPct + "%"}${dqTxt}.`;
+  document.getElementById("detail-match-note").hidden = false;
 
   // 2D camera detection photo + red box
   drawDetectionCrop(asset);
@@ -1367,7 +1384,8 @@ function renderTelemetryChart(asset) {
   if (!s1 || s1.length < 2) {
     ctx.fillStyle = "#5a605d";
     ctx.font = "11px sans-serif";
-    ctx.fillText(`Nominal: Pressure ${asset.telemetry?.latest?.process_pressure_bar ?? 4.8} bar · Signal 99.2%`, 10, H / 2);
+    const pressure = asset.telemetry?.latest?.process_pressure_bar;
+    ctx.fillText(Number.isFinite(pressure) ? `Workbook pressure: ${pressure} bar` : "No telemetry series available.", 10, H / 2);
     return;
   }
 
@@ -1436,9 +1454,9 @@ function renderJourneyControls(nav) {
   document.getElementById("btn-manual-walk").hidden = !manual;
   document.getElementById("btn-drop-obstacle").disabled = manual || !!state.demoObstacle || !["moving","paused"].includes(journey.phase) || journey.route.total_distance_m-nav.distance < 2;
   const remaining=Math.max(0,journey.route.total_distance_m-nav.distance);
-  document.getElementById("nav-hud-metrics").textContent=manual ? "WASD to walk · ← → to turn · F to inspect nearby" : idle ? "Choose a map point, equipment, or room tour." : `${remaining.toFixed(1)} m remaining · ${view.remainingSeconds} s`;
-  document.getElementById("sim-dist-label").textContent=idle?"":`${nav.distance.toFixed(1)} / ${journey.route.total_distance_m.toFixed(1)} m`;
-  document.getElementById("navigation-message").textContent=view.error;
+  document.getElementById("nav-hud-metrics").textContent=manual ? "WASD to walk · ← → to turn · F to inspect nearby" : idle ? "Choose a map point, equipment, or room tour." : `${remaining.toFixed(1)} ${state.imported ? "scan units" : "m"} remaining · ${view.remainingSeconds} s`;
+  document.getElementById("sim-dist-label").textContent=idle?"":`${nav.distance.toFixed(1)} / ${journey.route.total_distance_m.toFixed(1)} ${state.imported ? "units" : "m"}`;
+  document.getElementById("navigation-message").textContent=view.error || (!state.navigationAvailable ? "No supported floor route is available. Inspect with Free view." : "");
   document.getElementById("map-feedback").textContent=view.error;
 }
 
@@ -1517,6 +1535,7 @@ function cellAtPosition({x,z}, navigation=state.twin.navigation) {
 }
 
 function prepareRoomEdits(edits, placements=roomPlacements) {
+  if (state.imported) return prepareImportedRoomEdits(edits, placements);
   const ids = new Set(edits.map(edit=>edit.id));
   const affected = new Set([...ids,...placements.keys()].sort());
   const reviews = new Map(), parts = new Map();
@@ -1568,6 +1587,29 @@ function prepareRoomEdits(edits, placements=roomPlacements) {
   }
   if (navigation && state.demoObstacle) navigation = blockBox(navigation,state.demoObstacle);
   return {ids,parts,instances,assets,navigation,fills,placed,owners};
+}
+
+// Imported regions retain exact source membership. No box filling, fragment recovery, or invented walls.
+function prepareImportedRoomEdits(edits, placements) {
+  const ids = new Set(edits.map(edit => edit.id));
+  const affected = new Set([...ids, ...placements.keys()]);
+  const instances = new Set([...affected].map(id => instancesById.get(id)));
+  const assets = state.twin.assets.filter(a => !ids.has(a.id)).map(a => placements.has(a.id) ? placedRoomAsset(a, placements.get(a.id)) : a);
+  let navigation = initialNavigation;
+  const placed = [];
+  if (placements.size) {
+    indexedScan ??= indexRoomScan(...sourceScan);
+    for (const asset of assets.filter(a => a.transform)) {
+      const owner = instancesById.get(asset.id);
+      placed.push(copyPlacedSplats(indexedScan, indexedScan.owned.get(owner) || [], asset, owner));
+      if (asset.center[1] - asset.size[1]/2 < 1.62 && asset.center[1] + asset.size[1]/2 > .10) {
+        const c = Math.abs(Math.cos(asset.yaw)), s = Math.abs(Math.sin(asset.yaw));
+        navigation = blockBox(navigation, {x:asset.center[0],z:asset.center[2],size:Math.max(asset.size[0]*c+asset.size[2]*s,asset.size[0]*s+asset.size[2]*c)});
+      }
+    }
+  }
+  if (state.demoObstacle) navigation = blockBox(navigation, state.demoObstacle);
+  return {ids,parts:new Map(),instances,assets,navigation,fills:[],placed,owners:sourceScan?.[3]};
 }
 
 function uploadRoomFill(instances, layers, owners) {
@@ -1672,7 +1714,7 @@ function replanAfterRoomEdit(prior) {
 function renderRoomEditControls() {
   const count=document.getElementById('room-object-count');
   const moved = [...roomPlacements.keys()].filter(id=>!removedIds.has(id));
-  count.textContent=`${state.twin.assets.length} objects · ${removedIds.size} removed${moved.length ? ` · ${moved.length} moved` : ''}`;
+  count.textContent=`${state.twin.assets.length.toLocaleString()} ${state.imported ? "regions" : "objects"} · ${removedIds.size} removed${moved.length ? ` · ${moved.length} moved` : ''}`;
   document.getElementById('room-change-count').textContent=String(removedIds.size+moved.length);
   const status=document.getElementById('room-edit-status');
   status.textContent=[editsOffline && 'edits not saved to server',moved.length && 'Moved positions are saved in this browser.'].filter(Boolean).join(' · ');
@@ -1694,7 +1736,7 @@ function renderRoomEditControls() {
   reset.disabled=editBusy;
   const notice=document.getElementById('room-edit-notice');
   notice.textContent=removed ? (asset.mapped ? `${asset.tag} removed: its Excel record is no longer located in this room` : 'Removed from this room.') :
-    roomPlacements.has(asset.id) ? `Moved to X ${asset.center[0].toFixed(2)} m, Z ${asset.center[2].toFixed(2)} m. The photo shows the original location.` : '';
+    roomPlacements.has(asset.id) ? `Moved to X ${asset.center[0].toFixed(2)}, Z ${asset.center[2].toFixed(2)} ${state.imported ? "scan units (unverified)" : "m"}. The photo shows the original location.` : '';
   notice.hidden=!notice.textContent;
   const list=document.getElementById('room-edit-list');
   list.replaceChildren();
@@ -1748,7 +1790,7 @@ async function changeRoom(action,asset) {
     if (action==='restore') {
       const position=roomPlacements.get(asset.id);
       const source=state.assetsByObj.get(asset.id);
-      const review=reviewedTrolleyParts(source,state.assetsByObj);
+      const review=state.imported ? null : reviewedTrolleyParts(source,state.assetsByObj);
       const restored=position ? placedRoomAsset(source,position,review?.baseY) : asset;
       if (state.roomAssets.some(other=>other.transform && roomBoundsOverlap(restored,other))) {
         throw new Error('Move the other object away from this location first.');
@@ -1809,7 +1851,7 @@ function beginMovePreview(asset) {
   walkKeys.clear();
   viewRoomLocation(asset);
   const source=state.assetsByObj.get(asset.id);
-  const review=reviewedTrolleyParts(source,state.assetsByObj);
+  const review=state.imported ? null : reviewedTrolleyParts(source,state.assetsByObj);
   const [sx,sy,sz]=source.size;
   const baseY=review?.baseY ?? source.center[1]-sy/2;
   const box = new THREE.BoxGeometry(sx,source.center[1]+sy/2-baseY,sz);
@@ -1999,6 +2041,7 @@ function navigationError(error) {
 function dispatchRobotToAsset(asset) {
   asset=roomAsset(asset);
   if (!asset || removedIds.has(asset.id)) return;
+  if (!state.navigationAvailable) { navigationError(new Error("No supported floor route is available; use Free view to inspect.")); return; }
   takeApart?.close();
   try {
     const start=robotPosition();
@@ -2070,7 +2113,7 @@ function bindUIEvents() {
       takeApart.open(state.selectedAsset);
       return;
     }
-    if (movementKeys.includes(key)) {
+    if (movementKeys.includes(key) && state.navigationAvailable) {
       event.preventDefault();
       if (!state.manualWalk && event.repeat) return;
       if (!state.manualWalk) beginManualWalk();
@@ -2094,7 +2137,8 @@ function bindUIEvents() {
   document.addEventListener("visibilitychange",registerActivity);
   document.getElementById("autoplay-chip").addEventListener("click",registerActivity);
   document.getElementById("btn-drop-obstacle").addEventListener("click",dropDemoObstacle);
-  for(const id of ["btn-room-tour","btn-go-target"])document.getElementById(id).disabled=false;
+  for(const id of ["btn-room-tour","btn-go-target"])document.getElementById(id).disabled=!state.navigationAvailable;
+  document.getElementById("btn-go-target").disabled ||= !state.assetsById.has(state.twin.target_asset_id);
   document.getElementById("btn-room-tour").addEventListener("click",()=>{
     try{activateRoute(planRoomTour(state.twin.navigation,robotPosition()));}catch(error){navigationError(error);}
   });
@@ -2107,6 +2151,7 @@ function bindUIEvents() {
       if (point) setMovePoint(point);
       return;
     }
+    if(!state.navigationAvailable){navigationError(new Error("No supported floor route is available; use Free view to inspect."));return;}
     if(!point){navigationError(new Error("Choose a point inside the room walls."));return;}
     const objects=state.roomAssets.filter(asset=>{
       if(asset.tier!=="equipment"||asset.center[1]-asset.size[1]/2>1.62||asset.center[1]+asset.size[1]/2<.10)return false;
@@ -2134,11 +2179,13 @@ function bindUIEvents() {
   document.getElementById("select-splat-mode").addEventListener("change", resizeRenderer);
   document.getElementById("select-visual-review").addEventListener("change", (e) => {
     state.visualReviewFilter = e.target.value;
+    state.listLimit = 100;
     renderProposalList();
   });
 
   document.getElementById("asset-search").addEventListener("input", (e) => {
     state.searchQuery = e.target.value;
+    state.listLimit = 100;
     renderProposalList();
   });
 
@@ -2173,7 +2220,7 @@ function bindUIEvents() {
     const asset=state.selectedAsset;
     const requestId=++copilotRequestId;
     const current=()=>requestId===copilotRequestId && state.selectedAsset?.asset_id===asset.asset_id;
-    out.textContent = "Querying grounded telemetry, events, and Valmet SOP corpus...";
+    out.textContent = state.twin.runtime?.offline ? "Reading local workbook evidence…" : "Querying grounded telemetry, events, and Valmet SOP corpus...";
     try {
       const res = await fetch("/api/copilot/diagnose", {
         method: "POST",
@@ -2277,4 +2324,10 @@ async function bindArView() {
   dialog.addEventListener("close", () => video.pause());
 }
 
-init();
+init().catch(error => {
+  console.error(error);
+  document.getElementById("sidebar-stats-text").textContent = "Unable to load this scene";
+  const notice = document.getElementById("dataset-note");
+  notice.textContent = error.message;
+  notice.classList.add("load-error");
+});

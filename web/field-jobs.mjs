@@ -28,6 +28,7 @@ export async function showEquipment(equipment) {
   const keep = { q: search.value, f: filter.value };
   if (!card()) { search.value = ""; search.dispatchEvent(new Event("input")); }
   if (!card()) { filter.value = "all"; filter.dispatchEvent(new Event("change")); }
+  if (!card()) { search.value = obj; search.dispatchEvent(new Event("input")); }
   if (!card()) throw new Error(`${tag} is not in the room list (removed from the room?)`);
   card().click();
   document.getElementById("btn-room-location").click();
@@ -74,12 +75,18 @@ function renderQueue(root) {
 // ------------------------------------------------------------------ the job card (Equipment details)
 function renderJob(root) {
   const tag = currentTag();
+  if (root.dataset.equipment !== tag) {
+    root.querySelector("#fj-text").value = "";
+    root.querySelector(".fj-error").textContent = "";
+    root.dataset.equipment = tag;
+  }
   root.hidden = tag === "none";
   if (root.hidden) return;
   const job = data.jobs[tag];
   const status = root.querySelector(".fj-status");
   status.textContent = job ? progress(job) : "No job yet";
   status.className = `fj-status ${job?.status || "none"}`;
+  root.querySelector(".fj-start").hidden = Boolean(job);
   root.querySelector(".fj-checks").innerHTML = (job?.checks || []).map((c) => `
     <li class="${c.done ? "done" : ""}"><label>
       <input type="checkbox" data-check="${esc(c.id)}" ${c.done ? "checked disabled" : ""} ${job.status !== "in_progress" ? "disabled" : ""}>
@@ -88,7 +95,7 @@ function renderJob(root) {
     </label></li>`).join("");
   root.querySelector(".fj-notes").innerHTML = (job?.notes || []).slice().reverse().map((n) => `
     <li class="${esc(n.kind)}"><div class="fj-note-meta">${esc(n.kind)} · ${esc(n.by || "technician")} · ${esc(n.at)}</div>${esc(n.text)}</li>`).join("")
-    || `<li class="fj-empty">No notes yet. Notes from the call with Ilkka appear here too.</li>`;
+    || `<li class="fj-empty">No notes yet.</li>`;
   const open = job?.checks.filter((c) => !c.done).length ?? 1;
   const done = root.querySelector(".fj-mark-done");
   done.hidden = job?.status === "fixed";
@@ -116,11 +123,11 @@ function apply(next) {
 }
 
 function mountQueue() {
-  const root = document.createElement("section");
+  const root = document.createElement("details");
   root.id = "inspection-queue";
   root.className = "inspection-queue";
   root.setAttribute("aria-label", "Inspection queue");
-  root.innerHTML = `<h2 class="field-label">Needs inspection <span class="iq-count"></span></h2><ol class="iq-list"></ol>
+  root.innerHTML = `<summary class="field-label">Inspection queue <span class="iq-count"></span></summary><ol class="iq-list"></ol>
     <details class="iq-done"><summary>Done <span class="iq-done-count"></span></summary><ol class="iq-done-list"></ol></details>`;
   root.addEventListener("click", (e) => {
     const b = e.target.closest(".iq-row");
@@ -136,6 +143,7 @@ function mountJob() {
   root.className = "section-block field-job";
   root.hidden = true;
   root.innerHTML = `<div class="sec-title-row"><h3 class="sec-title">Technician job</h3><span class="fj-status"></span></div>
+    <button type="button" class="fj-btn primary fj-start">Start inspection checklist</button>
     <ol class="fj-checks"></ol>
     <h4 class="fj-sub">Technician notes</h4><ul class="fj-notes"></ul>
     <form class="fj-form">
@@ -148,6 +156,12 @@ function mountJob() {
       </div>
       <p class="fj-error" role="status"></p>
     </form>`;
+  root.querySelector(".fj-start").addEventListener("click", async e => {
+    const button = e.currentTarget;
+    button.disabled = true;
+    try { await act(root, { action: "start_job", equipment: currentTag() }); }
+    finally { button.disabled = false; }
+  });
   root.addEventListener("change", async (e) => {
     const id = e.target.dataset?.check;
     if (!id) return;

@@ -8,6 +8,7 @@ from __future__ import annotations
 import io
 import json
 import mimetypes
+import os
 import threading
 import time
 import zipfile
@@ -15,6 +16,9 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
+# Serving a prepared demo must never silently spend API credits or load secrets.
+# Explicit VALMET_OFFLINE=0 is required to opt into the legacy API-enabled mode.
+os.environ.setdefault("VALMET_OFFLINE", "1")
 from pipeline import asset_export, decisions_client, field_service, retrieval
 
 ROOT = Path(__file__).resolve().parent
@@ -69,12 +73,14 @@ FIELD_ACTIONS = {"start_job", "complete_check", "add_note", "close_job"}
 
 def load_data():
     global TWIN_DATA, ASSETS_BY_ID, ASSETS_BY_OBJ, RETRIEVER, FIELD
-    RETRIEVER = retrieval.load_saved()
+    RETRIEVER = retrieval.load_saved(try_gemma=False)
     with open(DATA_PATH, "r", encoding="utf-8") as f:
         TWIN_DATA = json.load(f)
     ASSETS_BY_ID = {a["asset_id"]: a for a in TWIN_DATA["assets"]}
     ASSETS_BY_OBJ = {a["id"]: a for a in TWIN_DATA["assets"]}
-    FIELD = field_service.FieldService(TWIN_DATA)
+    if len(ASSETS_BY_ID) != len(TWIN_DATA["assets"]) or len(ASSETS_BY_OBJ) != len(TWIN_DATA["assets"]):
+        raise ValueError("Duplicate object or asset IDs in the imported scene")
+    FIELD = field_service.FieldService(TWIN_DATA, RETRIEVER)
 
 
 
@@ -82,7 +88,7 @@ def answer_copilot_question(asset_id: str, question: str) -> dict:
     intent, router = classify_intent(question or "")
     res = _answer(asset_id, intent)
     res["intent"], res["router"] = intent, router
-    if RETRIEVER is not None and question.strip():
+    if RETRIEVER is not None and question.strip() and ASSETS_BY_ID.get(res.get("asset_id"), {}).get("mapped"):
         asset = ASSETS_BY_ID.get(res["asset_id"], {})
         hits = [h for h in RETRIEVER.search(f"{asset.get('tag', '')} {question}", k=8, scope=asset.get("asset_class"))
                 if h["kind"] != "asset_card" or h["id"] == f"DOC-{res['asset_id']}"][:3]
@@ -95,7 +101,10 @@ def answer_copilot_question(asset_id: str, question: str) -> dict:
 def _answer(asset_id: str, intent: str) -> dict:
     asset = ASSETS_BY_ID.get(asset_id) or ASSETS_BY_OBJ.get(asset_id)
     if not asset:
-        asset = ASSETS_BY_ID.get(TWIN_DATA["target_asset_id"])
+        return {"error": "Asset not found", "asset_id": asset_id, "answer": "No such scene item exists.", "citations": []}
+    if not asset.get("mapped"):
+        return {"asset_id": asset["asset_id"], "tag": asset["tag"], "answer": asset["diagnostics"]["executive_summary"],
+                "citations": [], "mapped": False}
     diag = asset["diagnostics"]
     tag = asset["tag"]
     aid = asset["asset_id"]
@@ -119,7 +128,7 @@ def _answer(asset_id: str, intent: str) -> dict:
         return {"asset_id": aid, "tag": tag, "answer": text, "citations": h0["supporting_ids"]}
 
     if intent == "telemetry":
-        lines = [f"**Live Telemetry & 3-Day Evidence for {tag} ({aid}):**"]
+        lines = [f"**Synthetic Pack Telemetry & 3-Day Evidence for {tag} ({aid}):**"]
         for ob in diag["observations"]:
             lines.append(f"- **{ob['metric']}:** {ob['value']} (`{ob['source_id']}`)")
         if asset.get("data_quality_issues"):
@@ -133,7 +142,7 @@ def _answer(asset_id: str, intent: str) -> dict:
         }
 
     if intent == "safety":
-        lines = [f"**Approved Field Verification Workflow for {tag} ({aid}):**"]
+        lines = [f"**Pack-Based Field Verification Workflow for {tag} ({aid}):**"]
         cites = []
         for s in diag["verification_steps"]:
             lines.append(f"{s['step']}. **{s['title']}:** {s['detail']} (`{s['citation']}`)")
@@ -210,7 +219,7 @@ def library_zip(saved: list[dict]) -> bytes:
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_STORED) as z:
         for e in saved:
-            for key in ("ply", "model_ply", "glb", "thumb"):
+            for key in ("ply", "model_ply", "glb", "thumb", "gspl", "scan_gspl", "source_rows"):
                 name = e["files"].get(key)
                 if name and (asset_export.LIBRARY / name).is_file():
                     z.write(asset_export.LIBRARY / name, name)
@@ -286,7 +295,8 @@ class TwinRequestHandler(SimpleHTTPRequestHandler):
             target = qs.get("target", [TWIN_DATA["target_asset_id"]])[0]
             route = TWIN_DATA["navigation"]["routes_by_asset"].get(target)
             if not route:
-                return self._send_json(TWIN_DATA["navigation"]["primary_route"])
+                return self._send_json({"status": "unavailable", "validated": False, "waypoints": [],
+                                       "reason": "No floor-supported route was generated for this item", "asset_id": target}, 404)
             return self._send_json(route)
 
         if path == "/api/work-orders":
@@ -322,6 +332,8 @@ class TwinRequestHandler(SimpleHTTPRequestHandler):
             asset = ASSETS_BY_ID.get(aid) or ASSETS_BY_OBJ.get(aid)
             if not asset:
                 return self._send_json({"error": "Asset not found"}, 404)
+            if not asset.get("mapped") or not asset["diagnostics"].get("work_order_draft"):
+                return self._send_json({"error": "No grounded maintenance draft is available for this item"}, 422)
             draft = dict(asset["diagnostics"].get("work_order_draft") or {})
             draft["notes"] = body.get("notes", "Field verification dispatched via Autonomous Copilot.")
             draft["status"] = "DRAFT_SUBMITTED"
