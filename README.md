@@ -110,6 +110,26 @@ The [asset library](http://127.0.0.1:8765/library.html) lists the saved objects 
 
 On 6 objects (7 Nov 2026), `tests.eval_refine` held out each object's best frame and its neighbours. Against that photo, mean colour error fell from 0.162 to 0.123, and SSIM rose from 0.340 to 0.399. Objects the walkthrough saw from few angles gain least: pump P-001 (OBJ-008) went from 0.128 to 0.124 error, and its SSIM fell from 0.275 to 0.262.
 
+## Take a pump apart in the room
+
+Select a pump that has a split unit model and choose **Take apart in the room** in Equipment details. Away from it, the robot walks there first. The view glides into first person at the robot and turns to the device. The unit's parts then ease apart where it stands. The room stays in view, dimmed and softly blurred, and the device's own scan splats are hidden under the model. Other frames, labels and the navigation panels are hidden until **Done** or **Esc**.
+
+- Each part has a callout with its name and size in mm, and the tag and synthetic fault of the device it serves.
+- The dock on the right has **Explode**, **Reassemble**, **Reset** and **Done**, a slider, the fault list, a button per part and the selected part's detail.
+- Click a part (or its callout or button) to select it. The eye eases about 30 % toward it.
+- The fault part is tinted and outlined in red. A unit mate's fault is shown in amber.
+
+Devices are matched by Excel tag. P-001 has no split model of its own, so it is shown as a stand-in with the P-005 unit model, and it carries only P-001's own issue (misalignment → lantern and coupling guard). The models are AI-generated (Higgsfield) units split into parts by geometry rules, in raw PLY coordinates of `Equipment Room.ply`. The viewer moves them into its levelled frame, `(x, 1.185 − y, −z)` as in `pipeline/ingest.py`, and centres them on the device's box. Sizes are those of scan2service's fitted unit, not of this viewer's box.
+
+The data comes from the MVP and is git-ignored like the rest of `web/data/`:
+
+```sh
+.venv/bin/python -m scripts.import_take_apart    # reads ~/sinceai-mvp/demo/web/public/data/s2s, writes web/data/take_apart/
+node tests/test_parts_data.mjs                    # device matching, stand-in faults, placement
+```
+
+Take apart is ported from Mikael Lehtonen's scan2service (`web/parts.js`) via SinceAI-2026/mvp, with the UX after Rasmus Mäkinen's pump explode. The code is in `web/room-parts.mjs`, `web/parts-data.mjs` and `web/room-parts.css`. `web/vendor/three/addons/loaders/GLTFLoader.js` is three.js r170's loader, matching the vendored three.
+
 ## Voice assistant (ElevenLabs agent Ilkka)
 
 Select **Call Ilkka for support** at the bottom of the viewer. Ilkka runs on `gemini-3.5-flash`, answers in short radio-style replies, and is told which equipment is selected in the viewer, so "what's wrong with this one?" needs no tag.

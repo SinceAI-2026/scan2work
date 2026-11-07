@@ -21,6 +21,7 @@ import { classCss } from "./asset-presentation.mjs";
 import { filterShows, onFilterChange } from "./view-filter.mjs";
 import { ICONS } from "./view-icons.mjs";
 import { createTakeApart } from "./take-apart.mjs";
+import { createRoomParts } from "./room-parts.mjs";
 import { sampleRoute, nearbyAssets, planFromPosition, reachableFloor, floorDestination, assetDestination, planRoomTour, advanceAlongRoute, segmentIsFree } from "./navigation-view.mjs";
 
 const state = {
@@ -75,6 +76,7 @@ const walkKeys = new Set();
 const movementKeys = ["w", "a", "s", "d", "arrowup", "arrowdown", "arrowleft", "arrowright"];
 let equipmentObstacles;
 let takeApart = null; // one object alone, the room faded (take-apart.mjs)
+let roomParts = null; // a pump unit apart where it stands, in first person (room-parts.mjs)
 let updateFillSort;
 let sourceScan, indexedScan, originalNavigation, initialNavigation, walkPoses;
 let editStore, activeEdits = [], removedIds = new Set(), editsOffline = false, editBusy = false;
@@ -117,6 +119,11 @@ async function init() {
     camera, controls, state, uniforms: () => splatMaterial?.uniforms, setPreset: applyCameraPreset,
     container: document.getElementById("canvas-container"), scene, renderer,
   });
+  roomParts = createRoomParts({
+    scene, camera, renderer, container: document.getElementById("canvas-container"), state, boxMeshes,
+    uniforms: () => splatMaterial?.uniforms, look: firstLook, eye: ROBOT_EYE_M, setPreset: applyCameraPreset,
+    robot: robotPosition, walkTo: dispatchRobotToAsset, closeOther: () => takeApart?.close(), setInspector: setInspectorOpen,
+  });
   buildRobotAvatar();
   editStore = roomEditStore(id => canRemove(state.assetsByObj.get(id)));
   roomPlacements = loadRoomPlacements(state.assetsByObj, canRemove);
@@ -143,10 +150,12 @@ async function init() {
     updateAttractMode(now);
     stepSimulation(dt, now * 0.001);
     takeApart.frame(boxMeshes);
+    roomParts.frame(dt);
     bimView.update(state.selectedAsset);
     updateMotionResolution(now);
     maybeTriggerDepthSort();
     renderer.render(scene, camera);
+    roomParts.draw();
     updateHudLabels();
   }
   requestAnimationFrame(animate);
@@ -385,6 +394,7 @@ async function loadEwaGaussianSplats(url) {
       uHasRemoved: {value:0},
       uFillDebug: {value:0},
       uSplatAxisLimit: { value: 180 },
+      uBlur: { value: 0 },   // room-parts.mjs: px² added to every footprint, the room softly blurred around a Take apart
     },
     vertexShader: `
       attribute float splatIndex;
@@ -398,6 +408,7 @@ async function loadEwaGaussianSplats(url) {
       uniform vec2 uViewport;
       uniform vec2 uFocal;
 ${SHADER_DECL}      uniform float uSplatAxisLimit;
+      uniform float uBlur;
       uniform float uBaseCount, uFillCount, uHasRemoved, uFillDebug;
       uniform sampler2D uRoomFill, uRemoved;
       uniform vec2 uRoomFillSize;
@@ -473,6 +484,11 @@ ${SHADER_OFFSET}        vec4 cam = modelViewMatrix * vec4(center, 1.0);
         float c_a = dot(wu, v_wu) + 0.15;
         float c_b = dot(wu, v_wv);
         float c_c = dot(wv, v_wv) + 0.15;
+        if (uBlur > 0.0) {   // a wider footprint, same coverage (opacity scaled by the area ratio)
+          float det0 = max(c_a * c_c - c_b * c_b, 1e-4);
+          c_a += uBlur; c_c += uBlur;
+          a *= sqrt(det0 / max(c_a * c_c - c_b * c_b, 1e-4));
+        }
 
         float mid = 0.5 * (c_a + c_c);
         float disc = max(0.0001, (c_a - c_c) * (c_a - c_c) * 0.25 + c_b * c_b);
@@ -2218,7 +2234,7 @@ function registerActivity() {
 function updateAttractMode(now) {
   if (bimView?.active) return;
   if (movePreview) return;
-  if (takeApart?.isOpen || state.manualWalk || !attract.enabled || attract.active || document.hidden || now-attract.lastActivity < 20000) return;
+  if (takeApart?.isOpen || roomParts?.isOpen || state.manualWalk || !attract.enabled || attract.active || document.hidden || now-attract.lastActivity < 20000) return;
   if (!["idle","arrived"].includes(state.journey.phase)) return;
   const target=state.assetsById.get(state.twin.target_asset_id);
   if (!target) return;
