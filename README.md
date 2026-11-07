@@ -70,7 +70,25 @@ The viewer uses Wael’s levelled Y-up coordinates. Native PLY exports retain th
 
 The floor plan and geometry preview show large candidate regions even when their class is unknown. Visible/hidden counts and the small-region/overhead controls expose the full catalog. Preserved Linards names are normalized for display, with their unverified status retained. Oriented envelopes and fitted pipes are derived geometry, not new confirmed assets.
 
-Observed floor is a separate context layer from the green navigation mask. The four wall guides retain Wael’s configured room-boundary assumptions. Adding these visual layers does not enlarge the walkable grid or change object ownership. Wael’s original generated 504-object artifact is not present in this checkout, so the integration cannot establish a one-to-one preservation claim for that separate extraction.
+Observed floor is a separate context layer from the green navigation mask. The four wall guides retain Wael’s configured room-boundary assumptions. Adding these visual layers does not enlarge the walkable grid or change object ownership.
+
+Wael’s original generated data was subsequently supplied as `field-atlas-data.zip` and inspected separately. It contains 504 assets across 24 classes, 471 linked source photos and 83 asset-attached cylinder geometries. The imported scene is a different segmentation, not a superset of those original objects: preserving the raw scan and Linards membership does not preserve Wael’s labels, grouping or evidence associations. Original and imported datasets must remain separate until an explicit correspondence and conflict policy is applied; object counts alone do not measure improvement.
+
+See the [original-data audit](docs/original-data-audit.md) for source-row correspondence, grouping changes, synthetic mapping differences and the original browser's walkthrough-based floor expansion. To repeat the read-only comparison, extract the archive into a separate directory, then run:
+
+```sh
+.venv/bin/python -m pipeline.audit_original_data \
+  --original-data /absolute/path/original/web/data \
+  --current-data web/data \
+  --output /absolute/path/comparison.json
+node scripts/audit_runtime_floor.mjs \
+  --original-data /absolute/path/original/web/data \
+  --current-data web/data \
+  --poses web/data/walk_poses.json \
+  --output /absolute/path/runtime-floor.json
+```
+
+Both output files must be outside the input data directories. These commands do not merge or relabel objects.
 
 Imports derive this context automatically. To recover it in an existing imported scene, run `.venv/bin/python -m pipeline.derived_context` and restart the server. This offline command preserves source membership and navigation, and writes `web/data/context_recovery_report.json` with integrity hashes. The current recovery adds 120 pipe-fit hypotheses; IFC export includes them separately from the 1,933 regions and marks the wall/slab assumptions and unverified scale.
 

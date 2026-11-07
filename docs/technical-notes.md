@@ -243,6 +243,8 @@ layout; the imported target has a separate exact-export integration test.
 
 ## Recovery of plan and BIM context after the expanded import
 
+**Update:** The original archive was subsequently supplied. The actual object, source-row and runtime-floor comparison is in [Original data audit](original-data-audit.md). The missing-artifact statements below describe the earlier recovery stage, not current availability.
+
 The first import preserved the scan and the new exact region memberships, but it
 **did omit useful derived layers from Wael's pipeline**. More extraction regions
 did not automatically make a richer BIM model. In particular, the initial import
@@ -251,13 +253,14 @@ and no retained catalog-name normalization. 383 of the 415 baseline regions had
 usable names but generic `unclassified` categories, so class-based plan filters
 hid them. It also displayed a sparse monochrome plan raster.
 
-The original Wael generated `digital_twin.json` is not present in the cloned
-repository or the locally searched Downloads/visualization directories. Upstream
-commit `ab777d3` reports 504 objects in 24 classes in its README, but those numbers
-cannot establish an exact object-by-object overlap with this imported scene.
+At the time of this recovery, the original Wael generated `digital_twin.json`
+was absent from the clone and locally searched directories. Its published 504
+objects and 24 classes could not establish an exact object-by-object overlap.
 The 415 preserved baseline regions refer to **Linards**, not Wael's 504 objects.
-The old Wael model's individual AI labels, merges and fitted assets cannot be
-claimed recovered without that generated artifact.
+The user subsequently supplied the original archive; its actual labels, merges,
+photos, fitted assets and exact source-row relationships are now documented in
+[Original data audit](original-data-audit.md). They were audited read-only and
+were not automatically merged into this recovery.
 
 `pipeline/derived_context.py` now restores independently derived display context
 using the existing Wael geometry methods, without changing the exact extraction:
