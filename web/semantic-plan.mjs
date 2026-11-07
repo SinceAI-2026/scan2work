@@ -146,6 +146,7 @@ export function bindSemanticPlan({snapshot, inspect, navigate, viewModel}) {
       }
       svg.append(svgNode("path",{d:path,fill:"#e2dfca","data-layer":"observed-floor"}));
     }
+    if(current.navigation.source_floor_grid)svg.append(svgNode("path",{d:floorPath(current.navigation.source_floor_grid,meta,project),fill:"#edf1ed","data-layer":"original-floor-grid"}));
     svg.append(svgNode("path",{d:floorPath(current.navigation.walkable_grid,meta,project),fill:"#dcebe5","data-layer":"walkable-grid"}));
     const walls=roomBimWalls(current.walls,meta);
     for (const {from,to} of walls) {

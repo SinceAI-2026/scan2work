@@ -4,8 +4,8 @@ The README lists what Scan2Work does; this page has the detail for the larger fe
 
 ## Room controls
 
-- **Camera** (round button, top left): **Follow robot**, **First person** (the robot's camera: drag to look,
-  WASD/arrows to walk) and **Aerial view**. The robot is driven the same way in every view; the view only moves
+- **Camera** (round button, top left): **Follow technician**, **First person** (the technician's camera: drag to look,
+  WASD/arrows to walk) and **Aerial view**. The technician is driven the same way in every view; the view only moves
   the camera.
 - **Scan / Coloured / BIM**: the same room and camera with a different mask: the original splat, objects tinted by
   class, or BIM geometry.
@@ -14,9 +14,22 @@ The README lists what Scan2Work does; this page has the detail for the larger fe
 - **Floor plan** opens the semantic plan and the IFC export. **Display** holds render quality, frame visibility
   (Nearby / All / Off), synthetic-fill tint and the ceiling cut.
 - **Arduino panel** (chip icon): the fault panel's live state, see [arduino/README.md](../arduino/README.md).
-- **Find equipment** and **To inspect** in the left sidebar. Selecting an item keeps the camera; **View location**,
-  **Navigate here** and **Isolate item** are explicit actions. **Inspect faulty device** and **Tour the room** start
-  the robot.
+- **Find equipment** and **To inspect** in the left sidebar. Selecting an item keeps the camera; **Take apart**, **Navigate here** and **Isolate item** are explicit actions. **Inspect faulty device** and **Tour the room** start
+  the technician.
+
+## Technician, hazards and guided demo
+
+**Play demo** walks to the faulty device, illustrates potential energy, then shows its source evidence. The service
+technician is adapted from Rasmus's procedural character. Pause/resume, Next, Stop and ordinary room interaction
+keep the walkthrough under the user's control. It does not complete inspection checks or change jobs or sensor state.
+
+**Hazards** is off by default and shows a few nearby workbook-linked devices. The selected demo boundary is an
+illustration, not a measured exclusion distance or isolation approval. Readings are recorded synthetic data.
+Equipment details lead with specifications and a compact condition/reading/time/next-check summary; the original
+photo remains above the job checklist. Full evidence is still available below.
+
+Reusable modules, attribution, data-selection decisions and current route checks are in the
+[Rasmus integration guide](rasmus-integration.md).
 
 ## Isolate an object and save it to the library
 

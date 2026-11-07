@@ -21,6 +21,7 @@
   <link rel="stylesheet" href="./view-layers.css">
   <link rel="stylesheet" href="./view-switch.css">
   <link rel="stylesheet" href="./fault-panel.css">
+  <link rel="stylesheet" href="./scene-context.css">
 </head>
 <body>
   <div id="arrival-announcement" class="visually-hidden" role="status" aria-live="polite"></div>
@@ -32,7 +33,8 @@
     <aside class="sidebar left-sidebar">
       <div class="sidebar-header"><h1>Explore the room</h1><p id="sidebar-stats-text" class="sidebar-stats">Loading room…</p><p id="dataset-note" class="dataset-note" role="status"></p></div>
       <div class="mission-box">
-        <button class="btn-walk primary" id="btn-room-tour" disabled>Tour the room</button>
+        <button class="btn-walk primary" id="btn-safety-demo" disabled aria-pressed="false">Play demo</button>
+        <button class="btn-walk" id="btn-room-tour" disabled>Tour the room</button>
         <button class="btn-walk" id="btn-go-target" disabled>Inspect faulty device</button>
       </div>
       <div class="filter-group"><label for="asset-search" class="field-label">Find equipment</label><input id="asset-search" class="clean-input" placeholder="Search tag or equipment…" type="search" /></div>
@@ -49,10 +51,10 @@
         <div class="viewport-Controls-overlay">
           <div class="room-toolbar" role="toolbar" aria-label="Room controls">
             <div class="view-switch" id="view-switch">
-              <button class="view-fab" id="view-fab" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="view-menu" aria-label="Change view: Follow robot"><span class="view-icon" id="view-fab-icon" data-icon="follow"></span><span id="view-fab-label">Follow robot</span><span class="view-chevron" data-icon="chevron" aria-hidden="true"></span></button>
+              <button class="view-fab" id="view-fab" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="view-menu" aria-label="Change view: Follow technician"><span class="view-icon" id="view-fab-icon" data-icon="follow"></span><span id="view-fab-label">Follow technician</span><span class="view-chevron" data-icon="chevron" aria-hidden="true"></span></button>
               <div class="view-menu" id="view-menu" role="menu" aria-label="Camera" hidden>
                 <button class="view-item" type="button" role="menuitemradio" data-cam="aerial" data-icon="aerial" aria-label="Aerial view">Aerial view <small>Orbit freely around the room</small></button>
-                <button class="view-item active" type="button" role="menuitemradio" data-cam="walk" data-icon="follow" aria-label="Follow robot">Follow robot <small>Watch the inspection route</small></button>
+                <button class="view-item active" type="button" role="menuitemradio" data-cam="walk" data-icon="follow" aria-label="Follow technician">Follow technician <small>Watch the inspection route</small></button>
                 <button class="view-item" type="button" role="menuitemradio" data-cam="first" data-icon="first" aria-label="First person">First person <small>Look and walk through the room</small></button>
               </div>
             </div>
@@ -77,6 +79,7 @@
             </div>
               </section>
             </div>
+            <button class="layer-link" id="btn-hazards" type="button" aria-pressed="false" disabled>Hazards</button>
             <button class="vp-btn" id="btn-ar-view" hidden>AR view</button>
           </div>
           <div class="room-view-summary">
@@ -128,6 +131,7 @@
         </div>
         <div id="asset-summary" class="asset-summary">
           <dl id="detail-specs" class="insp-specs"></dl>
+          <section id="device-status-summary" class="device-summary" aria-label="Device status summary" hidden></section>
           <p id="detail-match-note" class="insp-note" hidden></p>
           <button class="btn-primary-full btn-take-apart" id="btn-take-apart" title="Hide the room and show this region alone (T)">Isolate region</button>
         </div>
@@ -156,6 +160,7 @@
           <figcaption>Real walkthrough frame</figcaption>
         </figure>
 
+
         <p id="movable-notice" class="movable-notice" hidden>Movable object (not instrumented)</p>
 
         <!-- GROUNDED AI DIAGNOSTIC COPILOT -->
@@ -179,13 +184,13 @@
           <div class="field-label" style="margin-top:6px;">Grounded observations</div>
           <div id="observations-list" class="clean-stack"></div>
 
-</details>          <div class="field-label" style="margin-top:6px;">Ranked root-cause hypotheses</div>
+</details><details id="diagnostic-details"><summary>Diagnosis and verification details</summary><div class="field-label" style="margin-top:6px;">Ranked root-cause hypotheses</div>
           <div id="hypotheses-list" class="clean-stack"></div>
 
           <div class="field-label" style="margin-top:6px;">Safe field verification (LOTO first)</div>
           <div id="verification-steps-list" class="clean-stack"></div>
 
-          <!-- Interactive Copilot Q&A -->
+</details>          <!-- Interactive Copilot Q&A -->
           <div class="field-label" style="margin-top:8px;">Ask copilot about this equipment</div>
           <div class="chip-row">
             <button class="q-chip" data-q="Why is this asset deviating from normal operation?">Root cause</button>
@@ -264,7 +269,7 @@
           <li><i style="background:#f3ce9d"></i>Tanks and vessels</li><li><i style="background:#d7c8ef"></i>Instruments</li>
           <li><i style="background:#d2dbdf"></i>Fixtures and structure</li><li><i style="background:#eee5f4"></i>Movable objects</li>
           <li data-unreviewed-legend><i style="background:#d9e2e4"></i>Unreviewed envelopes</li><li data-floor-legend><i style="background:#e2dfca"></i>Observed floor samples</li>
-          <li><i style="background:#dcebe5"></i>Walkable simulation grid</li><li><i style="background:#247384"></i>Robot and route</li>
+          <li><i style="background:#dcebe5"></i>Technician route grid</li><li><i style="background:#247384"></i>Technician and route</li>
         </ul>
         <p id="semantic-plan-evidence-note">Observed floor is scan evidence, not a claim that every floor point is walkable. Grey envelopes have unverified labels and boundaries.</p>
         <p id="semantic-plan-export-note">Approximate IFC includes region envelopes, unreviewed pipe fits, and assumed walls/slab. Floor sample counts are included as evidence, not a reconstructed surface.</p>

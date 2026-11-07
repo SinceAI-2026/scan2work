@@ -34,12 +34,16 @@ These versions were resolved and installed in a new Python 3.12 environment on m
 | `pipeline/navigation.py`, `web/navigation*.mjs` | observed grid, boxes and destination → simulated route | Scan units/clearance assumptions; no robot controller |
 | `pipeline/retrieval.py` | `rag_index.json` → TF-IDF grounded evidence | scikit-learn; no downloaded embedding model in offline mode |
 | `pipeline/asset_records.py`, `pipeline/field_service.py` | canonical workbook bindings → operational API, checklist and local job log | Synthetic workbook values; prevents borrowed health on unmapped objects |
+| `pipeline/scene_context.py`, `web/device-summary.mjs` | active twin → read-only operator context and compact device summary | Standard library backend; no workbook rebuild, model calls or generated records |
+| `web/technician-avatar.mjs`, `web/technician-navigation.mjs` | Three.js + source occupancy → walking technician and matching runtime clearance profile | Procedural model adapted from Rasmus; scan scale remains unverified |
+| `web/hazard-layer.mjs` | operator context + current object geometry → optional energy annotations | Three.js/DOM; generic demonstration assumptions, no isolation authorization |
+| `web/safety-demo.mjs` | injected navigation/view callbacks → interruptible local walkthrough | No job, sensor, model or persistence API; reusable without the host app |
 | `server.py`, `pipeline/runtime_policy.py` | selected data directory → local HTTP/API/media range service | `VALMET_DATA_DIR`, `VALMET_OFFLINE=1` |
 | `scripts/serve_public_demo.py`, `web/runtime-access.mjs` | isolated prepared dataset → hosted read-only preview with browser-local edits | Existing HTTPS proxy; `VALMET_PUBLIC_DEMO=1`; no provisioning or credentials in the module |
 | `web/proposal-review*.mjs`, `web/imported-assets.mjs` | separate proposal catalog/evidence → candidate review | Optional full extraction URL supplied at launch |
 | `web/take-apart.mjs`, `web/explode.mjs` | rendered rows + object membership → isolate/explode | Membership must align exactly to the render |
 | `web/room-parts.mjs`, `web/parts-data.mjs`, `web/ai3d.mjs` | prepared `take_apart/index.json` + 23 GLBs → fitted illustrative models / split assemblies | Bundled Three.js loaders; no model service needed at runtime; dimensions unverified |
-| `live/board.py`, `live/stores.py`, `web/fault-panel.mjs` | installed local service + optional Arduino → hardware fault status | Public preview disables hardware APIs; optional database connectors listed below |
+| `live/board.py`, `live/security.py`, `live/stores.py`, `web/fault-panel.mjs` | optional Arduino input + shared inspection state → fault panel | Hosted use requires explicit Arduino opt-in, private device token and HTTPS; optional database connectors listed below |
 | `web/bim-export*.mjs`, `web/semantic-plan.mjs` | scene boxes, fitted geometry and context → plan/IFC | Browser only; scale remains unverified |
 | `distribution/build_release.py`, `scripts/install_scan2work.py` | prepared data/code → hashed archives → installed app | Python standard library; pip only during install |
 
@@ -57,7 +61,7 @@ These are **not** installed or activated by the demo installer. Install them in 
 | Legacy photo-refined saved objects | PyTorch >=2.4 (upstream tested 2.8), original frames/poses and source PLY | `pipeline/object_refine.py`; original unmarked dataset mode only, CPU supported |
 | Semantic embeddings | `sentence-transformers>=5.0`, model access/cache, possibly Hugging Face credentials | `pipeline/retrieval.py`; TF-IDF works without it |
 | New vision labels / generated diagnostics | Configured provider credentials and network access; may incur cost | `pipeline/gemini_labels.py`, `pipeline/decisions_client.py`, `pipeline/diagnostics.py` |
-| ElevenLabs voice assistant | ElevenLabs agent, configured MCP token and public HTTPS tunnel | `mcp_server.py`, `web/voice-assistant.mjs`; see original README |
+| ElevenLabs voice assistant | ElevenLabs agent, configured MCP token and public HTTPS tunnel | `mcp_server.py`, `web/voice-assistant.mjs`; see [voice and MCP](voice-mcp.md) |
 | Arduino fault panel | Arduino UNO Q; optional `live/requirements.txt` database clients, configured board token / service credentials | `arduino/README.md`; core installed board state uses the standard library; no live databases activated by installer |
 | IFC schema validation | IfcOpenShell in a validation environment | Not required for browser IFC generation |
 | JavaScript regression tests | Node.js (upstream tested 24) | `tests/*.mjs`, `web/*.test.mjs` |

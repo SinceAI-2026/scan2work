@@ -29,12 +29,17 @@ python3 -m venv .venv && .venv/bin/python -m pip install -r requirements.txt
 .venv/bin/python server.py 8765          # http://127.0.0.1:8765/  (add --lan for an Arduino on the same network)
 ```
 
-Select **Inspect faulty device** or **Tour the room**, or pick equipment and choose **Navigate here**.
+Select **Play demo** for a guided route → hazard illustration → equipment evidence walkthrough.
+Or browse freely, choose **Inspect faulty device**, **Tour the room**, or **Navigate here**.
+**Hazards** toggles potential-energy annotations; Pause, Stop or manual interaction interrupts the demo.
+Playback never completes jobs, changes Arduino readings or certifies safe work.
 
-The main hosted demo enables Ilkka, a shared synthetic inspection-job log and the Arduino fault panel. Visitors can
-start jobs, record checks and notes, and close jobs; their progress is visible to other visitors. Scene edits remain
+The hosted main room enables Ilkka, shared synthetic inspection jobs and the Arduino panel; the board is currently
+not connected. Visitors can start jobs, record checks and notes, and close jobs; their progress is visible to other
+visitors. Scene edits remain
 browser-local, and the separate extraction review stays read-only with voice disabled. The immutable 0.1.1 installer
-keeps voice off; local installations can also save scene changes and exact-source object exports. See
+keeps voice off; these source updates do not overwrite its download archives. Local installations can also save
+scene changes and exact-source object exports. See
 [hosted operation](docs/public-demo.md) and [voice/MCP setup](docs/voice-mcp.md).
 
 ## What it does
@@ -44,7 +49,9 @@ keeps voice off; local installations can also save scene changes and exact-sourc
 | Extraction | 504 framed objects in 24 classes in the release room; labels from real walkthrough photos, checked against a hand-labelled sample | [Pipeline](docs/pipeline.md) |
 | Two segmenters | Colour/geometry rules + Gemini labels (default), or SAM 2.1 + SigLIP 2/DINOv2 fully on-site | [Pipeline](docs/pipeline.md#two-segmenters) |
 | Workbook binding | All 30 Excel devices on distinct objects; status, telemetry and citations come from the workbook only | [Technical notes](docs/technical-notes.md) |
-| Navigation | A* on a 2.5D occupancy grid with robot clearance; follow, first-person (drive the robot) and aerial views | [Technical notes](docs/technical-notes.md#navigation-and-collision-model) |
+| Navigation | A* with the walking technician’s footprint; follow, first-person and aerial views; original floor data preserved | [Technical notes](docs/technical-notes.md#navigation-and-collision-model) |
+| Guided demo and hazards | Rasmus’s walking service technician, interruptible walkthrough and optional energy illustrations | [Integration and reuse](docs/rasmus-integration.md) |
+| Device summary | Canonical condition, one relevant reading/comparison, recorded time and next check; full evidence remains expandable | [Display decisions](docs/rasmus-integration.md#what-belongs-in-the-default-device-view) |
 | Room layers | Scan / Coloured by class / BIM masks of the same view, explode, Show in room filters, floor plan and IFC export | [Features](docs/features.md#room-controls) |
 | AI diagnosis | Grounded triage and LOTO-first verification steps; tested blind on the 13 faulty devices | [Technical notes](docs/technical-notes.md#diagnostics-and-optional-ai) |
 | Technician jobs | **To inspect** queue, checklist with safety-first rules, notes, **Mark done** | [Features](docs/features.md#voice-assistant-elevenlabs-agent-ilkka) |
@@ -73,11 +80,14 @@ synthetic.
 | Extraction | Label accuracy, 39 hand-labelled objects | 85 % (colour-rule baseline 13 %) | `tests.scorecard` |
 | Extraction | 2D→3D lifting: fused centre inside the true box | 95 % | `tests.validate_lifting` |
 | Mapping | Workbook devices on distinct objects | 30/30, 0 telemetry mismatches | `tests.scorecard` |
-| Navigation | Path samples off walkable floor / minimum clearance | 0 / 0.234 m (robot radius 0.15 m) | `tests.scorecard` |
+| Original robot route | Path samples off walkable floor / minimum clearance | 0 / 0.234 source units (radius 0.15) | `tests.scorecard` |
 | AI diagnosis | Blind root cause, telemetry only (top-1 / top-3) | 9/13 / 11/13 (baseline 2/13) | `tests.eval_triage` |
 | Grounding | Cited evidence IDs found in the workbook | all | `tests.scorecard` |
 | Refinement | Colour error / SSIM vs a held-out photo, 6 objects | 0.162 → 0.123 / 0.340 → 0.399 | `tests.eval_refine` |
 | Voice | Full CV-003 job by voice | 5/5 simulated runs | ElevenLabs tests |
+
+The original robot-route result predates the wider technician profile; current route checks are recorded in the
+[integration verification](docs/rasmus-integration.md#verification). Physical scale remains unverified.
 
 Limits: navigation checks are kinematic and grid-based; with alarms included the diagnosis is near trivial (alarm
 texts name the issue), so the telemetry-only row is the honest one; voice runs are text simulations.
@@ -128,6 +138,7 @@ a model ran ([generated artifact status](docs/technical-notes.md#generated-artif
 - [Technical note (brief)](docs/technical-note.md) · [Pipeline](docs/pipeline.md) · [Features in detail](docs/features.md) · [Technical notes (full)](docs/technical-notes.md)
 - [Installation](docs/installation.md) · [Dependencies](docs/dependencies.md) · [Hosted preview](docs/public-demo.md) · [R2 publishing](docs/cloudflare-r2.md)
 - [Voice and MCP](docs/voice-mcp.md) · [Arduino fault panel](arduino/README.md) · [Local segmenter](local_models/README.md)
+- [Rasmus integration and reusable modules](docs/rasmus-integration.md)
 - [Asset import](docs/asset-import-guide.md) · [Original-data audit](docs/original-data-audit.md)
 - Releases: [0.1.1](docs/release-0.1.1.md), [0.1.0](docs/release-0.1.0.md), [packaging audit](docs/packaging-audit.md)
 - Submission prep: [demo sequence](docs/demo-sequence.md), [slides outline](docs/slides-outline.md)

@@ -24,6 +24,7 @@ from pipeline.runtime_policy import configure_server_runtime
 configure_server_runtime(ROOT)
 from pipeline import asset_export, decisions_client, field_service, retrieval, config as C
 from pipeline.asset_records import asset_for_api, route_for_api, UNMAPPED_NOTICE
+from pipeline.scene_context import build_scene_context
 
 WEB_DIR = ROOT / "web"
 PUBLIC_DEMO = os.environ.get("VALMET_PUBLIC_DEMO") == "1"
@@ -455,6 +456,9 @@ class TwinRequestHandler(SimpleHTTPRequestHandler):
 
         if path == "/api/scene/edits":
             return self._send_json({'removed': []} if PUBLIC_DEMO else read_edits())
+
+        if path == "/api/scene-context":
+            return self._send_json(build_scene_context(TWIN_DATA))
 
         if path.startswith("/data/") and path.lower().endswith((".mp4", ".webm")):
             if PUBLIC_DEMO and not self._public_static_allowed():

@@ -509,3 +509,35 @@ full IFC schema validation. No browser errors were observed; 21 viewer tests
 passed and both patch scripts reported zero edits. The main dataset was unchanged.
 These are observed interaction checks, not a user study or proof of complete
 capability parity.
+
+### Rasmus-derived scene context (2026-11-07)
+
+`pipeline.scene_context.build_scene_context(twin)` supplies read-only
+`GET /api/scene-context` from the active in-memory twin. It does not load Excel,
+call models, generate assets, change navigation, or write any dataset. Its energy
+class rules are adapted from `SinceAI-2026/rasse` commit `5a3ca02`; its geometry,
+statuses, bindings and readings come exclusively from the active Scan2Work twin.
+
+The baseline projection contains 504 objects, 30 mapped device summaries and
+27 mapped devices with potential-energy annotations; 474 objects have no device
+status. The extraction projection uses its own 1,933 IDs and bindings: 30 mapped,
+1,903 unmapped, and 27 hazard annotations. No generated Rasse device profiles or
+positions are imported. A relevant signal is compared with its own setpoint or
+stored three-day mean; that mean is not a healthy baseline or a safe limit.
+
+The response preserves actual archived observation IDs when present and supplies
+explicit telemetry sheet/asset/field/time references otherwise. Current-state
+row references remain separate from telemetry timestamps. Existing data-quality
+issues are exposed. Non-finite readings become unknown; zero current does not
+prove electrical isolation; hot bearings remain annotated. Visual radii use
+unverified scene units. No inferred isolation points or safe-work decisions are
+emitted. Existing in-memory Arduino scripted faults are explicitly marked
+`runtime_scenario`, without incorrectly citing the recipient's original workbook
+record. The pure projection is recomputed on request, so it does not conceal
+those state changes behind a cache.
+
+Validation: `python -m unittest tests.test_scene_context tests.test_public_demo`
+passed 33 tests. Read-only checks against both prepared datasets confirmed all
+30 mapped IDs, statuses, centers and asset bindings are preserved and the
+response serializes with strict finite JSON. Browser QA uses an isolated local
+data copy; original assets and shared production jobs are unchanged.

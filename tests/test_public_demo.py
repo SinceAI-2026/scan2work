@@ -145,6 +145,20 @@ class PublicHTTPTests(unittest.TestCase):
         self.assertEqual(self.manifest.read_bytes(), self.original)
         self.assertTrue(self.request('GET', '/data//digital_twin.json')[1]['runtime']['public_demo'])
 
+    def test_scene_context_is_read_only_uses_active_twin_and_does_not_call_models(self):
+        self.twin['assets'] = [self.asset, {**self.asset, 'id': 'OBJ-004', 'mapped': False}]
+        before = copy.deepcopy(self.twin)
+        with mock.patch.object(server.decisions_client, 'decide', side_effect=AssertionError('model call')), \
+             mock.patch.object(server.field_service, 'read_log', side_effect=AssertionError('private state')):
+            status, result, _ = self.request('GET', '/api/scene-context')
+        self.assertEqual(status, 200)
+        self.assertEqual(set(result['devices']), {'OBJ-206'})
+        self.assertEqual(result['devices']['OBJ-206']['condition_state'], 'degraded')
+        self.assertEqual(result['counts']['unmapped'], 1)
+        self.assertEqual(self.twin, before)
+        self.assertEqual(self.manifest.read_bytes(), self.original)
+        self.assertEqual(self.request('POST', '/api/scene-context', {})[0], 403)
+
     def test_explicit_voice_config_does_not_enable_shared_writes_or_backend_models(self):
         with mock.patch.dict(os.environ, {'VALMET_VOICE_AGENT_ID': 'agent_fixture123',
             'VALMET_VOICE_AGENT_NAME': 'Public guide', 'VALMET_VOICE_MCP_URL': 'https://example.test/mcp'}):

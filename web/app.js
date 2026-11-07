@@ -1,4 +1,10 @@
 import * as THREE from "three";
+import { makeTechnician, technicianCameraOffset } from "./technician-avatar.mjs";
+import { withTechnicianClearance, TECHNICIAN_HEIGHT } from "./technician-navigation.mjs";
+import { createHazardLayer, energyDescription } from "./hazard-layer.mjs";
+import { renderDeviceSummary } from "./device-summary.mjs";
+import { mountSafetyDemo } from "./safety-demo.mjs";
+import { createContextRefresh, applyContextStatus } from "./scene-context-refresh.mjs";
 import { scenePolicy, firstNavigationPoint, regionSummary, escapeHtml as esc } from "./imported-assets.mjs";
 import { assetPresentation, displayAssetTag } from "./asset-presentation.mjs";
 import { renderAssetPhoto } from "./asset-photo.mjs";
@@ -57,6 +63,7 @@ const state = {
 };
 
 let scene, camera, renderer, controls;
+let technician, technicianLast, sceneContext=null, hazardLayer, safetyDemo, demoCameraGlide=null;
 let maxRenderDimension;
 let splatMesh, splatMaterial, sortWorker;
 let sortBusy = false;
@@ -67,11 +74,11 @@ let mapBackground;
 let semanticPlan;
 const AERIAL = new Set(["aerial"]);   // the view from above: Room view panel, layers, every label
 const isAerial = () => AERIAL.has(state.cameraPreset);
-const VIEW_NAMES = {walk:"Follow robot", first:"First person", aerial:"Aerial view"};
+const VIEW_NAMES = {walk:"Follow technician", first:"First person", aerial:"Aerial view"};
 const VIEW_ICONS = {walk:"follow", first:"first", aerial:"aerial"};
 const firstLook = {yaw:0, pitch:0, at:-1e9};   // first person: drag-to-look offsets from the walking direction
 const CEILING_CUT_M = 1.7;   // above the tallest pump or valve top, below the overhead pipe runs
-const ROBOT_EYE_M = 1.3;     // robot head and first-person camera height
+const ROBOT_EYE_M = 1.25;     // robot head and first-person camera height
 // Free view frames every object; Aerial view frames what its "Show in room" boxes pick (view-filter.mjs).
 let bimView;
 
@@ -100,11 +107,14 @@ const instancesById = new Map();
 const instanceSizes = new Map();
 
 async function init() {
-  const [twin, poses] = await Promise.all([
+  const [twin, poses, context] = await Promise.all([
     fetch("./data/digital_twin.json").then(res => res.json()),
     fetch("./data/walk_poses.json").then(res => res.ok ? res.json() : null).catch(() => null),
+    fetch("./api/scene-context").then(res => res.ok ? res.json() : null).catch(() => null),
   ]);
   state.twin = twin;
+  sceneContext=context;
+  applyContextStatus(twin.assets,context);
   mountDemoBanner(twin.runtime);
   state.datasetId = twin.scene?.dataset_id || twin.runtime?.dataset_id || "";
   Object.assign(state,scenePolicy(twin));
@@ -137,6 +147,7 @@ async function init() {
   originalNavigation = twin.navigation;
   walkPoses = !state.imported && Array.isArray(poses) ? poses : [];
   if (walkPoses.length) twin.navigation = withWalkthroughPassages(twin.navigation, twin.assets, walkPoses);
+  twin.navigation=withTechnicianClearance(twin.navigation,{assets:twin.assets});
   initialNavigation = twin.navigation;
   equipmentObstacles = manualObstacles(state.twin.assets, state.twin.navigation.grid_meta.robot_radius_m);
 
@@ -206,6 +217,7 @@ async function init() {
   renderProposalList();
   selectAsset(targetAsset, false);
   applyCameraPreset("aerial");
+  setupSceneContext(targetAsset);
   const apartHash = decodeURIComponent(location.hash).match(/^#apart=(.+)$/);
   if (apartHash && liveRoomAssets.has(apartHash[1])) {
     selectAsset(liveRoomAssets.get(apartHash[1]), false);
@@ -223,6 +235,9 @@ async function init() {
     lastTs = now;
     updateAttractMode(now);
     stepSimulation(dt, now * 0.001);
+    safetyDemo?.tick(dt);
+    hazardLayer?.frame();
+    if(demoCameraGlide&&!safetyDemo?.state.paused){const g=demoCameraGlide;g.elapsed+=dt;const t=Math.min(1,g.elapsed/g.duration),k=t*t*(3-2*t);camera.position.lerpVectors(g.from,g.to,k);controls.target.lerpVectors(g.aimFrom,g.aimTo,k);controls.update();if(t===1)demoCameraGlide=null;}
     takeApart.frame(boxMeshes);
     if (proposalReview?.isOpen) for (const entry of boxMeshes.values()) entry.group.visible=false;
     roomParts.frame(dt);
@@ -259,7 +274,7 @@ function initThreeScene() {
   maxRenderDimension = Math.min(gl.getParameter(gl.MAX_RENDERBUFFER_SIZE),
     renderer.capabilities.maxTextureSize, viewportLimits[0], viewportLimits[1]);
   renderer.setClearColor(0x16191b, 1);
-  renderer.domElement.setAttribute("aria-label", "Equipment Room 3D Gaussian scene and inspection robot");
+  renderer.domElement.setAttribute("aria-label", "Equipment Room 3D Gaussian scene and service technician");
   container.insertBefore(renderer.domElement, container.firstChild);
   resizeRenderer();
 
@@ -779,7 +794,7 @@ function applyCameraPreset(preset) {
   }
   document.getElementById("view-control-hint").textContent=preset==="first"
     ? "Drag to look · WASD / arrows to walk · Shift to move faster"
-    : preset==="walk" ? "Camera follows the robot · click the map to choose a destination"
+    : preset==="walk" ? "Camera follows the technician · click the map to choose a destination"
     : "Drag to orbit · right-drag to pan · scroll to zoom";
   setViewLayer(aerial ? state.viewLayer : "scan");
 
@@ -974,41 +989,10 @@ function buildAssetBoundingBoxes() {
 }
 
 function buildRobotAvatar() {
+  technician = makeTechnician(THREE,{height:TECHNICIAN_HEIGHT});
   robotGroup = new THREE.Group();
-  robotGroup.renderOrder = 6;
-  const radius = state.twin.navigation.grid_meta.robot_radius_m;
-  const widthScale = radius / .15;
-
-  const baseMesh = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.13 * widthScale, radius, 0.10, 24),
-    new THREE.MeshStandardMaterial({ color: 0x172622, metalness: 0.4, roughness: 0.4 })
-  );
-  baseMesh.position.y = 0.06;
-  robotGroup.add(baseMesh);
-
-  // About 1.45 m to the top of the sensor: shorter than a person, tall enough to see over most equipment.
-  // The room's ceiling slab starts at 1.97 m.
-  const mast = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.03, 0.045, 1.15, 16),
-    new THREE.MeshStandardMaterial({ color: 0x475569, metalness: 0.4, roughness: 0.4 })
-  );
-  mast.position.y = 0.685;
-  robotGroup.add(mast);
-
-  const head = new THREE.Mesh(
-    new THREE.BoxGeometry(0.16 * widthScale, 0.12, 0.2 * widthScale),
-    new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.5, roughness: 0.3 })
-  );
-  head.position.y = ROBOT_EYE_M;
-  robotGroup.add(head);
-
-  lidarRing = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.05, 0.05, 0.025, 16, 1, true),
-    new THREE.MeshBasicMaterial({ color: 0x8fd14f, wireframe: true })
-  );
-  lidarRing.position.y = ROBOT_EYE_M + 0.1;
-  robotGroup.add(lidarRing);
-
+  robotGroup.add(technician.root);
+  robotGroup.traverse(object=>{object.renderOrder=6;});
   const proxRadius = state.twin.navigation.grid_meta.proximity_radius_m || 1.65;
   proxRing = new THREE.Mesh(
     new THREE.RingGeometry(proxRadius - 0.02, proxRadius, 64),
@@ -1021,6 +1005,54 @@ function buildRobotAvatar() {
 
   scene.add(robotGroup);
   robotGroup.position.fromArray(state.journey.route.waypoints[0].position);
+  technicianLast=robotPosition();
+}
+
+function setupSceneContext(targetAsset) {
+  const button=document.getElementById("btn-hazards"), play=document.getElementById("btn-safety-demo");
+  button.disabled=!sceneContext?.devices;
+  if(button.disabled)button.title="Energy context is unavailable on this server.";
+  hazardLayer=createHazardLayer(THREE,{scene,context:()=>sceneContext,assets:()=>state.roomAssets,
+    selected:()=>state.selectedAsset,position:robotPosition,container:document.getElementById("canvas-container"),button});
+  let saved;
+  const focus=()=>{
+    const from=camera.position.clone(),aimFrom=controls.target.clone();
+    selectAsset(targetAsset,false);viewRoomLocation(roomAsset(targetAsset),{avoid:robotPosition()});
+    setInspectorOpen(false);
+    // Frame the floor illustration and device together; source-photo detail opens in the next step.
+    camera.position.y=1.8;controls.target.y=.8;camera.lookAt(controls.target);
+    if(!matchMedia('(prefers-reduced-motion: reduce)').matches){demoCameraGlide={from,aimFrom,to:camera.position.clone(),aimTo:controls.target.clone(),elapsed:0,duration:.85};camera.position.copy(from);controls.target.copy(aimFrom);}
+  };
+  safetyDemo=mountSafetyDemo({button:play,container:document.getElementById("canvas-container"),host:{
+    capture(){saved={preset:state.cameraPreset,layer:state.viewLayer,cut:state.ceilingCut,boxes:state.boxesMode,hazards:hazardLayer.enabled,inspector:document.body.classList.contains("inspector-open"),position:camera.position.clone(),target:controls.target.clone()};roomParts?.close({immediate:true});proposalReview?.close();takeApart?.close();setInspectorOpen(false);},
+    navigate(){showMissionView();setBoxesMode("selected");dispatchRobotToAsset(targetAsset,{firstPerson:false});},
+    caption:phase=>phase==='hazard'?`${targetAsset.tag} · ${energyDescription(sceneContext.devices[targetAsset.id]).reading}. ${energyDescription(sceneContext.devices[targetAsset.id]).source}. The zone illustrates potential energy, not verified isolation or a measured clearance.`:null,
+    travel:()=>state.journey.phase,
+    pause(){if(state.journey.phase==='moving')applyJourneyEvent({type:'pause'});},
+    resume(){if(state.journey.phase==='paused')applyJourneyEvent({type:'resume'});},
+    focus,
+    hazard(on){hazardLayer.setDemo(on);hazardLayer.setEnabled(on||saved?.hazards);},
+    evidence(){setInspectorOpen(true);renderAssetPhoto(roomAsset(targetAsset),document.getElementById("asset-photo"),location.href);document.querySelector('.inspector-scroll').scrollTop=0;},
+    restore({takeover}){demoCameraGlide=null;hazardLayer.setDemo(false);hazardLayer.setEnabled(saved.hazards);setBoxesMode(saved.boxes);if(!takeover){setInspectorOpen(saved.inspector);applyCameraPreset(saved.preset);setViewLayer(saved.layer);setCeilingCut(saved.cut);camera.position.copy(saved.position);controls.target.copy(saved.target);controls.update();}},
+    failed(){document.getElementById('navigation-message').textContent='Demo paused: no valid route to the selected device. Explore with Free view.';},
+  }});
+  play.disabled=!state.navigationAvailable||!sceneContext?.devices?.[targetAsset.id]?.hazards?.length;
+  if(play.disabled)play.title="A mapped target, energy context and a walkable route are needed for this demo.";
+  const refreshContext=createContextRefresh({
+    load:()=>fetch('./api/scene-context',{cache:'no-store'}).then(response=>{if(!response.ok)throw new Error('Equipment context unavailable');return response.json();}),
+    apply(context){
+      safetyDemo?.stop({takeover:true});sceneContext=context;
+      applyContextStatus(state.twin.assets,context);applyContextStatus(state.roomAssets,context);
+      button.disabled=Boolean(context.unavailable);play.disabled=Boolean(context.unavailable)||!state.navigationAvailable||!context.devices?.[targetAsset.id]?.hazards?.length;
+      if(context.unavailable)hazardLayer.setEnabled(false);
+      if(state.selectedAsset){
+        renderDeviceSummary(document.getElementById('device-status-summary'),roomAsset(state.selectedAsset),context);
+        if(!context.unavailable&&document.body.classList.contains('inspector-open')&&!takeApart?.isOpen&&!roomParts?.isOpen)selectAsset(state.selectedAsset,false);
+      }
+    }
+  });
+  window.addEventListener('fault-panel',refreshContext);
+
 }
 
 function buildRouteMap() { rebuildReachableOverlay(); }
@@ -1154,6 +1186,8 @@ function stepSimulation(dt, elapsedSec) {
   currentNavigation = nav;
   const {x: rx, z: rz, yaw} = nav;
   robotGroup.position.set(rx, 0, rz);
+  technician.animate(Math.hypot(rx-technicianLast.x,rz-technicianLast.z),dt);
+  technicianLast={x:rx,z:rz};
   recordPassedAssets({x:rx,z:rz});
   robotGroup.rotation.y = yaw;
   if (lidarRing) lidarRing.rotation.y = elapsedSec * 5.0;
@@ -1224,6 +1258,9 @@ function stepSimulation(dt, elapsedSec) {
   applyExplode(boxMeshes, splatMaterial);
   renderJourneyControls(nav);
   if (state.boxesMode !== "off") applyLayerFrames();
+  if(safetyDemo&&safetyDemo.state.phase!=='idle') {
+    for(const entry of boxMeshes.values())entry.group.visible=!entry.removed&&entry.asset.id===state.selectedAsset?.id;
+  }
   document.getElementById("prox-count").textContent = `${(state.nearby || []).length} in range`;
   drawRouteMap(nav);
   semanticPlan.update(nav,state.journey);
@@ -1480,6 +1517,7 @@ function selectAsset(asset, openInspector = false) {
   if (takeApart?.isOpen && takeApart.active.asset !== asset) takeApart.open(asset);
   copilotRequestId++;
   const presentation = assetPresentation(asset);
+  renderDeviceSummary(document.getElementById("device-status-summary"),asset,sceneContext);
   const removed = removedIds.has(asset.id);
   renderRoomEditControls();
   document.getElementById("active-asset-details").hidden = removed;
@@ -1520,14 +1558,14 @@ function selectAsset(asset, openInspector = false) {
   document.getElementById("detail-subtitle").textContent =
     presentation.category;
 
-  // Short specs under the title: AI confidence and health, nothing else (the label is already the title)
+  // Preserve the upstream specs layout, while distinguishing condition confidence from recognition accuracy.
   const effPct = Number.isFinite(asset.effective_confidence) ? Math.round(asset.effective_confidence * 100) : null;
-  const specs = [effPct !== null && ["AI confidence", `${effPct}%`, ""],
+  const specs = [!uninstrumented && asset.mapped && effPct !== null && ["Condition-model confidence", `${effPct}%`, ""],
     !uninstrumented && asset.health_score != null && ["Health", `${asset.health_score}%`, asset.condition_state]].filter(Boolean);
   const specList = document.getElementById("detail-specs");
   specList.replaceChildren(...specs.flatMap(([k, v, cls]) => {
     const dt = document.createElement("dt"), dd = document.createElement("dd");
-    dt.textContent = k; dd.textContent = v; if (cls) dd.className = cls;
+    dt.textContent = k; dd.textContent = v; if (k === "Condition-model confidence") dd.title="Workbook condition model after data-quality adjustment; not object-recognition accuracy."; if (cls) dd.className = cls;
     return [dt, dd];
   }));
   specList.hidden = !specs.length;
@@ -1556,6 +1594,7 @@ function selectAsset(asset, openInspector = false) {
   document.getElementById("detail-doc-id").textContent = asset.knowledge_doc_id || "DOC-3D-MAPPING";
   const diag = asset.diagnostics || {};
   document.getElementById("exec-summary-box").textContent = diag.executive_summary;
+  document.getElementById("exec-summary-box").hidden = Boolean(sceneContext?.devices?.[asset.id]);
   const severity = document.getElementById("triage-severity");
   const severityLabel = diag.ai_triage?.severity?.label;
   severity.hidden = !severityLabel;
@@ -1623,7 +1662,7 @@ function renderTelemetryChart(asset) {
   const series = asset.telemetry?.series || {};
   let s1 = series.position_setpoint_pct || series.vibration_mm_s || series.process_pressure_bar || [];
   let s2 = series.position_actual_pct || series.bearing_temp_c || [];
-  let label = "Live Telemetry";
+  let label = "Synthetic workbook snapshot";
 
   if (series.position_setpoint_pct && series.position_actual_pct) {
     label = "SP (forest) vs Actual PV (terracotta)";
@@ -1679,7 +1718,7 @@ function showArrivalReport(assetId) {
   document.getElementById("btn-map-expand").setAttribute("aria-expanded","false");
   const presentation = assetPresentation(asset);
   const uninstrumented = presentation.kind !== "instrumented";
-  document.getElementById("arrival-evidence").open=!uninstrumented;
+  document.getElementById("arrival-evidence").open=false;
   const heading=document.getElementById(uninstrumented ? "detail-title" : "service-guidance-title");
   document.querySelector(".inspector-scroll").scrollTop=0;
   heading.focus({preventScroll:true});
@@ -1835,7 +1874,7 @@ function prepareRoomEdits(edits, placements=roomPlacements) {
       const indices=[...indexedScan.owned.get(owner).filter(index=>owners[index]===owner),...(added.get(owner)||[])];
       return copyPlacedSplats(scan,indices,asset,owner);
     });
-    navigation = navigationAfterRoomEdits(originalNavigation,assets,scan,instances,fills,walkPoses,initialNavigation.grid_meta,placed);
+    navigation = withTechnicianClearance(navigationAfterRoomEdits(originalNavigation,assets,scan,instances,fills,walkPoses,initialNavigation.grid_meta,placed),{assets});
   }
   if (navigation && state.demoObstacle) navigation = blockBox(navigation,state.demoObstacle);
   return {ids,parts,instances,assets,navigation,fills,placed,owners};
@@ -1945,7 +1984,7 @@ function replanAfterRoomEdit(prior) {
   }
   try {
     let replacement;
-    const destination=asset && !asset.is_target ? assetDestination(navigation,start,asset) : {...route,stops:[]};
+    const destination=asset ? assetDestination(navigation,start,asset) : {...route,stops:[]};
     try { replacement=planFromPosition(navigation,start,destination); }
     catch(error) {
       if (!asset) throw error;
@@ -2069,7 +2108,7 @@ async function changeRoom(action,asset) {
   }
 }
 
-function viewRoomLocation(asset) {
+function viewRoomLocation(asset,{avoid=null}={}) {
   if (takeApart?.isOpen) takeApart.close();
   const navigation=state.twin.navigation,m=navigation.grid_meta;
   const [x,y,z]=asset.center, eye=1.22;
@@ -2082,7 +2121,9 @@ function viewRoomLocation(asset) {
       const i=Math.floor((p.x+(x-p.x)*t-m.x_min)/m.res),j=Math.floor((p.z+(z-p.z)*t-m.z_min)/m.res);
       if(!navigation.clearance_grid_m[i]?.[j]) obstruction++;
     }
-    const score=Math.abs(distance-2)*4+obstruction*.16-p.clearance*.35;
+    let avatarPenalty=0;
+    if(avoid){const dx=x-p.x,dz=z-p.z,t=((avoid.x-p.x)*dx+(avoid.z-p.z)*dz)/(dx*dx+dz*dz);if(t>0&&t<1&&Math.hypot(avoid.x-p.x-t*dx,avoid.z-p.z-t*dz)<.48)avatarPenalty=30;}
+    const score=Math.abs(distance-2)*4+obstruction*.16-p.clearance*.35+avatarPenalty;
     if(score<cost){best=p;cost=score;}
   }
   applyCameraPreset('detail');
@@ -2370,15 +2411,12 @@ function updateFollowCamera(nav, dt, route) {
   const goalYaw = nav.yaw ?? robotGroup.rotation.y;
   if (followRig.yaw === undefined || followRig.snap) followRig.yaw = goalYaw;
   else followRig.yaw += Math.atan2(Math.sin(goalYaw - followRig.yaw), Math.cos(goalYaw - followRig.yaw)) * ease(3);
-  const dx = Math.sin(followRig.yaw), dz = Math.cos(followRig.yaw), start = [nav.x, 0, nav.z];
-  let distance = 1.6;
-  while (distance > 0.6 && !segmentIsFree(state.twin.navigation, start, [nav.x - dx * distance, 0, nav.z - dz * distance])) distance -= 0.1;
-  // Over the right shoulder (0.3 m to the side), so the robot's mast does not block the middle of the view.
-  const rx = -dz * 0.3, rz = dx * 0.3;
-  const goalPos = new THREE.Vector3(nav.x - dx * distance + rx, 1.6, nav.z - dz * distance + rz);
+  const dx = Math.sin(followRig.yaw), dz = Math.cos(followRig.yaw);
+  const rig=technicianCameraOffset(nav,followRig.yaw,(start,end)=>segmentIsFree(state.twin.navigation,start,end));
+  const goalPos = new THREE.Vector3(rig.x,rig.y,rig.z);
   const arrivedAt = state.journey.phase === "arrived" && route?.asset_id ? roomAsset(state.assetsById.get(route.asset_id)) : null;
   const goalTarget = arrivedAt ? new THREE.Vector3().fromArray(arrivedAt.center)
-    : new THREE.Vector3(nav.x + dx * 0.6 + rx, 1.0, nav.z + dz * 0.6 + rz);
+    : new THREE.Vector3(nav.x + dx * .25,rig.targetY,nav.z + dz * .25);
   followRig.pos.lerp(goalPos, ease(6));
   followRig.target.lerp(goalTarget, ease(6));
   followRig.snap = false;
@@ -2402,7 +2440,7 @@ function dispatchRobotToAsset(asset, {firstPerson = true} = {}) {
     const navigation = state.twin.navigation;
     const primary = navigation.primary_route;
     let route;
-    if (asset.asset_id === state.twin.target_asset_id && primary?.validated && primary.asset_id === asset.asset_id) {
+    if (!navigation.technician_profile && asset.asset_id === state.twin.target_asset_id && primary?.validated && primary.asset_id === asset.asset_id) {
       try {
         route = planFromPosition(navigation, start, {...primary, kind:"asset"});
       } catch {

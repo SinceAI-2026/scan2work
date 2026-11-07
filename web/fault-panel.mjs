@@ -97,7 +97,7 @@ function render(st) {
   const actions = canControlArduino(runtime) && !pendingAction;
   card.querySelector('[data-action="ack"]').disabled = !actions || st.status !== "fault";
   card.querySelector('[data-action="claim"]').disabled = !actions;
-  const key = `${st.status}:${t?.tag || ""}`;
+  const key = JSON.stringify([st.status,t?.tag,t?.issue_code,t?.issue,t?.signal?.name,t?.signal?.normal,t?.signal?.now]);
   if (key !== lastKey) {
     lastKey = key;
     window.dispatchEvent(new CustomEvent("fault-panel", { detail: st }));

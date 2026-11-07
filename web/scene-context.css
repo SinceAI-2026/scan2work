@@ -1,0 +1,16 @@
+#btn-hazards[aria-pressed=true]{background:#fff0bd;border-color:#ca8b2c;color:#5c3d12}
+.device-summary{margin:12px 0;padding:12px;border:1px solid #d8e1d3;border-radius:9px;background:#eef3e9;line-height:1.45;font-size:12px}
+.device-summary-top{display:flex;gap:10px;align-items:flex-start;justify-content:space-between}.device-summary-top strong{font-size:14px}.device-summary-top span{white-space:nowrap;font-size:10px;text-transform:uppercase;color:#705738}.device-summary p{margin:8px 0}.device-summary small{font-size:10px;color:#53685c}.device-summary-reading{font-weight:600}
+.hazard-summary,.safety-demo-card{position:absolute;z-index:20;width:min(340px,calc(100% - 32px));padding:14px;border:1px solid #d2d9c9;border-radius:11px;background:#f7f7efed;color:#26372d;box-shadow:0 5px 24px #0002;font-size:12px;line-height:1.5;pointer-events:auto}
+.hazard-summary{left:16px;top:calc(var(--room-controls-height,140px) + 22px);border-color:#dbb35a}.hazard-summary p{margin:5px 0}.hazard-summary small{color:#6e6247;font-size:10px}
+.safety-demo-card{left:16px;bottom:16px}.safety-demo-card h3{font-size:18px;margin:6px 0}.safety-demo-card p{margin:6px 0 12px}.safety-demo-card small{font-size:10px;letter-spacing:.08em;color:#815e21;font-weight:700}.safety-demo-card>div{display:flex;gap:6px;flex-wrap:wrap}.safety-demo-card button{padding:7px 10px;background:#fff;border:1px solid #c3d0bf;border-radius:6px;color:#284d37;cursor:pointer;font:inherit}.safety-demo-card button:disabled{opacity:.5;cursor:default}.safety-demo-active .navigation-hud{visibility:hidden}.safety-demo-active .hazard-summary{display:none}
+@media(max-width:650px){.safety-demo-card{bottom:10px;left:10px;width:min(300px,calc(100% - 20px));font-size:11px}.hazard-summary{left:10px;width:250px}.safety-demo-card h3{font-size:16px}}
+@media(prefers-reduced-motion:no-preference){.hazard-summary,.safety-demo-card{animation:scene-context-in .25s ease-out}@keyframes scene-context-in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}}
+
+@media(max-width:650px){
+ .guided-demo-active .workspace{grid-template-columns:minmax(0,1fr)}
+ .guided-demo-active .left-sidebar{display:none}
+ .guided-demo-active .safety-demo-card{position:fixed;left:10px;right:10px;bottom:10px;width:auto;z-index:70;max-height:220px;overflow:auto}
+ .guided-demo-active.inspector-open .inspector-scroll{padding-bottom:240px}
+ .guided-demo-active .route-map-panel{display:none}
+}
