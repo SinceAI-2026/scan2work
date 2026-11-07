@@ -17,6 +17,7 @@ import { indexRoomScan, fillRoomObject, traceRoomInstance, reviewedTrolleyParts 
 import { loadRoomPlacements, saveRoomPlacements, placedRoomAsset, roomBoundsOverlap, roomPlacementError, copyPlacedSplats } from "./room-placement.mjs";
 import { navigationAfterRoomEdits } from "./room-edit-navigation.mjs";
 import { roomEditStore } from "./room-edits.mjs";
+import { TransformControls } from "three/addons/controls/TransformControls.js";
 import { isPublicDemo, mountDemoBanner } from "./runtime-access.mjs";
 import { createGameMap, mapFrame, mapPoint, mapWorldPoint } from "./game-map.mjs";
 import { bindSemanticPlan } from "./semantic-plan.mjs";
@@ -104,6 +105,7 @@ let updateFillSort;
 let sourceScan, indexedScan, originalNavigation, initialNavigation, walkPoses;
 let editStore, activeEdits = [], removedIds = new Set(), editsOffline = false, editBusy = false;
 let roomPlacements = new Map(), liveRoomAssets = new Map(), movePreview = null;
+let moveGizmo = null, moveAnchor = null, moveGizmoReleased = 0; // Move in room: translate arrows on the floor (TransformControls)
 let foldedRoomParts = new Map();
 const MAX_ROOM_CUTS = 32, CUT_PAD = 0.03, CUT_TO_FLOOR = 0.3; // updateRoomCuts
 const tracedFragments = new Map();
@@ -380,6 +382,7 @@ function initThreeScene() {
     mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
     raycaster.setFromCamera(mouse, camera);
     if (movePreview) {
+      if (moveGizmo.axis || performance.now()-moveGizmoReleased<300) return; // a click on the arrows is not a floor click
       const point = raycaster.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0,1,0),0),new THREE.Vector3());
       if (point) setMovePoint(point);
       return;
@@ -1918,7 +1921,8 @@ function cellAtPosition({x,z}, navigation=state.twin.navigation) {
   return navigation.walkable_grid[Math.floor((x-m.x_min)/m.res)]?.[Math.floor((z-m.z_min)/m.res)];
 }
 
-function prepareRoomEdits(edits, placements=roomPlacements) {
+// preview: a drag in progress. Splats follow the arrows; navigation is rebuilt only when the drag ends.
+function prepareRoomEdits(edits, placements=roomPlacements, preview=null) {
   if (state.exactMembership) return prepareExactRoomEdits(edits, placements);
   const ids = new Set(edits.map(edit=>edit.id));
   const affected = new Set([...ids,...placements.keys()].sort());
@@ -1958,15 +1962,19 @@ function prepareRoomEdits(edits, placements=roomPlacements) {
       for (const [index,neighbour] of retained) assign(index,neighbour);
     }
     const scan = {...indexedScan,instances:owners};
+    const fillKey=[...affected].join(',');
     fills = [...affected].map(id=>{
-      const asset = state.assetsByObj.get(id);
-      return [asset,fillRoomObject(scan,asset,instances,state.twin.scene.walls)];
+      const asset = state.assetsByObj.get(id), key=`${fillKey}|${id}`;
+      const cached = preview?.fills.get(key) ?? fillRoomObject(scan,asset,instances,state.twin.scene.walls);
+      preview?.fills.set(key,cached);
+      return [asset,cached];
     });
     placed = assets.filter(asset=>asset.transform).map(asset=>{
       const owner = instancesById.get(asset.id);
       const indices=[...indexedScan.owned.get(owner).filter(index=>owners[index]===owner),...(added.get(owner)||[])];
       return copyPlacedSplats(scan,indices,asset,owner);
     });
+    if (preview) return {ids,parts,instances,assets,navigation:null,fills,placed,owners};
     navigation = withTechnicianProfile(navigationAfterRoomEdits(originalNavigation,assets,scan,instances,fills,walkPoses,initialNavigation.grid_meta,placed));
   }
   if (navigation && state.demoObstacle) navigation = blockBox(navigation,state.demoObstacle);
@@ -2035,7 +2043,8 @@ function updateRoomCuts() {
   const u = splatMaterial?.uniforms;
   if (!u?.uCutMin) return;
   const boxes = ai3d?.cutBoxes() ?? [];
-  for (const id of new Set([...removedIds, ...roomPlacements.keys()])) {
+  const dragged = movePreview?.dragged ? [movePreview.asset.id] : []; // its first drag: the old spot empties at once
+  for (const id of new Set([...removedIds, ...roomPlacements.keys(), ...dragged])) {
     const a = state.assetsByObj.get(id), min = a?.aabb_min ?? a?.bbox_min, max = a?.aabb_max ?? a?.bbox_max;
     if (!min || !max) continue;
     const box = {min: min.map(v => v - CUT_PAD), max: max.map(v => v + CUT_PAD)};
@@ -2270,9 +2279,12 @@ function beginMovePreview(asset) {
   outline.renderOrder=10;
   scene.add(outline);
   const [x,y,z]=asset.center;
-  // the pending placement lives here; the mouse (drag, floor or map click) and Q / E change it
-  movePreview={asset:source,outline,review,x,z,
-    height:Math.max(0,asset.transform ? y-asset.size[1]/2 : baseY),yaw:Math.round(asset.yaw*180/Math.PI)};
+  const height=Math.max(0,asset.transform ? y-asset.size[1]/2 : baseY), yaw=Math.round(asset.yaw*180/Math.PI);
+  // committed: where the object is in the room now; the arrows, a floor or map click and Q / E move it from there
+  movePreview={asset:source,outline,review,x,z,height,yaw,committed:{x,z,yaw},fills:new Map()};
+  moveAnchor.position.set(x,height,z);
+  moveGizmo.attach(moveAnchor);
+  moveGizmo.getHelper().visible=true;
   document.body.classList.add('placing-object');
   document.getElementById('room-move-form').hidden=false;
   updateMovePreview();
@@ -2284,8 +2296,9 @@ function closeMovePreview() {
   movePreview.outline.geometry.dispose();
   movePreview.outline.material.dispose();
   movePreview=null;
+  moveGizmo.detach();
+  moveGizmo.getHelper().visible=false;
   document.body.classList.remove('placing-object','dragging-object');
-  renderer.domElement.classList.remove('over-object');
   document.getElementById('room-move-form').hidden=true;
 }
 
@@ -2294,12 +2307,14 @@ function setMovePoint(point) {
   movePreview.x=point.x;
   movePreview.z=point.z;
   updateMovePreview();
+  commitMovePreview();
 }
 
 function turnMovePreview(degrees) {
   if (!movePreview) return;
   movePreview.yaw=Math.round(movePreview.yaw+degrees);
   updateMovePreview();
+  commitMovePreview();
 }
 
 function updateMovePreview() {
@@ -2311,71 +2326,85 @@ function updateMovePreview() {
   const rail=review?.rail;
   const includeRail=rail && !removedIds.has(rail.id) && !roomPlacements.has(rail.id);
   if (includeRail) omitted.add(instancesById.get(rail.id));
-  const collisionAssets=includeRail ? state.roomAssets.filter(other=>other.id!==rail.id) : state.roomAssets;
+  const collisionAssets=(includeRail ? state.roomAssets.filter(other=>other.id!==rail.id) : state.roomAssets);
   const placedAsset=placedRoomAsset(asset,placement,review?.baseY);
   const error=roomPlacementError(placedAsset,collisionAssets,indexedScan,omitted,initialNavigation.grid_meta);
   outline.visible=true;
   outline.position.fromArray(placedAsset.center);
   outline.rotation.y=-placement.yaw;
   outline.material.color.setHex(error ? 0xff9b85 : 0x79e2ef);
+  if (!moveGizmo.dragging) moveAnchor.position.set(x,height,z);
   Object.assign(movePreview,{placement,error});
   document.getElementById('room-move-error').textContent=error;
-  document.getElementById('btn-place-object').disabled=!!error;
 }
 
-// Move in room: press on the outline and drag it over the floor (the camera stays put while dragging);
-// pressing anywhere else still orbits, and a plain click on the floor drops the object there.
-function bindMoveDrag() {
-  const canvas=renderer.domElement, ray=new THREE.Raycaster(), ndc=new THREE.Vector2(), box=new THREE.Box3();
-  let drag=null, frame=0;
-  const cast=e=>{
-    const r=canvas.getBoundingClientRect();
-    ndc.set((e.clientX-r.left)/r.width*2-1,-(e.clientY-r.top)/r.height*2+1);
-    ray.setFromCamera(ndc,camera);
-    return ray.ray;
-  };
-  const floorAt=(e,y)=>cast(e).intersectPlane(new THREE.Plane(new THREE.Vector3(0,1,0),-y),new THREE.Vector3());
-  const onObject=e=>{
-    const outline=movePreview.outline;
-    outline.updateMatrixWorld();
-    box.setFromObject(outline).expandByScalar(.06);
-    return !!cast(e).intersectBox(box,new THREE.Vector3());
-  };
-  canvas.addEventListener('pointerdown',e=>{
-    if (!movePreview || e.button!==0 || !onObject(e)) return;
-    const p=floorAt(e,movePreview.height);
-    if (!p) return;
-    drag={dx:movePreview.x-p.x,dz:movePreview.z-p.z};
-    controls.enabled=false;
-    canvas.setPointerCapture(e.pointerId);
-    document.body.classList.add('dragging-object');
-    e.preventDefault();
-    e.stopImmediatePropagation(); // before OrbitControls and the click-to-select handler
-  },{capture:true});
-  canvas.addEventListener('pointermove',e=>{
-    if (!movePreview) return;
-    if (!drag) { canvas.classList.toggle('over-object',onObject(e)); return; }
-    const p=floorAt(e,movePreview.height);
-    if (!p) return;
-    movePreview.x=p.x+drag.dx;
-    movePreview.z=p.z+drag.dz;
-    frame ||= requestAnimationFrame(()=>{ frame=0; updateMovePreview(); });
+// While the arrows are dragged the object's own splats follow them (no navigation rebuild); see prepareRoomEdits.
+function showPlacementSplats(placement) {
+  const next=new Map(roomPlacements);
+  if (placement) next.set(movePreview.asset.id,placement);
+  else next.delete(movePreview.asset.id);
+  const {instances,fills,placed,owners}=prepareRoomEdits(activeEdits,next,movePreview);
+  uploadRoomFill(instances,[...fills.map(([,fill])=>fill.data),...placed],owners);
+}
+
+// The object goes where the arrows, click or turn left it, at once. A blocked spot snaps back to the last good one.
+function commitMovePreview() {
+  if (!movePreview?.placement) return;
+  const {asset,placement,error,committed}=movePreview;
+  if (!error && changePlacement(asset,placement,true)) {
+    movePreview.committed={x:movePreview.x,z:movePreview.z,yaw:movePreview.yaw};
+    movePreview.dragged=false;
+    return;
+  }
+  const message=document.getElementById('room-move-error').textContent;
+  Object.assign(movePreview,committed);
+  updateMovePreview();
+  if (state.exactMembership || movePreview.dragged) showPlacementSplats(roomPlacements.get(asset.id));
+  movePreview.dragged=false;
+  document.getElementById('room-move-error').textContent=`${message || error} It stays where it was.`;
+}
+
+// Move in room: red and blue arrows (and the square between them) drag the object over the floor.
+function bindMoveGizmo() {
+  moveAnchor=new THREE.Object3D();
+  scene.add(moveAnchor);
+  moveGizmo=new TransformControls(camera,renderer.domElement);
+  moveGizmo.setMode('translate');
+  moveGizmo.setSpace('world');
+  moveGizmo.showY=false;
+  const helper=moveGizmo.getHelper();
+  helper.visible=false;
+  helper.traverse(object=>{object.renderOrder=20;});
+  scene.add(helper);
+  let frame=0, last=0;
+  moveGizmo.addEventListener('dragging-changed',event=>{
+    controls.enabled=!event.value;
+    document.body.classList.toggle('dragging-object',event.value);
+    if (!event.value) moveGizmoReleased=performance.now();
+    if (!event.value && movePreview) {
+      cancelAnimationFrame(frame); frame=0;
+      updateMovePreview();
+      commitMovePreview();
+    }
   });
-  const end=e=>{
-    if (!drag) return;
-    drag=null;
-    controls.enabled=true;
-    if (canvas.hasPointerCapture(e.pointerId)) canvas.releasePointerCapture(e.pointerId);
-    document.body.classList.remove('dragging-object');
-    e.stopImmediatePropagation(); // a drag is not a floor click
-  };
-  canvas.addEventListener('pointerup',end,{capture:true});
-  canvas.addEventListener('pointercancel',end,{capture:true});
+  moveGizmo.addEventListener('objectChange',()=>{
+    if (!movePreview || !moveGizmo.dragging) return;
+    moveAnchor.position.y=movePreview.height;
+    movePreview.x=moveAnchor.position.x;
+    movePreview.z=moveAnchor.position.z;
+    movePreview.dragged=true;
+    frame ||= requestAnimationFrame(now=>{
+      frame=0;
+      updateMovePreview();
+      if (now-last>90) { last=now; showPlacementSplats(movePreview.placement); }
+    });
+  });
 }
 
-function changePlacement(asset, placement) {
+// live: from the arrows (keep the move open and the camera where it is). Returns whether the room changed.
+function changePlacement(asset, placement, live=false) {
   manualAnnotations?.close();
-  if (editBusy || removedIds.has(asset.id) || !canRemove(asset)) return;
+  if (editBusy || removedIds.has(asset.id) || !canRemove(asset)) return false;
   const next=new Map(roomPlacements);
   if (placement) next.set(asset.id,placement);
   else next.delete(asset.id);
@@ -2390,9 +2419,10 @@ function changePlacement(asset, placement) {
     }
     saveRoomPlacements(next,state.datasetId);
     roomPlacements=next;
-    closeMovePreview();
+    if (!live) closeMovePreview();
     applyRoomEdits({removed:activeEdits,offline:editsOffline},false,prepared);
-    if (state.selectedAsset.id===asset.id) viewRoomLocation(state.selectedAsset);
+    if (!live && state.selectedAsset.id===asset.id) viewRoomLocation(state.selectedAsset);
+    return true;
   } catch(error) {
     if (movePreview) document.getElementById('room-move-error').textContent=error.message;
     else {
@@ -2400,6 +2430,7 @@ function changePlacement(asset, placement) {
       notice.textContent=error.message;
       notice.hidden=false;
     }
+    return false;
   }
 }
 
@@ -2422,14 +2453,12 @@ function bindRoomEdits() {
   document.getElementById('btn-room-location').addEventListener('click',()=>viewRoomLocation(state.selectedAsset));
   document.getElementById('btn-move-object').addEventListener('click',()=>beginMovePreview(state.selectedAsset));
   document.getElementById('btn-reset-position').addEventListener('click',()=>changePlacement(state.selectedAsset,null));
-  document.getElementById('btn-cancel-move').addEventListener('click',closeMovePreview);
   document.getElementById('btn-rotate-left').addEventListener('click',()=>turnMovePreview(-15));
   document.getElementById('btn-rotate-right').addEventListener('click',()=>turnMovePreview(15));
-  bindMoveDrag();
-  const form=document.getElementById('room-move-form');
-  form.addEventListener('submit',event=>{
+  bindMoveGizmo();
+  document.getElementById('room-move-form').addEventListener('submit',event=>{
     event.preventDefault();
-    if (movePreview?.placement && !movePreview.error) changePlacement(movePreview.asset,movePreview.placement);
+    closeMovePreview();
   });
   document.getElementById('room-fill-debug').addEventListener('change',event=>{
     splatMaterial.uniforms.uFillDebug.value=Number(event.target.checked);
@@ -2685,7 +2714,7 @@ function bindUIEvents() {
       const key=event.key.toLowerCase();
       if (event.key === 'Escape') closeMovePreview();
       else if (key === 'q' || key === 'e') { event.preventDefault(); turnMovePreview(key === 'q' ? -15 : 15); }
-      else if (event.key === 'Enter') { event.preventDefault(); if (!movePreview.error) changePlacement(movePreview.asset,movePreview.placement); }
+      else if (event.key === 'Enter') { event.preventDefault(); closeMovePreview(); }
       return;
     }
     if (event.defaultPrevented || event.isComposing || event.altKey || event.ctrlKey || event.metaKey ||
