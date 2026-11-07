@@ -1,0 +1,56 @@
+/* Inspection queue and technician job card (field-jobs.mjs). */
+.inspection-queue { display: flex; flex-direction: column; gap: 6px; }
+.inspection-queue h2 { font-weight: 600; display: flex; gap: 6px; align-items: center; }
+.iq-count, .iq-done-count { font-family: var(--mono); color: var(--text-main); }
+.iq-list, .iq-done-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; max-height: 220px; overflow-y: auto; }
+.iq-row {
+  width: 100%; display: grid; grid-template-columns: auto 1fr auto; gap: 2px 8px; align-items: baseline;
+  padding: 7px 9px; border: 1px solid var(--border); border-radius: 6px; background: var(--card-bg);
+  font: inherit; font-size: 11px; text-align: left; color: var(--text-main); cursor: pointer;
+}
+.iq-row:hover, .iq-row:focus-visible { border-color: var(--forest); }
+.iq-tag { font-family: var(--mono); font-weight: 600; }
+.iq-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-muted); }
+.iq-state { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--amber); }
+.iq-state.attention_required, .iq-state.degraded { color: var(--terracotta); }
+.iq-progress { grid-column: 1 / -1; color: var(--text-muted); font-size: 10px; }
+.iq-done summary { font-size: 11px; color: var(--text-muted); cursor: pointer; padding: 2px 0; }
+.iq-done .iq-row { opacity: .75; }
+.iq-done .iq-state { color: var(--forest); }
+.iq-empty, .fj-empty { font-size: 11px; color: var(--text-muted); padding: 4px 0; }
+
+.field-job[hidden] { display: none; }
+.fj-status { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; padding: 2px 7px; border-radius: 99px; background: #eef0ea; color: var(--text-muted); }
+.fj-status.in_progress { background: #f6ecd9; color: var(--amber); }
+.fj-status.fixed { background: #e1ede4; color: var(--forest); }
+.fj-status.escalated, .fj-status.not_fixed { background: #f7e3df; color: var(--terracotta); }
+.fj-checks, .fj-notes { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 5px; font-size: 11px; }
+.fj-checks label { display: flex; gap: 7px; align-items: flex-start; cursor: pointer; }
+.fj-checks input { margin-top: 1px; accent-color: var(--forest); }
+.fj-checks li.done b { color: var(--text-muted); text-decoration: line-through; }
+.fj-checks small { display: block; color: var(--text-muted); }
+.fj-safety { font-style: normal; font-size: 9px; text-transform: uppercase; color: var(--terracotta); font-weight: 600; }
+.fj-sub { font-size: 12px; font-weight: 600; margin-top: 4px; }
+.fj-notes { max-height: 200px; overflow-y: auto; }
+.fj-notes li { padding: 6px 8px; border-left: 3px solid var(--border); background: var(--card-bg); border-radius: 0 5px 5px 0; line-height: 1.4; }
+.fj-notes li.fix { border-left-color: var(--forest); }
+.fj-notes li.measurement { border-left-color: var(--amber); }
+.fj-notes li.escalation { border-left-color: var(--terracotta); }
+.fj-notes li.fj-empty { border: 0; background: none; padding: 0; }
+.fj-note-meta { font-size: 10px; color: var(--text-muted); }
+.fj-form { display: flex; flex-direction: column; gap: 6px; }
+.fj-form textarea { width: 100%; box-sizing: border-box; resize: vertical; font: inherit; font-size: 12px; padding: 7px 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--card-bg); color: var(--text-main); }
+.fj-row { display: flex; gap: 6px; flex-wrap: wrap; }
+.fj-kind { font: inherit; font-size: 11px; padding: 5px; border: 1px solid var(--border); border-radius: 6px; background: var(--card-bg); }
+.fj-btn { padding: 6px 10px; border-radius: 6px; font-size: 11px; font-weight: 600; cursor: pointer; border: 1px solid #c7d3c4; background: #fff; color: var(--forest); }
+.fj-btn.primary { background: var(--forest); color: #fff; border-color: var(--forest); margin-left: auto; }
+.fj-btn:disabled { opacity: .45; cursor: default; }
+.fj-error { font-size: 11px; color: var(--terracotta); min-height: 0; margin: 0; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+.fj-flash {
+  position: absolute; top: 14px; left: 50%; transform: translate(-50%, -8px); z-index: 20;
+  padding: 7px 14px; border-radius: 99px; background: var(--header-bg); color: #fff; font-size: 12px; font-weight: 600;
+  opacity: 0; pointer-events: none; transition: opacity .2s, transform .2s;
+}
+.fj-flash.on { opacity: 1; transform: translate(-50%, 0); }

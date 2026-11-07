@@ -11,3 +11,7 @@ web/data/*
 # ...except the inputs and the AI answer cache, which make a rebuild free and reproducible
 !web/data/decisions_cache.json
 !web/data/walk_poses.json
+
+# the voice assistant MCP token: never commit
+.mcp_token
+web/data/field_log.json.lock

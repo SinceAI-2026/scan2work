@@ -2,13 +2,23 @@ import * as THREE from "three";
 import { inspectionCameraPose } from "./inspection-camera.mjs";
 import { assetPresentation } from "./asset-presentation.mjs";
 import { renderAssetPhoto } from "./asset-photo.mjs";
-import { planObstacleDrop } from "./temporary-obstacles.mjs";
+import { blockBox, planObstacleDrop } from "./temporary-obstacles.mjs";
 import { resolveRenderQuality } from "./render-quality.mjs";
 import { createJourney, transitionJourney, journeyView } from "./journey.mjs";
+import { manualObstacles, manualStep } from "./manual-walk.mjs";
+import { withWalkthroughPassages } from "./walkthrough-navigation.mjs";
+import { indexRoomScan, fillRoomObject, traceRoomInstance, reviewedTrolleyParts } from "./room-fill.mjs";
+import { loadRoomPlacements, saveRoomPlacements, placedRoomAsset, roomBoundsOverlap, roomPlacementError, copyPlacedSplats } from "./room-placement.mjs";
+import { navigationAfterRoomEdits } from "./room-edit-navigation.mjs";
+import { roomEditStore } from "./room-edits.mjs";
 import { createGameMap, mapFrame, mapPoint, mapWorldPoint } from "./game-map.mjs";
+import { bindSemanticPlan } from "./semantic-plan.mjs";
+import { createBimRoom } from "./bim-room.mjs";
+import { fitBimVessels } from "./bim-geometry.mjs";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { explodeState, explodeOffset, loadInstanceUniforms, applyExplode, mountExplodeControls, SHADER_DECL, SHADER_OFFSET, SHADER_COLOR } from "./explode.mjs";
-import { sampleRoute, nearbyAssets, planFromPosition, reachableFloor, floorDestination, assetDestination, planRoomTour, advanceAlongRoute } from "./navigation-view.mjs";
+import { createTakeApart } from "./take-apart.mjs";
+import { sampleRoute, nearbyAssets, planFromPosition, reachableFloor, floorDestination, assetDestination, planRoomTour, advanceAlongRoute, segmentIsFree } from "./navigation-view.mjs";
 
 const state = {
   twin: null,
@@ -16,12 +26,13 @@ const state = {
   assetsByObj: new Map(),
   selectedAsset: null,
   journey: null,
+  manualWalk: null,
   walkSummary: null,
   previousRoute: null,
   demoObstacle: null,
   speed: 1.0,
   splatMode: "ewa",        // "ewa" | "semantic"
-  cameraPreset: "walk",  // "inside" | "overview" | "walk" | "detail"
+  cameraPreset: "walk",
   boxesMode: "proximity",  // "proximity" | "all" | "off"
   visualReviewFilter: "mapped",
   classFilter: "all",
@@ -32,11 +43,12 @@ let scene, camera, renderer, controls;
 let maxRenderDimension;
 let splatMesh, splatMaterial, sortWorker;
 let sortBusy = false;
-let splatCount = 0;
 let lastSortCamKey = "";
 let hudLastUpdate = -1;
 let proximityKey = "";
 let mapBackground;
+let semanticPlan;
+let bimView;
 
 let currentNavigation;
 let copilotRequestId=0;
@@ -46,15 +58,37 @@ const boxMeshes = new Map();
 const hudElements = new Map();
 const imageCache = new Map();
 const attract = {enabled:new URLSearchParams(location.search).get("attract") !== "0",active:false,lastActivity:0};
+const walkKeys = new Set();
+const movementKeys = ["w", "a", "s", "d", "arrowup", "arrowdown", "arrowleft", "arrowright"];
+let equipmentObstacles;
+let takeApart = null; // one object alone, the room faded (take-apart.mjs)
+let updateFillSort;
+let sourceScan, indexedScan, originalNavigation, initialNavigation, walkPoses;
+let editStore, activeEdits = [], removedIds = new Set(), editsOffline = false, editBusy = false;
+let roomPlacements = new Map(), liveRoomAssets = new Map(), movePreview = null;
+let foldedRoomParts = new Map();
+const tracedFragments = new Map();
+const instancesById = new Map();
+const instanceSizes = new Map();
 
 async function init() {
-  const res = await fetch("./data/digital_twin.json");
-  state.twin = await res.json();
+  const [twin, poses] = await Promise.all([
+    fetch("./data/digital_twin.json").then(res => res.json()),
+    fetch("./data/walk_poses.json").then(res => res.ok ? res.json() : null).catch(() => null),
+  ]);
+  state.twin = twin;
+  state.roomAssets = twin.assets;
+  originalNavigation = twin.navigation;
+  walkPoses = Array.isArray(poses) ? poses : [];
+  if (walkPoses.length) twin.navigation = withWalkthroughPassages(twin.navigation, twin.assets, walkPoses);
+  initialNavigation = twin.navigation;
+  equipmentObstacles = manualObstacles(state.twin.assets, state.twin.navigation.grid_meta.robot_radius_m);
 
   for (const a of state.twin.assets) {
     state.assetsById.set(a.asset_id, a);
     state.assetsByObj.set(a.id, a);
   }
+  state.twin.assets.forEach((asset, i) => instancesById.set(asset.id, i + 1));
 
   const first = state.twin.navigation.primary_route.waypoints[0];
   state.journey = createJourney({asset_id:null,tag:"Explore the room",kind:"idle",duration_s:0,total_distance_m:0,waypoints:[first],validated:true});
@@ -66,7 +100,15 @@ async function init() {
   await loadEwaGaussianSplats("./data/boiler_room_points.bin");
   buildAssetBoundingBoxes();
   mountExplodeControls();
+  takeApart = createTakeApart({
+    camera, controls, state, uniforms: () => splatMaterial?.uniforms, setPreset: applyCameraPreset,
+    container: document.getElementById("canvas-container"), scene, renderer,
+  });
   buildRobotAvatar();
+  editStore = roomEditStore(id => canRemove(state.assetsByObj.get(id)));
+  roomPlacements = loadRoomPlacements(state.assetsByObj, canRemove);
+  const savedEdits = await editStore.load();
+  applyRoomEdits(savedEdits, true);
   buildRouteMap();
   rebuildRouteGeometry();
 
@@ -74,6 +116,11 @@ async function init() {
   renderProposalList();
   selectAsset(targetAsset, false);
   applyCameraPreset("overview");
+  const apartHash = decodeURIComponent(location.hash).match(/^#apart=(.+)$/);
+  if (apartHash && liveRoomAssets.has(apartHash[1])) {
+    selectAsset(liveRoomAssets.get(apartHash[1]), false);
+    takeApart.open(state.selectedAsset);
+  }
 
   let lastTs = performance.now();
   function animate(now) {
@@ -82,15 +129,21 @@ async function init() {
     lastTs = now;
     updateAttractMode(now);
     stepSimulation(dt, now * 0.001);
-    maybeTriggerDepthSort();
-    renderer.render(scene, camera);
-    updateHudLabels();
+    takeApart.frame(boxMeshes);
+    if (bimView.active) {
+      bimView.update(currentNavigation,state.journey,state.selectedAsset);
+      renderer.render(bimView.scene,camera);
+    } else {
+      maybeTriggerDepthSort();
+      renderer.render(scene, camera);
+      updateHudLabels();
+    }
   }
   requestAnimationFrame(animate);
 }
 
 function updateSidebarStats() {
-  const assets = state.twin.assets;
+  const assets = state.roomAssets;
   const mapped = assets.filter((a) => a.mapped).length;
   const alerts = assets.filter((a) => a.mapped && assetPresentation(a).needsAttention).length;
   document.getElementById("sidebar-stats-text").textContent =
@@ -142,6 +195,16 @@ function initThreeScene() {
     mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
     mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
     raycaster.setFromCamera(mouse, camera);
+    if (movePreview) {
+      const point = raycaster.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0,1,0),0),new THREE.Vector3());
+      if (point) setMovePoint(point);
+      return;
+    }
+    if (bimView?.active) {
+      const asset=bimView.pick(raycaster);
+      if (asset) selectAsset(asset,true);
+      return;
+    }
     const pickables = [];
     for (const entry of boxMeshes.values()) {
       if (entry.group.visible) pickables.push(entry.fillMesh);
@@ -186,7 +249,6 @@ async function loadEwaGaussianSplats(url) {
   const header = new DataView(buf, 0, 16);
   const count = header.getUint32(8, true);
   const stride = header.getUint32(12, true) || 40;
-  splatCount = count;
 
   const TEX_W = 2048;
   const TEX_H = Math.ceil(count / TEX_W);
@@ -254,7 +316,7 @@ async function loadEwaGaussianSplats(url) {
   instGeom.index = baseQuad.index;
   instGeom.attributes.position = baseQuad.attributes.position;
 
-  const initialOrder = new Float32Array(count);
+  const initialOrder = new Float32Array(count + 16384);
   for (let i = 0; i < count; i++) initialOrder[i] = i;
   const splatIdxAttr = new THREE.InstancedBufferAttribute(initialOrder, 1);
   splatIdxAttr.setUsage(THREE.DynamicDrawUsage);
@@ -274,6 +336,14 @@ async function loadEwaGaussianSplats(url) {
       uViewport: { value: new THREE.Vector2(1280, 720) },
       uFocal: { value: new THREE.Vector2(900, 900) },
       ...explodeUniforms,
+      uBaseCount: {value:count},
+      uFillCount: {value:0},
+      uRoomFill: {value:makeRoomTexture(new Float32Array(12),3,1)},
+      uRoomFillSize: {value:new THREE.Vector2(3,1)},
+      uRemoved: {value:makeRoomTexture(new Float32Array(256 * explodeUniforms.uInstTableSize.value.y),256,
+        explodeUniforms.uInstTableSize.value.y,THREE.RedFormat)},
+      uHasRemoved: {value:0},
+      uFillDebug: {value:0},
       uSplatAxisLimit: { value: 180 },
     },
     vertexShader: `
@@ -288,13 +358,25 @@ async function loadEwaGaussianSplats(url) {
       uniform vec2 uViewport;
       uniform vec2 uFocal;
 ${SHADER_DECL}      uniform float uSplatAxisLimit;
+      uniform float uBaseCount, uFillCount, uHasRemoved, uFillDebug;
+      uniform sampler2D uRoomFill, uRemoved;
+      uniform vec2 uRoomFillSize;
 
       void main() {
         float col = mod(splatIndex, uTexSize.x);
         float row = floor(splatIndex / uTexSize.x);
         vec2 uv = (vec2(col, row) + 0.5) / uTexSize;
 
-        vec4 centerRgba = texture2D(uCenterTex, uv);
+        bool synthetic = splatIndex >= uBaseCount;
+        float fillIndex = splatIndex - uBaseCount;
+        if (synthetic && fillIndex >= uFillCount) {
+          gl_Position = vec4(0.0, 0.0, 2.0, 1.0);
+          return;
+        }
+        float fillWidth = uRoomFillSize.x / 3.0;
+        vec2 fillUv = (vec2(3.0 * mod(fillIndex, fillWidth), floor(fillIndex / fillWidth)) + 0.5) / uRoomFillSize;
+        vec4 fillCovB = synthetic ? texture2D(uRoomFill, fillUv + vec2(2.0 / uRoomFillSize.x, 0.0)) : vec4(0.0);
+        vec4 centerRgba = synthetic ? texture2D(uRoomFill, fillUv) : texture2D(uCenterTex, uv);
         vec3 center = centerRgba.xyz;
 ${SHADER_OFFSET}        vec4 cam = modelViewMatrix * vec4(center, 1.0);
 
@@ -310,15 +392,15 @@ ${SHADER_OFFSET}        vec4 cam = modelViewMatrix * vec4(center, 1.0);
           return;
         }
 
-        vec4 covA = texture2D(uCovATex, uv);
-        vec4 covB = texture2D(uCovBTex, uv);
+        vec4 covA = synthetic ? texture2D(uRoomFill, fillUv + vec2(1.0 / uRoomFillSize.x, 0.0)) : texture2D(uCovATex, uv);
+        vec4 covB = synthetic ? fillCovB : texture2D(uCovBTex, uv);
 
         // Unpack lossless RGBA
         float rg = centerRgba.w;
         float r = mod(rg, 256.0) / 255.0;
         float g = floor(rg / 256.0) / 255.0;
         float b = covB.z;
-        float a = covB.w;
+        float a = covB.w < 0.0 ? fract(-covB.w) * 2.0 : covB.w;
 
         mat3 Vrk = mat3(
           covA.x, covA.y, covA.z,
@@ -363,7 +445,8 @@ ${SHADER_OFFSET}        vec4 cam = modelViewMatrix * vec4(center, 1.0);
         vec2 minorAxis = min(2.0 * sqrt(lambda2), uSplatAxisLimit) * vec2(-diagVec.y, diagVec.x);
 
         vColor = vec4(r, g, b, a);
-${SHADER_COLOR}        vQuadCoord = position.xy;
+${SHADER_COLOR}        if (synthetic && instId < 0.5 && uFillDebug > 0.5) vColor.rgb = mix(vColor.rgb, vec3(1.0, 0.2, 0.65), 0.82);
+        vQuadCoord = position.xy;
 
         vec2 offsetClip = (position.x * majorAxis + position.y * minorAxis) / uViewport;
         gl_Position = vec4(pos2d.xy + offsetClip * pos2d.w, pos2d.z, pos2d.w);
@@ -395,12 +478,29 @@ ${SHADER_COLOR}        vQuadCoord = position.xy;
   splatMesh.renderOrder = 1;
   scene.add(splatMesh);
 
-  initSortWorker(workerPositions, splatIdxAttr);
+  const instanceTexture = explodeUniforms.uInstTex.value;
+  if (instanceTexture.userData.complete) {
+    const instances = instanceTexture.image.data;
+    const counts = new Uint32Array(state.twin.assets.length + 1);
+    for (let i=0;i<count;i++) counts[instances[i]]++;
+    for (const [id,index] of instancesById) instanceSizes.set(id,counts[index]);
+    sourceScan = [centerColorData,covAData,covBData,instances,count];
+    fitBimVessels(state.twin.assets,centerColorData,covBData,instances,count);
+  }
+  initSortWorker(workerPositions, instGeom);
 }
 
-function initSortWorker(positions, splatIdxAttr) {
+function makeRoomTexture(data, width, height, format=THREE.RGBAFormat) {
+  const texture = new THREE.DataTexture(data,width,height,format,THREE.FloatType);
+  texture.needsUpdate = true;
+  return texture;
+}
+
+function initSortWorker(positions, geometry) {
   const workerCode = `
     let pos = null;
+    let fills = new Float32Array(0);
+    let revision = 0;
     let count = 0;
     let depthInt = null;
     let counts = new Uint32Array(65536);
@@ -412,23 +512,36 @@ function initSortWorker(positions, splatIdxAttr) {
         depthInt = new Uint16Array(count);
         return;
       }
+      if (e.data.fills) {
+        fills = e.data.fills;
+        revision = e.data.revision;
+        count = (pos.length + fills.length) / 3;
+        depthInt = new Uint16Array(count);
+        return;
+      }
       if (!pos) return;
       const vx = e.data.viewZ[0];
       const vy = e.data.viewZ[1];
       const vz = e.data.viewZ[2];
       const vw = e.data.viewZ[3];
 
+      const depth = i => {
+        const k = i*3;
+        const a = k < pos.length ? pos : fills;
+        const j = k < pos.length ? k : k - pos.length;
+        return a[j]*vx + a[j+1]*vy + a[j+2]*vz + vw;
+      };
       let minD = 1e9, maxD = -1e9;
       // Compute camera Z (in Three.js camera looks down -Z, so more negative Z is further away; sort back-to-front = ascending Z)
       for (let i = 0; i < count; i++) {
-        const z = pos[i*3]*vx + pos[i*3+1]*vy + pos[i*3+2]*vz + vw;
+        const z = depth(i);
         if (z < minD) minD = z;
         if (z > maxD) maxD = z;
       }
       const scale = 65535.0 / Math.max(1e-4, maxD - minD);
       counts.fill(0);
       for (let i = 0; i < count; i++) {
-        const z = pos[i*3]*vx + pos[i*3+1]*vy + pos[i*3+2]*vz + vw;
+        const z = depth(i);
         const b = Math.min(65535, Math.max(0, ((z - minD) * scale) | 0));
         depthInt[i] = b;
         counts[b]++;
@@ -444,17 +557,32 @@ function initSortWorker(positions, splatIdxAttr) {
         const b = depthInt[i];
         out[counts[b]++] = i;
       }
-      self.postMessage({ sorted: out }, [out.buffer]);
+      self.postMessage({ sorted: out, revision }, [out.buffer]);
     };
   `;
   const blob = new Blob([workerCode], { type: "application/javascript" });
   sortWorker = new Worker(URL.createObjectURL(blob));
   sortWorker.postMessage({ positions }, [positions.buffer]);
 
+  let revision = 0;
+  updateFillSort = fills => {
+    sortWorker.postMessage({fills,revision:++revision},[fills.buffer]);
+    lastSortCamKey = "";
+  };
   sortWorker.onmessage = (e) => {
-    splatIdxAttr.array = e.data.sorted;
-    splatIdxAttr.needsUpdate = true;
     sortBusy = false;
+    if (e.data.revision !== revision) return;
+    const sorted = e.data.sorted;
+    let attribute = geometry.getAttribute("splatIndex");
+    if (attribute.array.length < sorted.length) {
+      geometry.dispose();
+      attribute = new THREE.InstancedBufferAttribute(new Float32Array(sorted.length + 16384),1);
+      attribute.setUsage(THREE.DynamicDrawUsage);
+      geometry.setAttribute("splatIndex",attribute);
+    }
+    attribute.array.set(sorted);
+    attribute.needsUpdate = true;
+    geometry.instanceCount = sorted.length;
   };
 }
 
@@ -471,10 +599,17 @@ function maybeTriggerDepthSort() {
 }
 
 function applyCameraPreset(preset) {
+  if (preset === "bim" && takeApart?.isOpen) takeApart.close();
   state.cameraPreset = preset;
+  controls.enabled = preset !== "first" && !(state.manualWalk && preset === "walk");
   document.querySelectorAll("[data-cam]").forEach((b) => {
     b.classList.toggle("active", b.dataset.cam === preset);
   });
+  if (preset === "bim") {
+    setInspectorOpen(false);
+    bimView.setRoom(state.roomAssets,state.twin.scene.walls,state.twin.navigation.grid_meta);
+  }
+  bimView?.setActive(preset === "bim");
 
   if (preset === "overview") {
     camera.position.set(-0.35, 1.48, 1.85);
@@ -585,9 +720,11 @@ function buildAssetBoundingBoxes() {
 function buildRobotAvatar() {
   robotGroup = new THREE.Group();
   robotGroup.renderOrder = 6;
+  const radius = state.twin.navigation.grid_meta.robot_radius_m;
+  const widthScale = radius / .15;
 
   const baseMesh = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.13, 0.15, 0.10, 24),
+    new THREE.CylinderGeometry(0.13 * widthScale, radius, 0.10, 24),
     new THREE.MeshStandardMaterial({ color: 0x172622, metalness: 0.4, roughness: 0.4 })
   );
   baseMesh.position.y = 0.06;
@@ -601,7 +738,7 @@ function buildRobotAvatar() {
   robotGroup.add(mast);
 
   const head = new THREE.Mesh(
-    new THREE.BoxGeometry(0.14, 0.09, 0.18),
+    new THREE.BoxGeometry(0.14 * widthScale, 0.09, 0.18 * widthScale),
     new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.5, roughness: 0.3 })
   );
   head.position.y = 0.56;
@@ -632,9 +769,14 @@ function buildRouteMap() { rebuildReachableOverlay(); }
 
 function rebuildReachableOverlay() {
   const navigation=state.twin.navigation,m=navigation.grid_meta;
-  const floor=reachableFloor(navigation,robotPosition());
-  mapBackground=createGameMap(navigation,floor,state.twin.assets);
-  document.getElementById("map-coverage").textContent="Outlined objects block movement";
+  const position=robotPosition();
+  const cell=cellAtPosition(position);
+  const [x,z]=navigation.start_xz;
+  const floor=reachableFloor(navigation,cell ? position : {x,z});
+  mapBackground=createGameMap(navigation,floor,state.roomAssets);
+  const legend = document.getElementById("map-coverage");
+  legend.textContent = navigation.walkthrough_passages ? "Teal · Walkthrough passages" : "Outlined objects block movement";
+  legend.classList.toggle("walkthrough-legend", !!navigation.walkthrough_passages);
 }
 
 function drawRouteMap(nav) {
@@ -655,6 +797,11 @@ function drawRouteMap(nav) {
     ctx.fillStyle="#d99044";ctx.strokeStyle="#ffdc9e";ctx.lineWidth=2;
     ctx.fillRect(a[0],a[1],b[0]-a[0],b[1]-a[1]);ctx.strokeRect(a[0],a[1],b[0]-a[0],b[1]-a[1]);
   }
+  if (movePreview?.placement) {
+    const [x,,z]=movePreview.placement.center;
+    ctx.beginPath();ctx.arc(...project(x,z),9,0,Math.PI*2);
+    ctx.strokeStyle=movePreview.error ? '#ff9b85' : '#79e2ef';ctx.lineWidth=3;ctx.stroke();
+  }
   if(active) {
     const points=route.waypoints;
     ctx.lineWidth=8;ctx.strokeStyle="#0b1722";ctx.beginPath();
@@ -673,7 +820,7 @@ function drawRouteMap(nav) {
     const end=points.at(-1).position,goal=project(end[0],end[2]);
     ctx.save();ctx.translate(...goal);ctx.rotate(Math.PI/4);ctx.fillStyle="#f4cf76";ctx.strokeStyle="#0e1b24";ctx.lineWidth=3;
     ctx.fillRect(-7,-7,14,14);ctx.strokeRect(-7,-7,14,14);ctx.restore();
-    const target=route.asset_id?state.assetsById.get(route.asset_id):null;
+    const target=route.asset_id ? roomAsset(state.assetsById.get(route.asset_id)) : null;
     if(target) {
       const p=project(target.center[0],target.center[2]);
       ctx.strokeStyle="#ff8a7866";ctx.lineWidth=2;ctx.setLineDash([5,6]);ctx.beginPath();ctx.moveTo(...goal);ctx.lineTo(...p);ctx.stroke();ctx.setLineDash([]);
@@ -733,7 +880,7 @@ function stepSimulation(dt, elapsedSec) {
   const route = state.journey.route;
   if (!route || !route.waypoints || route.waypoints.length === 0) return;
 
-  if (state.journey.phase === "moving") {
+  if (state.journey.phase === "moving" && !editBusy && !movePreview) {
     const nextTime=Math.min(route.duration_s,state.journey.elapsed+dt*state.speed);
     try {
       advanceAlongRoute(state.twin.navigation,route,robotPosition(),state.journey.elapsed,nextTime);
@@ -744,7 +891,8 @@ function stepSimulation(dt, elapsedSec) {
   }
 
   const sampled = sampleRoute(route, state.journey.elapsed);
-  const nav = state.journey.phase === "blocked" ? {...sampled,...robotPosition()} : sampled;
+  const nav = state.manualWalk ? keyboardWalk(editBusy || movePreview ? 0 : dt) :
+    state.journey.phase === "blocked" ? {...sampled,...robotPosition()} : sampled;
   currentNavigation = nav;
   const {x: rx, z: rz, yaw} = nav;
   robotGroup.position.set(rx, 0, rz);
@@ -752,14 +900,17 @@ function stepSimulation(dt, elapsedSec) {
   robotGroup.rotation.y = yaw;
   if (lidarRing) lidarRing.rotation.y = elapsedSec * 5.0;
 
-  if (state.cameraPreset === "walk") {
+  robotGroup.visible = state.cameraPreset !== "first";
+  if (state.cameraPreset === "first" || (state.cameraPreset === "walk" && state.manualWalk)) {
+    updateWalkCamera(nav);
+  } else if (state.cameraPreset === "walk") {
     // Both camera and robot follow the validated corridor; no offset through walls.
     const behind = sampleRoute(route, Math.max(0, state.journey.elapsed - 1.2));
     const ahead = sampleRoute(route, Math.min(route.duration_s, state.journey.elapsed + 0.8));
     camera.position.set(behind.x, 1.12, behind.z);
     controls.target.set(ahead.x, 1.05, ahead.z);
     if (state.journey.phase === "arrived" || Math.hypot(ahead.x - behind.x, ahead.z - behind.z) < 0.05) {
-      const target = route.asset_id ? state.assetsById.get(route.asset_id) : null;
+      const target = route.asset_id ? roomAsset(state.assetsById.get(route.asset_id)) : null;
       if (target) controls.target.fromArray(target.center);
     }
     controls.update();
@@ -768,13 +919,14 @@ function stepSimulation(dt, elapsedSec) {
   const refreshHud = elapsedSec - hudLastUpdate >= 0.15 || hudLastUpdate < 0;
   if (refreshHud) {
     hudLastUpdate = elapsedSec;
-    state.nearby = nearbyAssets(state.twin.assets, rx, rz, state.twin.navigation.grid_meta.proximity_radius_m);
+    state.nearby = nearbyAssets(state.roomAssets, rx, rz, state.twin.navigation.grid_meta.proximity_radius_m);
     renderProximityStream(state.nearby);
   }
   const nearbyMap = new Map((state.nearby || []).map(a => [a.id, a.distance_m]));
 
   // Update 3D box visibility cleanly (matching IMG_4398.HEIC: focus on selected + nearby shortlist)
   for (const [objId, entry] of boxMeshes.entries()) {
+    if (entry.removed) continue;
     const a = entry.asset;
     const isNear = nearbyMap.has(objId);
     const isSel = state.selectedAsset && state.selectedAsset.id === objId;
@@ -816,6 +968,7 @@ function stepSimulation(dt, elapsedSec) {
   renderJourneyControls(nav);
   document.getElementById("prox-count").textContent = `${(state.nearby || []).length} in range`;
   drawRouteMap(nav);
+  semanticPlan.update(nav,state.journey);
 
 }
 
@@ -825,7 +978,7 @@ function recordPassedAssets(position) {
   const from = summary.previous, dx = position.x - from.x, dz = position.z - from.z;
   const length2 = dx * dx + dz * dz;
   const radius = state.twin.navigation.grid_meta.proximity_radius_m || 1.65;
-  for (const asset of state.twin.assets) {
+  for (const asset of state.roomAssets) {
     if (summary.passed.has(asset.id)) continue;
     const t = length2 ? Math.max(0, Math.min(1, ((asset.center[0]-from.x)*dx + (asset.center[2]-from.z)*dz) / length2)) : 0;
     if (Math.hypot(asset.center[0]-from.x-t*dx, asset.center[2]-from.z-t*dz) > radius) continue;
@@ -958,7 +1111,7 @@ function renderProposalList() {
   const listEl = document.getElementById("asset-list");
   const q = state.searchQuery.trim().toLowerCase();
 
-  const filtered = state.twin.assets.filter((a) => {
+  const filtered = state.roomAssets.filter((a) => {
     if (state.visualReviewFilter === "alerts" && !(a.mapped && assetPresentation(a).needsAttention)) return false;
     if (state.visualReviewFilter === "mapped" && !a.mapped) return false;
     if (state.classFilter !== "all" && a.class !== state.classFilter) return false;
@@ -1064,9 +1217,26 @@ function fmtComma(num) {
 }
 
 function selectAsset(asset, openInspector = false) {
+  if (movePreview && movePreview.asset.id !== asset.id) closeMovePreview();
+  asset = roomAsset(asset);
+  if (removedIds.has(asset.id) && takeApart?.isOpen) takeApart.close();
   state.selectedAsset = asset;
+  if (takeApart?.isOpen && takeApart.active.asset !== asset) takeApart.open(asset);
   copilotRequestId++;
   const presentation = assetPresentation(asset);
+  const removed = removedIds.has(asset.id);
+  renderRoomEditControls();
+  document.getElementById("active-asset-details").hidden = removed;
+  if (removed) {
+    renderAssetPhoto(null,document.getElementById("asset-photo"),location.href);
+    document.getElementById("detail-id-status").textContent = `${asset.id} · Removed from room`;
+    document.getElementById("detail-health-pill").hidden = true;
+    document.getElementById("detail-title").textContent = `${asset.label} · ${asset.tag}`;
+    document.getElementById("detail-subtitle").textContent = presentation.category;
+    renderProposalList();
+    if (openInspector) setInspectorOpen(true);
+    return;
+  }
   const uninstrumented = presentation.kind !== "instrumented";
   renderAssetPhoto(asset,document.getElementById("asset-photo"),location.href);
   document.querySelector(".copilot-block").hidden = uninstrumented;
@@ -1225,12 +1395,13 @@ function renderTelemetryChart(asset) {
 }
 
 function setInspectorOpen(open) {
+  if (!open && movePreview) closeMovePreview();
   document.body.classList.toggle("inspector-open",open);
   document.getElementById("btn-inspector").setAttribute("aria-expanded",String(open));
 }
 
 function showArrivalReport(assetId) {
-  const asset=state.assetsById.get(assetId);
+  const asset=roomAsset(state.assetsById.get(assetId));
   if(!asset)return;
   selectAsset(asset,true);
   document.getElementById("canvas-container").classList.remove("map-expanded");
@@ -1255,28 +1426,34 @@ function applyJourneyEvent(event) {
 
 function renderJourneyControls(nav) {
   const journey=state.journey,view=journeyView(journey),idle=journey.phase==="idle";
+  const manual = !!state.manualWalk;
   const button=document.getElementById("btn-play");
-  button.disabled=view.disabled;
+  button.disabled=manual || view.disabled;
   button.textContent=view.button;
-  document.getElementById("nav-hud-state").textContent=view.status;
-  document.getElementById("nav-hud-target").textContent=view.destination;
-  document.getElementById("btn-drop-obstacle").disabled = !!state.demoObstacle || !["moving","paused"].includes(journey.phase) || journey.route.total_distance_m-nav.distance < 2;
+  document.getElementById("nav-hud-state").textContent=manual ? "MANUAL CONTROL" : view.status;
+  document.getElementById("nav-hud-target").textContent=manual ? "Explore the room" : view.destination;
+  document.querySelector(".journey-controls").hidden = manual;
+  document.getElementById("btn-manual-walk").hidden = !manual;
+  document.getElementById("btn-drop-obstacle").disabled = manual || !!state.demoObstacle || !["moving","paused"].includes(journey.phase) || journey.route.total_distance_m-nav.distance < 2;
   const remaining=Math.max(0,journey.route.total_distance_m-nav.distance);
-  document.getElementById("nav-hud-metrics").textContent=idle ? "Choose a map point, equipment, or room tour." : `${remaining.toFixed(1)} m remaining · ${view.remainingSeconds} s`;
+  document.getElementById("nav-hud-metrics").textContent=manual ? "WASD to walk · ← → to turn · F to inspect nearby" : idle ? "Choose a map point, equipment, or room tour." : `${remaining.toFixed(1)} m remaining · ${view.remainingSeconds} s`;
   document.getElementById("sim-dist-label").textContent=idle?"":`${nav.distance.toFixed(1)} / ${journey.route.total_distance_m.toFixed(1)} m`;
   document.getElementById("navigation-message").textContent=view.error;
   document.getElementById("map-feedback").textContent=view.error;
 }
 
-function activateRoute(route, {preserveWalk=false, preserveHistory=false} = {}) {
+function activateRoute(route, {preserveWalk=false, preserveHistory=false, keepView=false} = {}) {
   const result=transitionJourney(state.journey,{type:"start",route,position:robotPosition()});
-  setInspectorOpen(false);
+  state.manualWalk = null;
+  walkKeys.clear();
+  if (!keepView) setInspectorOpen(false);
   document.getElementById("arrival-announcement").textContent="";
   state.journey=result.journey;
   if (!preserveWalk) state.walkSummary = {passed:new Set(),attention:new Set(),previous:robotPosition()};
   if (!preserveHistory) clearRouteHistory();
   recordPassedAssets(robotPosition());
-  rebuildRouteGeometry();rebuildReachableOverlay();applyCameraPreset("walk");
+  rebuildRouteGeometry();rebuildReachableOverlay();
+  if (!keepView) applyCameraPreset(state.cameraPreset === "first" ? "first" : "walk");
   if(result.arrivedAssetId)showArrivalReport(result.arrivedAssetId);
   renderJourneyControls(sampleRoute(route,state.journey.elapsed));
 }
@@ -1290,16 +1467,20 @@ function clearRouteHistory() {
   document.getElementById("replan-status").textContent="";
 }
 
+function fadePreviousRoute(route) {
+  state.previousRoute=route;
+  const points=route.waypoints.map(w=>new THREE.Vector3(w.position[0],.035,w.position[2]));
+  previousRouteLine=new THREE.Line(new THREE.BufferGeometry().setFromPoints(points),
+    new THREE.LineBasicMaterial({color:0xc0c9cc,transparent:true,opacity:.28,depthWrite:false}));
+  scene.add(previousRouteLine);
+}
+
 function dropDemoObstacle() {
   try {
     const route=state.journey.route;
     const result=planObstacleDrop(state.twin.navigation,route,robotPosition(),state.journey.elapsed);
     clearRouteHistory();
-    state.previousRoute=route;
-    const points=route.waypoints.map(w=>new THREE.Vector3(w.position[0],.035,w.position[2]));
-    previousRouteLine=new THREE.Line(new THREE.BufferGeometry().setFromPoints(points),
-      new THREE.LineBasicMaterial({color:0xc0c9cc,transparent:true,opacity:.28,depthWrite:false}));
-    scene.add(previousRouteLine);
+    fadePreviousRoute(route);
     state.demoObstacle=result.obstacle;
     state.twin.navigation=result.navigation;
     const o=result.obstacle;
@@ -1320,13 +1501,505 @@ function dropDemoObstacle() {
   }
 }
 
+function canRemove(asset) {
+  return !!asset && !asset.is_target && asset.asset_id !== state.twin.target_asset_id && !!instanceSizes.get(asset.id);
+}
+
+function roomAsset(asset) {
+  if (!asset) return asset;
+  const id = foldedRoomParts.get(asset.id) || asset.id;
+  return liveRoomAssets.get(id) || state.assetsByObj.get(id) || asset;
+}
+
+function cellAtPosition({x,z}, navigation=state.twin.navigation) {
+  const m=navigation.grid_meta;
+  return navigation.walkable_grid[Math.floor((x-m.x_min)/m.res)]?.[Math.floor((z-m.z_min)/m.res)];
+}
+
+function prepareRoomEdits(edits, placements=roomPlacements) {
+  const ids = new Set(edits.map(edit=>edit.id));
+  const affected = new Set([...ids,...placements.keys()].sort());
+  const reviews = new Map(), parts = new Map();
+  for (const id of affected) {
+    const review = reviewedTrolleyParts(state.assetsByObj.get(id),state.assetsByObj);
+    if (!review) continue;
+    const railOwner = !affected.has(review.rail.id) && instanceSizes.has(review.rail.id)
+      ? instancesById.get(review.rail.id) : undefined;
+    if (railOwner) parts.set(review.rail.id,id);
+    reviews.set(id,{...review,railOwner});
+  }
+  const instances = new Set([...affected].map(id=>instancesById.get(id)));
+  const assets = state.twin.assets.filter(asset=>!ids.has(asset.id) && !parts.has(asset.id))
+    .map(asset=>placements.has(asset.id) ? placedRoomAsset(asset,placements.get(asset.id),reviews.get(asset.id)?.baseY) : asset);
+  let navigation = initialNavigation;
+  let fills = [], placed = [], owners = sourceScan?.[3];
+  if (affected.size) {
+    indexedScan ??= indexRoomScan(...sourceScan);
+    owners = indexedScan.instances.slice();
+    const added = new Map();
+    const assign = (index,owner) => {
+      owners[index]=owner;
+      if (!owner) return;
+      if (!added.has(owner)) added.set(owner,[]);
+      added.get(owner).push(index);
+    };
+    for (const id of affected) {
+      const asset = state.assetsByObj.get(id), owner = instancesById.get(id);
+      const review = reviews.get(id);
+      const traceKey = `${id}:${review?.railOwner ?? ''}`;
+      if (!tracedFragments.has(traceKey)) tracedFragments.set(traceKey,
+        traceRoomInstance(indexedScan,asset,owner,state.twin.assets,state.twin.scene.walls,review));
+      const {recovered,retained}=tracedFragments.get(traceKey);
+      if (review?.railOwner) for (const index of indexedScan.owned.get(review.railOwner)) assign(index,owner);
+      for (const index of recovered) if (!owners[index]) assign(index,owner);
+      for (const [index,neighbour] of retained) assign(index,neighbour);
+    }
+    const scan = {...indexedScan,instances:owners};
+    fills = [...affected].map(id=>{
+      const asset = state.assetsByObj.get(id);
+      return [asset,fillRoomObject(scan,asset,instances,state.twin.scene.walls)];
+    });
+    placed = assets.filter(asset=>asset.transform).map(asset=>{
+      const owner = instancesById.get(asset.id);
+      const indices=[...indexedScan.owned.get(owner).filter(index=>owners[index]===owner),...(added.get(owner)||[])];
+      return copyPlacedSplats(scan,indices,asset,owner);
+    });
+    navigation = navigationAfterRoomEdits(originalNavigation,assets,scan,instances,fills,walkPoses,initialNavigation.grid_meta,placed);
+  }
+  if (navigation && state.demoObstacle) navigation = blockBox(navigation,state.demoObstacle);
+  return {ids,parts,instances,assets,navigation,fills,placed,owners};
+}
+
+function uploadRoomFill(instances, layers, owners) {
+  const u = splatMaterial.uniforms;
+  if (owners && u.uInstTex.value.image.data !== owners) {
+    u.uInstTex.value.image.data=owners;
+    u.uInstTex.value.needsUpdate=true;
+  }
+  const mask = u.uRemoved.value.image.data;
+  mask.fill(0);
+  for (const index of instances) mask[index]=1;
+  u.uRemoved.value.needsUpdate=true;
+  u.uHasRemoved.value=Number(instances.size>0);
+  const count=layers.reduce((sum,data)=>sum+data.length/12,0);
+  const cols=Math.max(1,Math.min(256,count)), height=Math.max(1,Math.ceil(count/cols));
+  const pixels=new Float32Array(cols*height*12), positions=new Float32Array(count*3);
+  let offset=0;
+  for(const data of layers){
+    pixels.set(data,offset*12);
+    for(let k=0;k<data.length;k+=12){
+      positions.set(data.slice(k,k+3),offset*3);
+      offset++;
+    }
+  }
+  u.uRoomFill.value.dispose();
+  u.uRoomFill.value=makeRoomTexture(pixels,cols*3,height);
+  u.uRoomFillSize.value.set(cols*3,height);
+  u.uFillCount.value=count;
+  updateFillSort(positions);
+}
+
+function applyRoomEdits(snapshot, initial=false, prepared) {
+  const prior = state.journey;
+  const {ids,parts,instances,assets,navigation,fills,placed,owners} = prepared ?? prepareRoomEdits(snapshot.removed);
+  if (!navigation) throw new Error("This room change would block the room entrance.");
+  activeEdits = snapshot.removed;
+  editsOffline = snapshot.offline;
+  if (editsOffline || roomPlacements.size) document.getElementById('room-changes').open=true;
+  removedIds = ids;
+  foldedRoomParts = parts;
+  state.roomAssets = assets;
+  if (bimView?.active) bimView.setRoom(assets,state.twin.scene.walls,navigation.grid_meta);
+  liveRoomAssets = new Map(assets.map(asset=>[asset.id,asset]));
+  state.twin.navigation = navigation;
+  equipmentObstacles = manualObstacles(assets,navigation.grid_meta.robot_radius_m);
+  if (instances.size || !initial) uploadRoomFill(instances,[...fills.map(([,fill])=>fill.data),...placed],owners);
+  for (const [id,entry] of boxMeshes) {
+    entry.removed=ids.has(id) || parts.has(id);
+    const source=state.assetsByObj.get(id);
+    entry.asset=liveRoomAssets.get(id) || source;
+    entry.group.rotation.y=-entry.asset.yaw;
+    entry.group.scale.y=source.size[1] > 0 ? entry.asset.size[1]/source.size[1] : 1;
+    if (entry.removed) entry.group.visible=false;
+  }
+  if (state.walkSummary) for (const id of [...ids,...parts.keys()]) {
+    state.walkSummary.passed.delete(id);
+    state.walkSummary.attention.delete(id);
+  }
+  if (takeApart?.isOpen && (ids.has(takeApart.active.asset.id) || roomPlacements.has(takeApart.active.asset.id))) takeApart.close();
+  hudLastUpdate=-1;
+  updateSidebarStats();
+  renderRoomEditControls();
+  if (initial) return;
+  selectAsset(state.selectedAsset);
+  rebuildReachableOverlay();
+  replanAfterRoomEdit(prior);
+}
+
+function replanAfterRoomEdit(prior) {
+  if (!['moving','paused','blocked'].includes(prior.phase) || state.manualWalk || prior.route.kind==='idle') return;
+  const {route,elapsed}=prior;
+  const start=robotPosition(), navigation=state.twin.navigation;
+  const asset=route.asset_id && roomAsset(state.assetsById.get(route.asset_id));
+  clearRouteHistory();
+  if (asset && removedIds.has(asset.id)) {
+    state.journey=createJourney({kind:"idle",tag:"Explore the room",duration_s:0,total_distance_m:0,
+      waypoints:[{position:[start.x,0,start.z],t:0,distance_m:0,yaw:robotGroup.rotation.y}]});
+    rebuildRouteGeometry();
+    navigationError(new Error(`${asset.tag} was removed. Choose another destination.`));
+    return;
+  }
+  try {
+    let replacement;
+    const destination=asset && !asset.is_target ? assetDestination(navigation,start,asset) : {...route,stops:[]};
+    try { replacement=planFromPosition(navigation,start,destination); }
+    catch(error) {
+      if (!asset) throw error;
+      replacement=planFromPosition(navigation,start,assetDestination(navigation,start,asset));
+    }
+    const progress=sampleRoute(route,elapsed).distance;
+    const shorter=replacement.total_distance_m+.02<route.total_distance_m-progress;
+    if (shorter) fadePreviousRoute({...route,waypoints:[{position:[start.x,0,start.z]},...route.waypoints.filter(w=>w.distance_m>progress)]});
+    activateRoute(replacement,{preserveWalk:true,preserveHistory:true,keepView:true});
+    if (prior.phase==='paused') applyJourneyEvent({type:'pause'});
+    document.getElementById('replan-status').textContent=shorter ? 'Shorter route · previous route faded' : 'Route updated for the room change';
+  } catch(error) {
+    rebuildRouteGeometry();
+    navigationError(new Error(`Room changed. ${error.message}`));
+  }
+}
+
+function renderRoomEditControls() {
+  const count=document.getElementById('room-object-count');
+  const moved = [...roomPlacements.keys()].filter(id=>!removedIds.has(id));
+  count.textContent=`${state.twin.assets.length} objects · ${removedIds.size} removed${moved.length ? ` · ${moved.length} moved` : ''}`;
+  document.getElementById('room-change-count').textContent=String(removedIds.size+moved.length);
+  const status=document.getElementById('room-edit-status');
+  status.textContent=[editsOffline && 'edits not saved to server',moved.length && 'Moved positions are saved in this browser.'].filter(Boolean).join(' · ');
+  status.hidden=!status.textContent;
+  const asset=state.selectedAsset;
+  const removed=removedIds.has(asset.id);
+  const button=document.getElementById('btn-room-edit');
+  button.textContent=removed ? 'Restore' : 'Remove from room';
+  button.disabled=editBusy || !canRemove(asset);
+  const tooltip=asset.is_target || asset.asset_id===state.twin.target_asset_id ?
+    `${asset.tag} is the current inspection target.` : !canRemove(asset) ? 'Scan membership is unavailable for this object.' : '';
+  button.title=tooltip;
+  document.getElementById('room-edit-tooltip').title=tooltip;
+  const move=document.getElementById('btn-move-object');
+  const reset=document.getElementById('btn-reset-position');
+  move.disabled=editBusy || removed || !canRemove(asset);
+  move.title=tooltip;
+  reset.hidden=removed || !roomPlacements.has(asset.id);
+  reset.disabled=editBusy;
+  const notice=document.getElementById('room-edit-notice');
+  notice.textContent=removed ? (asset.mapped ? `${asset.tag} removed: its Excel record is no longer located in this room` : 'Removed from this room.') :
+    roomPlacements.has(asset.id) ? `Moved to X ${asset.center[0].toFixed(2)} m, Z ${asset.center[2].toFixed(2)} m. The photo shows the original location.` : '';
+  notice.hidden=!notice.textContent;
+  const list=document.getElementById('room-edit-list');
+  list.replaceChildren();
+  for(const edit of activeEdits){
+    const item=state.assetsByObj.get(edit.id), row=document.createElement('div');
+    row.className='room-change-row';
+    const name=document.createElement('button'), time=document.createElement('time'), restore=document.createElement('button');
+    name.type=restore.type='button';
+    name.textContent=item.tag;
+    name.title=item.label;
+    name.addEventListener('click',()=>selectAsset(item,true));
+    const at=new Date(edit.at);
+    if (Number.isFinite(at.valueOf())) {
+      time.dateTime=at.toISOString();
+      time.title=at.toLocaleString();
+      time.textContent=at.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+    }
+    restore.textContent='Restore';
+    restore.setAttribute('aria-label',`Restore ${item.tag}`);
+    restore.disabled=editBusy;
+    restore.addEventListener('click',()=>changeRoom('restore',item));
+    row.append(name,time,restore);
+    list.append(row);
+  }
+  for (const id of moved) {
+    const item=liveRoomAssets.get(id), row=document.createElement('div');
+    row.className='room-change-row';
+    const name=document.createElement('button'), reset=document.createElement('button');
+    name.type=reset.type='button';
+    name.textContent=item.tag;
+    name.title=item.label;
+    name.addEventListener('click',()=>selectAsset(item,true));
+    reset.textContent='Reset position';
+    reset.setAttribute('aria-label',`Reset position of ${item.tag}`);
+    reset.disabled=editBusy;
+    reset.addEventListener('click',()=>changePlacement(item,null));
+    row.append(name,reset);
+    list.append(row);
+  }
+}
+
+async function changeRoom(action,asset) {
+  if (editBusy || !canRemove(asset)) return;
+  closeMovePreview();
+  editBusy=true;
+  walkKeys.clear();
+  renderRoomEditControls();
+  try {
+    const next=activeEdits.filter(edit=>edit.id!==asset.id);
+    if(action==='remove') next.push({id:asset.id});
+    if (action==='restore') {
+      const position=roomPlacements.get(asset.id);
+      const source=state.assetsByObj.get(asset.id);
+      const review=reviewedTrolleyParts(source,state.assetsByObj);
+      const restored=position ? placedRoomAsset(source,position,review?.baseY) : asset;
+      if (state.roomAssets.some(other=>other.transform && roomBoundsOverlap(restored,other))) {
+        throw new Error('Move the other object away from this location first.');
+      }
+    }
+    const prepared=prepareRoomEdits(next);
+    if (!prepared.navigation || !cellAtPosition(robotPosition(),prepared.navigation)) {
+      throw new Error('Move the robot clear of this location before changing the room.');
+    }
+    const snapshot=await editStore.edit(action,asset.id);
+    const same=snapshot.removed.length===prepared.ids.size && snapshot.removed.every(edit=>prepared.ids.has(edit.id));
+    applyRoomEdits(snapshot,false,same ? prepared : undefined);
+    document.getElementById('room-changes').open=true;
+  } catch(error) {
+    const notice=document.getElementById('room-edit-notice');
+    notice.textContent=error.message;
+    notice.hidden=false;
+  } finally {
+    editBusy=false;
+    document.getElementById('btn-room-edit').disabled=!canRemove(state.selectedAsset);
+    document.getElementById('btn-move-object').disabled=removedIds.has(state.selectedAsset.id) || !canRemove(state.selectedAsset);
+    document.getElementById('btn-reset-position').disabled=false;
+    document.querySelectorAll('#room-edit-list button[aria-label]').forEach(button=>button.disabled=false);
+  }
+}
+
+function viewRoomLocation(asset) {
+  if (takeApart?.isOpen) takeApart.close();
+  const navigation=state.twin.navigation,m=navigation.grid_meta;
+  const [x,y,z]=asset.center, eye=1.22;
+  let best, cost=Infinity;
+  for(const p of reachableFloor(navigation,robotPosition())) {
+    const distance=Math.hypot(p.x-x,eye-y,p.z-z);
+    if(distance<1.75 || distance>2.25) continue;
+    let obstruction=0;
+    for(let t=.05;t<.78;t+=.04){
+      const i=Math.floor((p.x+(x-p.x)*t-m.x_min)/m.res),j=Math.floor((p.z+(z-p.z)*t-m.z_min)/m.res);
+      if(!navigation.clearance_grid_m[i]?.[j]) obstruction++;
+    }
+    const score=Math.abs(distance-2)*4+obstruction*.16-p.clearance*.35;
+    if(score<cost){best=p;cost=score;}
+  }
+  applyCameraPreset('detail');
+  if(best) {
+    camera.position.set(best.x,eye,best.z);
+    controls.target.fromArray(asset.center);
+    controls.update();
+  }
+}
+
+function moveField(name) {
+  return document.getElementById(`room-move-${name}`);
+}
+
+function beginMovePreview(asset) {
+  if (editBusy || removedIds.has(asset.id) || !canRemove(asset)) return;
+  closeMovePreview();
+  walkKeys.clear();
+  viewRoomLocation(asset);
+  const source=state.assetsByObj.get(asset.id);
+  const review=reviewedTrolleyParts(source,state.assetsByObj);
+  const [sx,sy,sz]=source.size;
+  const baseY=review?.baseY ?? source.center[1]-sy/2;
+  const box = new THREE.BoxGeometry(sx,source.center[1]+sy/2-baseY,sz);
+  const edges = new THREE.EdgesGeometry(box);
+  box.dispose();
+  const outline = new THREE.LineSegments(edges,new THREE.LineBasicMaterial({color:0x79e2ef,depthTest:false}));
+  outline.renderOrder=10;
+  scene.add(outline);
+  movePreview={asset:source,outline,review};
+  document.body.classList.add('placing-object');
+  document.getElementById('room-move-form').hidden=false;
+  const [x,y,z]=asset.center;
+  moveField('x').value=x.toFixed(2);
+  moveField('z').value=z.toFixed(2);
+  moveField('height').value=Math.max(0,asset.transform ? y-asset.size[1]/2 : baseY).toFixed(2);
+  moveField('yaw').value=String(Math.round(asset.yaw*180/Math.PI));
+  updateMovePreview();
+}
+
+function closeMovePreview() {
+  if (!movePreview) return;
+  scene.remove(movePreview.outline);
+  movePreview.outline.geometry.dispose();
+  movePreview.outline.material.dispose();
+  movePreview=null;
+  document.body.classList.remove('placing-object');
+  document.getElementById('room-move-form').hidden=true;
+}
+
+function setMovePoint(point) {
+  moveField('x').value=point.x.toFixed(2);
+  moveField('z').value=point.z.toFixed(2);
+  updateMovePreview();
+}
+
+function updateMovePreview() {
+  if (!movePreview) return;
+  const {asset,outline,review}=movePreview;
+  const [x,z,height,degrees]=['x','z','height','yaw'].map(name=>moveField(name).valueAsNumber);
+  const valid=[x,z,height,degrees].every(Number.isFinite);
+  const placement=valid ? {center:[x,height+asset.size[1]/2,z],yaw:degrees*Math.PI/180,source:[...asset.center,asset.yaw]} : null;
+  let error='Enter a position, height, and rotation.';
+  outline.visible=valid;
+  if (placement) {
+    indexedScan ??= indexRoomScan(...sourceScan);
+    const omitted=new Set([...removedIds,...roomPlacements.keys(),asset.id].map(id=>instancesById.get(id)));
+    const rail=review?.rail;
+    const includeRail=rail && !removedIds.has(rail.id) && !roomPlacements.has(rail.id);
+    if (includeRail) omitted.add(instancesById.get(rail.id));
+    const collisionAssets=includeRail ? state.roomAssets.filter(other=>other.id!==rail.id) : state.roomAssets;
+    const placedAsset=placedRoomAsset(asset,placement,review?.baseY);
+    error=roomPlacementError(placedAsset,collisionAssets,indexedScan,omitted,initialNavigation.grid_meta);
+    outline.position.fromArray(placedAsset.center);
+    outline.rotation.y=-placement.yaw;
+    outline.material.color.setHex(error ? 0xff9b85 : 0x79e2ef);
+  }
+  Object.assign(movePreview,{placement,error});
+  document.getElementById('room-move-error').textContent=error;
+  document.getElementById('btn-place-object').disabled=!!error;
+}
+
+function changePlacement(asset, placement) {
+  if (editBusy || removedIds.has(asset.id) || !canRemove(asset)) return;
+  const next=new Map(roomPlacements);
+  if (placement) next.set(asset.id,placement);
+  else next.delete(asset.id);
+  try {
+    const original=state.assetsByObj.get(asset.id);
+    if (!placement && state.roomAssets.some(other=>other.transform && other.id!==asset.id && roomBoundsOverlap(original,other))) {
+      throw new Error('Move the other object away from this location first.');
+    }
+    const prepared=prepareRoomEdits(activeEdits,next);
+    if (!prepared.navigation || !cellAtPosition(robotPosition(),prepared.navigation)) {
+      throw new Error('Move the robot clear of this location before placing the object.');
+    }
+    saveRoomPlacements(next);
+    roomPlacements=next;
+    closeMovePreview();
+    applyRoomEdits({removed:activeEdits,offline:editsOffline},false,prepared);
+    if (state.selectedAsset.id===asset.id) viewRoomLocation(state.selectedAsset);
+  } catch(error) {
+    if (movePreview) document.getElementById('room-move-error').textContent=error.message;
+    else {
+      const notice=document.getElementById('room-edit-notice');
+      notice.textContent=error.message;
+      notice.hidden=false;
+    }
+  }
+}
+
+function bindRoomEdits() {
+  const dialog=document.getElementById('confirm-room-removal');
+  let pendingAsset;
+  document.getElementById('btn-room-edit').addEventListener('click',()=>{
+    const asset=state.selectedAsset;
+    if (!canRemove(asset) || editBusy) return;
+    if (removedIds.has(asset.id)) { changeRoom('restore',asset); return; }
+    pendingAsset=asset;
+    dialog.returnValue='';
+    document.getElementById('room-remove-message').textContent=`Remove ${asset.tag} · ${asset.label} from this room? You can restore it from Room changes.`;
+    dialog.showModal();
+  });
+  dialog.addEventListener('close',()=>{
+    if(dialog.returnValue==='remove' && pendingAsset) changeRoom('remove',pendingAsset);
+    pendingAsset=null;
+  });
+  document.getElementById('btn-room-location').addEventListener('click',()=>viewRoomLocation(state.selectedAsset));
+  document.getElementById('btn-move-object').addEventListener('click',()=>beginMovePreview(state.selectedAsset));
+  document.getElementById('btn-reset-position').addEventListener('click',()=>changePlacement(state.selectedAsset,null));
+  document.getElementById('btn-cancel-move').addEventListener('click',closeMovePreview);
+  const form=document.getElementById('room-move-form');
+  form.addEventListener('input',updateMovePreview);
+  form.addEventListener('submit',event=>{
+    event.preventDefault();
+    if (movePreview?.placement && !movePreview.error) changePlacement(movePreview.asset,movePreview.placement);
+  });
+  document.getElementById('room-fill-debug').addEventListener('change',event=>{
+    splatMaterial.uniforms.uFillDebug.value=Number(event.target.checked);
+  });
+}
+
 function robotPosition() {return {x:robotGroup.position.x,z:robotGroup.position.z};}
+
+function cameraYaw() {
+  const direction = camera.getWorldDirection(new THREE.Vector3());
+  return Math.atan2(direction.x, direction.z);
+}
+
+function beginManualWalk() {
+  const position = robotPosition(), yaw = cameraYaw();
+  state.manualWalk = {yaw};
+  state.journey = createJourney({kind:"idle", tag:"Explore the room", duration_s:0, total_distance_m:0,
+    waypoints:[{position:[position.x, 0, position.z], t:0, distance_m:0, yaw}]});
+  state.walkSummary ??= {passed:new Set(), attention:new Set(), previous:position};
+  document.getElementById("arrival-announcement").textContent = "";
+  clearRouteHistory();
+  rebuildRouteGeometry();
+  applyCameraPreset(state.cameraPreset === "first" ? "first" : "walk");
+}
+
+function keyboardWalk(dt) {
+  const manual = state.manualWalk;
+  const forward = Number(walkKeys.has("w") || walkKeys.has("arrowup")) - Number(walkKeys.has("s") || walkKeys.has("arrowdown"));
+  const side = Number(walkKeys.has("d")) - Number(walkKeys.has("a"));
+  const turn = Number(walkKeys.has("arrowleft")) - Number(walkKeys.has("arrowright"));
+  if (!["walk", "first"].includes(state.cameraPreset)) {
+    manual.yaw = cameraYaw();
+    if (turn) applyCameraPreset("walk");
+  }
+  manual.yaw += turn * 1.8 * dt;
+  const x = Math.sin(manual.yaw), z = Math.cos(manual.yaw);
+  const start = robotPosition();
+  const step = dt / (Math.hypot(forward, side) || 1);
+  const end = manualStep(state.twin.navigation, equipmentObstacles, start,
+    (x * forward - z * side) * step, (z * forward + x * side) * step);
+  const dx = end.x - start.x, dz = end.z - start.z;
+  const yaw = state.cameraPreset === "first" ? manual.yaw :
+    dx || dz ? Math.atan2(dx, dz) : robotGroup.rotation.y;
+  return {...end, yaw, distance:0};
+}
+
+function updateWalkCamera(nav) {
+  const yaw = state.manualWalk?.yaw ?? nav.yaw;
+  const dx = Math.sin(yaw), dz = Math.cos(yaw);
+  if (state.cameraPreset === "first") {
+    camera.position.set(nav.x, .69, nav.z);
+    controls.target.set(nav.x + dx, .69, nav.z + dz);
+  } else {
+    // Keep the trailing camera on this side of a wall when space behind the robot is tight.
+    const start = [nav.x, 0, nav.z];
+    let distance = 1.55;
+    while (distance > .1 && !segmentIsFree(state.twin.navigation, start, [nav.x - dx * distance, 0, nav.z - dz * distance])) {
+      distance *= .5;
+    }
+    if (distance <= .1) distance = 0;
+    camera.position.set(nav.x - dx * distance, 1.4, nav.z - dz * distance);
+    const lookAhead = .14 + .2 * distance;
+    controls.target.set(nav.x + dx * lookAhead, .47, nav.z + dz * lookAhead);
+  }
+  camera.lookAt(controls.target);
+}
 
 function navigationError(error) {
   applyJourneyEvent({type:"block",message:error.message});
 }
 
 function dispatchRobotToAsset(asset) {
+  asset=roomAsset(asset);
+  if (!asset || removedIds.has(asset.id)) return;
+  takeApart?.close();
   try {
     const start=robotPosition();
     const navigation = state.twin.navigation;
@@ -1354,7 +2027,9 @@ function registerActivity() {
 }
 
 function updateAttractMode(now) {
-  if (!attract.enabled || attract.active || document.hidden || now-attract.lastActivity < 20000) return;
+  if (bimView?.active) return;
+  if (movePreview) return;
+  if (takeApart?.isOpen || state.manualWalk || !attract.enabled || attract.active || document.hidden || now-attract.lastActivity < 20000) return;
   if (!["idle","arrived"].includes(state.journey.phase)) return;
   const target=state.assetsById.get(state.twin.target_asset_id);
   if (!target) return;
@@ -1368,6 +2043,51 @@ function updateAttractMode(now) {
 
 function bindUIEvents() {
   bindArView();
+  bindRoomEdits();
+  bimView=createBimRoom({camera,controls,container:document.getElementById("canvas-container")});
+  semanticPlan=bindSemanticPlan({
+    snapshot:()=>({assets:state.roomAssets,walls:state.twin.scene.walls,navigation:state.twin.navigation,
+      robot:robotPosition(),journey:state.journey,selected:state.selectedAsset}),
+    inspect:asset=>selectAsset(asset,true),
+    navigate:dispatchRobotToAsset,
+    viewModel:()=>applyCameraPreset("bim"),
+  });
+  document.getElementById("btn-semantic-plan").disabled=false;
+  const resumeMission = () => dispatchRobotToAsset(state.assetsById.get(state.twin.target_asset_id));
+  document.getElementById("btn-manual-walk").addEventListener("click", resumeMission);
+  window.addEventListener("keydown", event => {
+    if (movePreview) {
+      if (event.key === 'Escape') closeMovePreview();
+      return;
+    }
+    if (event.defaultPrevented || event.isComposing || event.altKey || event.ctrlKey || event.metaKey ||
+        event.target.closest?.("input, textarea, select, [contenteditable], video") ||
+        document.querySelector("dialog[open], #wo-modal:not(.hidden)")) return;
+    if (takeApart?.isOpen) return; // its own keys: R, G, Esc
+    const key = event.key.toLowerCase();
+    if (!event.repeat && key === "t" && state.selectedAsset && !removedIds.has(state.selectedAsset.id)) {
+      event.preventDefault();
+      takeApart.open(state.selectedAsset);
+      return;
+    }
+    if (movementKeys.includes(key)) {
+      event.preventDefault();
+      if (!state.manualWalk && event.repeat) return;
+      if (!state.manualWalk) beginManualWalk();
+      walkKeys.add(key);
+    } else if (!event.repeat && key === "m") {
+      resumeMission();
+    } else if (!event.repeat && key === "f") {
+      const {x, z} = robotPosition();
+      const nearest = nearbyAssets(state.roomAssets, x, z, 1.8)
+        .filter(asset => assetPresentation(asset).kind === "instrumented")
+        .sort((a, b) => a.distance_m - b.distance_m)[0];
+      if (nearest) selectAsset(state.assetsByObj.get(nearest.id), true);
+    }
+  });
+  window.addEventListener("keyup", event => walkKeys.delete(event.key.toLowerCase()));
+  window.addEventListener("blur", () => walkKeys.clear());
+  document.addEventListener("visibilitychange", () => walkKeys.clear());
   attract.lastActivity=performance.now();
   for (const type of ["pointerdown","keydown","wheel","touchstart"]) document.addEventListener(type,registerActivity,{capture:true,passive:true});
   document.addEventListener("pointermove",()=>{if (!attract.active) attract.lastActivity=performance.now();},{passive:true});
@@ -1383,8 +2103,12 @@ function bindUIEvents() {
     const point=mapWorldPoint(m,e.currentTarget.width,e.currentTarget.height,
       (e.clientX-rect.left)/rect.width*e.currentTarget.width,
       (e.clientY-rect.top)/rect.height*e.currentTarget.height);
+    if (movePreview) {
+      if (point) setMovePoint(point);
+      return;
+    }
     if(!point){navigationError(new Error("Choose a point inside the room walls."));return;}
-    const objects=state.twin.assets.filter(asset=>{
+    const objects=state.roomAssets.filter(asset=>{
       if(asset.tier!=="equipment"||asset.center[1]-asset.size[1]/2>1.62||asset.center[1]+asset.size[1]/2<.10)return false;
       const dx=point.x-asset.center[0],dz=point.z-asset.center[2],c=Math.cos(asset.yaw),s=Math.sin(asset.yaw);
       return Math.abs(dx*c+dz*s)<=asset.size[0]/2 && Math.abs(-dx*s+dz*c)<=asset.size[2]/2;
@@ -1439,6 +2163,7 @@ function bindUIEvents() {
     if (target) dispatchRobotToAsset(target);
   });
 
+  document.getElementById("btn-take-apart").addEventListener("click", () => takeApart.open(state.selectedAsset));
   document.getElementById("btn-navigate-selected").addEventListener("click", () => {
     if (state.selectedAsset) dispatchRobotToAsset(state.selectedAsset);
   });

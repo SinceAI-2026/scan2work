@@ -26,6 +26,62 @@
 .journey-controls{flex-wrap:wrap}#replan-status{font-size:10px;line-height:1.5;color:#ffe1aa}#replan-status:empty{display:none}
 
 .autoplay-chip{background:#efe2a8;color:#453a12;border-color:#d9c87a;font-weight:650}
+.manual-walk-chip{background:#d9edf0;color:#174650;border-color:#92bec6;font-weight:650}
+.walkthrough-legend{color:#a2d9d0}
+.semantic-plan-dialog{margin:auto;width:min(1140px,96vw);max-height:94dvh;padding:18px;overflow:auto;border:1px solid #aabcb4;border-radius:12px;background:#f9f8f0;color:#203539}
+.semantic-plan-dialog::backdrop{background:#132622b0}
+.semantic-plan-header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:0 0 12px;border-bottom:1px solid #d9dfd6}
+.semantic-plan-header h2{font-size:19px}.semantic-plan-header p{font-size:12px;color:#516861}
+.semantic-plan-header button{width:auto;white-space:nowrap}
+.semantic-plan-layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(180px,220px);gap:16px;align-items:start}
+#semantic-plan-drawing{display:block;width:100%;max-height:75dvh;background:#f4f2e8;border-radius:8px}
+.semantic-plan-tools{display:grid;gap:9px;padding-top:14px;font-size:12px}.semantic-plan-tools p{line-height:1.45;color:#516861}
+.semantic-plan-tools input[type=search]{width:100%;padding:6px;border:1px solid #b6c5bb;border-radius:4px}
+#semantic-plan-results:not(:empty),.semantic-plan-selected{display:grid;gap:4px}
+#semantic-plan-results:empty{display:none}.semantic-plan-selected{padding:8px;background:#e9efe8;border-radius:6px}
+#semantic-plan-results button{padding:4px;text-align:left;border:1px solid #cad8d0;border-radius:3px;background:white;color:#203539}
+.semantic-plan-legend{list-style:none;display:grid;grid-template-columns:1fr 1fr;gap:6px;color:#3d5653}
+.semantic-plan-legend i{display:inline-block;width:10px;height:10px;border:1px solid #617b72;border-radius:2px;margin-right:4px}
+.semantic-plan-asset,.semantic-plan-tag{cursor:pointer}
+.semantic-plan-asset:focus-visible .semantic-plan-shape,.semantic-plan-asset[aria-pressed=true] .semantic-plan-shape{stroke:#1a637b;stroke-width:4px}
+@media(max-width:720px){.semantic-plan-layout{grid-template-columns:1fr}.semantic-plan-header{align-items:flex-start}.semantic-plan-dialog{padding:10px}}
+.bim-view-open .workspace{grid-template-columns:minmax(0,1fr)}
+.bim-view-open .left-sidebar,.bim-mode .hud-overlay,.bim-mode .navigation-hud,.bim-mode .route-map-panel,
+.bim-mode .display-options,.bim-mode #btn-ar-view,.bim-mode #btn-manual-walk,.bim-mode #autoplay-chip,
+.bim-mode [data-cam]:not([data-cam=bim]):not(#btn-bim-back){display:none}
+.bim-mode .vp-btn{color:#dbe8ec;background:#182832;border-color:#37525d;box-shadow:none}
+.bim-mode .vp-btn.active{color:#c5fbf7;background:#20414b;border-color:#528c92}
+#bim-options{position:absolute;inset:0;z-index:18;pointer-events:none;color:#d5e6eb}
+.bim-panel,.bim-legend{position:absolute;background:#111f28ed;border:1px solid #2e4754;border-radius:8px;font-size:12px}
+.bim-panel{display:grid;gap:9px;top:15px;right:16px;padding:12px 14px;pointer-events:auto}
+.bim-panel label{display:flex;align-items:center;gap:6px}.bim-panel input{accent-color:#5db6b8}
+.bim-panel button{padding:5px 7px;border:1px solid #385761;border-radius:4px;background:#192f3a;color:inherit}
+.bim-selection{position:absolute;left:16px;top:52px;padding:6px 9px;border:1px solid #2e4754;border-radius:5px;background:#111f28;color:#d5e6eb;font-size:12px}
+.bim-legend{left:16px;bottom:18px;display:flex;flex-wrap:wrap;gap:9px 14px;padding:9px 12px;max-width:calc(100% - 32px)}
+.bim-legend i{display:inline-block;width:8px;height:8px;margin-right:4px;border-radius:2px}
+@media(max-width:650px){.bim-panel{top:56px;right:10px}.bim-legend{left:10px;bottom:10px}}
+.room-object-count{color:#c2d3c8;font-size:11px;white-space:nowrap}
+.room-changes{border-top:1px solid var(--border);padding-top:8px;font-size:11px;flex-shrink:0}
+.room-changes summary{display:flex;justify-content:space-between;font-weight:600;cursor:pointer}
+#room-edit-list{display:grid;gap:4px;max-height:125px;overflow:auto;margin-top:5px}
+.room-change-row,.room-edit-actions{display:flex;align-items:center;gap:6px}
+.room-change-row>button:first-child{flex:1;text-align:left;overflow:hidden;text-overflow:ellipsis}
+.room-change-row time{color:var(--text-muted);font-size:10px}
+.room-edit-actions>*,.room-edit-actions>span>button{width:100%}
+.room-move-form{display:grid;gap:8px;font-size:11px;padding:9px;background:#e8f1ef;border:1px solid #c3d5cf;border-radius:6px}
+.room-move-fields{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+.room-move-fields label{display:grid;gap:3px}.room-move-fields input{width:100%;padding:4px;border:1px solid var(--border);border-radius:3px}
+#room-move-error{color:#80451c}#room-move-error:empty{display:none}
+.placing-object canvas{cursor:crosshair}
+.placing-object .route-map-panel{right:386px;width:min(280px,calc(100% - 402px))}
+.placing-object .map-expanded .route-map-panel{width:min(500px,calc(100% - 402px))}
+@media(max-width:750px){.placing-object .route-map-panel{display:none}}
+.room-edit-notice,#room-edit-status{color:#7b491c;font-size:11px;line-height:1.45}
+.room-edit-notice{background:#f6edda;border-radius:4px;padding:8px}
+.active-asset-details{display:grid;gap:10px}
+.room-fill-toggle{display:flex;align-items:center;gap:5px}
+.room-edit-dialog{margin:auto;padding:18px;width:min(420px,90vw);border:1px solid var(--border);border-radius:8px;background:#f8f7f0;color:var(--text-main)}
+.room-edit-dialog::backdrop{background:#101a1680}.room-edit-dialog h2{font-size:16px}.room-edit-dialog p{margin:10px 0;line-height:1.4}
 
 .asset-photo{margin:0;border:1px solid var(--border);border-radius:6px;overflow:hidden}.asset-photo img{display:block;width:100%;max-height:210px;object-fit:contain;background:#172622}.asset-photo figcaption{font-size:10px;color:var(--text-muted);padding:7px 9px;background:#fff}
 

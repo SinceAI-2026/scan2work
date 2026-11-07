@@ -127,6 +127,12 @@ The server starts with `.venv/bin/python server.py 8765`. It serves the viewer a
 
 Work-order drafts remain in the server process's memory. They are demonstration records, not submitted maintenance orders or persistent enterprise integration. The current server also differs from the workbook API contract. It uses `/api/copilot/diagnose`, and does not implement the contract's document and scene-anchor endpoints.
 
+## Semantic floor plan and IFC
+
+The **Floor plan** in the viewer draws equipment footprints, fitted pipes, and the room outline from the live twin. Search by tag or name to select an asset, open its inspector, or plan a route. The drawing follows room edits and shows the current robot position and route. Overhead geometry is available as a separate layer. The BIM view, plan, and IFC export use the same fitted vessel bodies. The viewer fits a cylinder to each candidate vessel’s assigned splats and checks its support and residual against held-out splats before using it in place of the envelope.
+
+**Download IFC4** exports the same live room inventory as IFC STEP in metres. The model contains a site, building, storey, room, walls, slab, and equipment with Valmet tags and source metadata. The scan's X, Y, Z coordinates are written as IFC X, −Z, Y. Fitted pipes use circular extrusions and other assets use oriented bounding volumes. Wall height and thickness and slab thickness are assumptions. The model is suitable for room orientation and asset lookup, with envelope geometry that needs field verification for dimensional work. The Python floor-plan generator also produces SVG, PDF, and PNG from the scan on a full rebuild.
+
 ## Verification
 
 Run these checks from the `valmet-twin` directory.

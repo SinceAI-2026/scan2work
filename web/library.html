@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Field Atlas · Asset library</title>
+  <script type="importmap">
+    { "imports": { "three": "./vendor/three/three.module.js", "three/addons/": "./vendor/three/addons/" } }
+  </script>
+  <style>
+    :root {
+      --header-bg: #172622; --bg: #f5f5ef; --card: #fff; --border: #dce0d5; --text: #1c2a22; --muted: #69766c;
+      --forest: #245b42; --terracotta: #c64c38; --amber: #b27624; --stage: #121615;
+      --font: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; --mono: ui-monospace, Menlo, monospace;
+    }
+    * { box-sizing: border-box; margin: 0; }
+    body { background: var(--bg); color: var(--text); font: 13px/1.45 var(--font); }
+    a { color: var(--forest); }
+    header {
+      position: sticky; top: 0; z-index: 5; display: flex; flex-wrap: wrap; gap: 12px; align-items: center;
+      padding: 10px 20px; min-height: 52px; background: var(--header-bg); color: #f5f7f0;
+    }
+    header h1 { font-size: 15px; letter-spacing: -.02em; }
+    header h1 span { color: #aed581; margin-right: 8px; }
+    header h1 small { font-size: 12px; font-weight: 400; color: #a9bcb0; margin-left: 8px; padding-left: 10px; border-left: 1px solid #52645a; }
+    .stage[hidden] { display: none; }
+    .hint { margin-top: 16px; font-size: 11px; line-height: 1.5; color: var(--muted); }
+    .hint code { font-size: 10px; }
+    .card .mono { font-family: var(--mono); }
+    .stage .btn.on { background: #e2ebd9 !important; color: var(--forest) !important; }
+    .btn.danger { color: #ffb4a6 !important; border-color: #8a4a3e !important; }
+    #empty { display: flex; flex-direction: column; gap: 10px; align-items: center; grid-column: 1 / -1; }
+    #empty h3 { color: var(--text); font-size: 16px; }
+    #empty p { max-width: 520px; line-height: 1.6; }
+    header a, header button {
+      border: 1px solid #637b6c; border-radius: 6px; color: #f2f7ee; background: transparent; padding: 6px 10px;
+      font: 12px var(--font); text-decoration: none; cursor: pointer;
+    }
+    header a:hover, header button:hover { background: #2c4436; }
+    header input {
+      flex: 1; min-width: 140px; max-width: 340px; padding: 7px 10px; border-radius: 6px; border: 1px solid #52645a;
+      background: #22332c; color: #f5f7f0; font: 12px var(--font);
+    }
+    #stats { color: #a9bcb0; font-size: 12px; }
+    .spacer { flex: 1; }
+    main { display: grid; grid-template-columns: 270px minmax(0, 1fr); gap: 20px; align-items: start; padding: 14px 20px 40px; }
+    /* Left: saved collection, then classes -> look-alike types (after linards-project's library) */
+    #types { position: sticky; top: 66px; max-height: calc(100vh - 80px); overflow-y: auto; padding-right: 4px; }
+    #types h2 {
+      display: flex; align-items: center; gap: 6px; margin: 18px 0 6px; font-size: 11px; font-weight: 600;
+      text-transform: uppercase; letter-spacing: .06em; color: var(--muted);
+    }
+    #types h2 small { margin-left: auto; font-weight: 400; text-transform: none; letter-spacing: 0; }
+    #types button {
+      display: flex; align-items: center; gap: 8px; width: 100%; padding: 5px 6px; border: 1px solid transparent;
+      border-radius: 6px; background: transparent; color: var(--text); font: 12px var(--font); text-align: left; cursor: pointer;
+    }
+    #types button:hover { background: #ebefe5; }
+    #types button.selected { background: #e2ebd9; border-color: #c7d3c4; }
+    #types button .n { margin-left: auto; color: var(--muted); font: 11px var(--mono); }
+    .chip { width: 9px; height: 9px; border-radius: 50%; flex: none; display: inline-block; }
+    /* Right: the selected group */
+    #detail { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+    .stage {
+      display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 0; border-radius: 10px; overflow: hidden;
+      background: var(--stage); border: 1px solid #26302c; min-height: 340px;
+    }
+    #model { position: relative; height: 380px; }
+    #model canvas { display: block; width: 100%; height: 100%; }
+    #model-status { position: absolute; left: 12px; top: 10px; color: #c9d4cc; font-size: 11px; }
+    .stage aside { background: #1a201e; color: #e8eee8; padding: 14px; display: flex; flex-direction: column; gap: 8px; font-size: 12px; }
+    .stage aside h3 { font-size: 16px; letter-spacing: -.02em; }
+    .stage aside .sub { color: #a9bcb0; font-size: 11px; }
+    .stage aside dl { display: grid; grid-template-columns: auto 1fr; gap: 3px 10px; font-size: 11px; }
+    .stage aside dt { color: #8fa197; }
+    .stage aside dd { font-family: var(--mono); overflow-wrap: anywhere; }
+    .stage aside .row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: auto; }
+    .btn {
+      padding: 7px 10px; border-radius: 6px; border: 1px solid #c7d3c4; background: #fff; color: var(--forest);
+      font: 600 11px var(--font); cursor: pointer; text-decoration: none; display: inline-block;
+    }
+    .btn.primary { background: var(--forest); border-color: var(--forest); color: #fff; }
+    .stage .btn:not(.primary) { background: transparent; color: #e8eee8; border-color: #52645a; }
+    #instances { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; }
+    .card {
+      background: var(--card); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; cursor: pointer;
+      display: flex; flex-direction: column; transition: box-shadow .15s;
+    }
+    .card:hover { box-shadow: 0 6px 18px #0002; }
+    .card.focus { outline: 2px solid var(--forest); }
+    .card img { width: 100%; aspect-ratio: 1; object-fit: cover; background: var(--stage); display: block; }
+    .card .body { padding: 8px 10px 10px; display: flex; flex-direction: column; gap: 3px; }
+    .card .name { font-weight: 600; display: flex; align-items: center; gap: 6px; }
+    .card .sub { color: var(--muted); font-size: 11px; font-family: var(--mono); }
+    .card .status { font-size: 11px; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex: none; background: #8fa197; }
+    .dot.healthy { background: #3c8a5a; } .dot.watch { background: var(--amber); }
+    .dot.degraded, .dot.attention_required { background: var(--terracotta); } .dot.movable { background: #8b5cf6; }
+    .badge { font: 600 9px var(--font); padding: 1px 5px; border-radius: 3px; background: #f6edda; color: #946b1d; letter-spacing: .04em; }
+    #empty { padding: 30px; text-align: center; color: var(--muted); border: 1px dashed var(--border); border-radius: 8px; }
+    @media (max-width: 900px) {
+      main { grid-template-columns: 1fr; }
+      #types { position: static; max-height: 260px; }
+      .stage { grid-template-columns: 1fr; }
+      #model { height: 300px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1><span>◆</span>Field Atlas <small>Asset library · Equipment Room</small></h1>
+    <input id="q" type="search" placeholder="Search saved objects: tag, label, id…" aria-label="Search the library" />
+    <span id="stats">Loading…</span>
+    <span class="spacer"></span>
+    <a id="zip" href="./api/library/export.zip" download>Download saved (.zip)</a>
+    <a href="./index.html">Back to the room</a>
+  </header>
+  <main>
+    <nav id="types" aria-label="Saved objects by class">
+      <h2>Your saved objects</h2>
+      <div id="classes"></div>
+      <p class="hint">Add more from the room: select equipment, <b>Take apart</b> (T), <b>Save to library</b>.
+        Each object is cut out of <code>Equipment Room.ply</code> as its own 3D model.</p>
+    </nav>
+    <section id="detail">
+      <div class="stage" id="stage">
+        <div id="model"><span id="model-status"></span></div>
+        <aside id="focus"></aside>
+      </div>
+      <div id="instances"></div>
+    </section>
+  </main>
+  <script type="module" src="library.mjs"></script>
+</body>
+</html>

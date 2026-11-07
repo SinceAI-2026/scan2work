@@ -4,7 +4,7 @@ export function renderAssetPhoto(asset, figure, baseUrl) {
   image.removeAttribute("src");
   image.hidden = true;
   figure.hidden = true;
-  if (typeof asset.photo !== "string" || !asset.photo.trim()) return;
+  if (typeof asset?.photo !== "string" || !asset.photo.trim()) return;
   let url;
   try { url = new URL(asset.photo, baseUrl); } catch { return; }
   if (!["http:","https:"].includes(url.protocol)) return;

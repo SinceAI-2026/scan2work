@@ -89,14 +89,20 @@ export function createGameMap(navigation, reachable, assets=[]) {
     if(floor[x]&&z>=0&&z<m.nz)floor[x][z]=1;
   }
   // Broad surfaces and straight vector contours replace individual scan cells.
-  const accessible=contourPath(floor,m.nz,scale,30,2.2);
-  const structures=contourPath(closeMask(obstacles),m.nz,scale,35,2.0);
+  const accessible=contourPath(floor,m.nz,scale,4,.6);
+  const closed = closeMask(obstacles);
+  const structures = contourPath(closed.map((row, x) => row.map((blocked, z) => blocked && !floor[x][z])), m.nz, scale, 12, .6);
+  const passageMask = navigation.walkthrough_passages;
   const frame=mapFrame(canvas.width,canvas.height);
   ctx.fillStyle='#172023';ctx.fillRect(0,0,canvas.width,canvas.height);
   ctx.save();ctx.translate(frame.x,frame.y);ctx.scale(.84,.84);
   ctx.beginPath();ctx.rect(0,0,canvas.width,canvas.height);ctx.clip();
   ctx.fillStyle='#353f40';ctx.fillRect(0,0,canvas.width,canvas.height);
-  ctx.fillStyle='#465354';ctx.fill(accessible,'evenodd');
+  ctx.fillStyle='#516060';ctx.fill(accessible,'evenodd');
+  if (passageMask) {
+    const passage = contourPath(floor.map((row, x) => row.map((free, z) => free && passageMask[x][z])), m.nz, scale, 2, .6);
+    ctx.fillStyle='#448883';ctx.fill(passage,'evenodd');
+  }
   ctx.strokeStyle='#72828250';ctx.lineWidth=2;ctx.stroke(accessible);
   // A quiet floor texture, clipped to accessible space, echoes a level floor plan.
   ctx.save();ctx.clip(accessible,'evenodd');ctx.strokeStyle='#bccbc70a';ctx.lineWidth=1;
@@ -107,8 +113,8 @@ export function createGameMap(navigation, reachable, assets=[]) {
   ctx.fillStyle='#777f7e';ctx.fill(structures,'evenodd');
   ctx.save();ctx.clip(structures,'evenodd');ctx.strokeStyle='#e5ece516';ctx.lineWidth=2;
   for(let x=-canvas.height;x<canvas.width;x+=18){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x+canvas.height,canvas.height);ctx.stroke();}ctx.restore();
-  ctx.lineJoin='miter';ctx.miterLimit=3;ctx.strokeStyle='#111a1cb0';ctx.lineWidth=13;ctx.stroke(structures);
-  ctx.strokeStyle='#d8e0db';ctx.lineWidth=5;ctx.stroke(structures);
+  ctx.lineJoin='miter';ctx.miterLimit=3;ctx.strokeStyle='#111a1cb0';ctx.lineWidth=5;ctx.stroke(structures);
+  ctx.strokeStyle='#d8e0db';ctx.lineWidth=2;ctx.stroke(structures);
   // Show individual equipment footprints used by occupancy construction. Small
   // objects remain visible even when their scan contour was simplified away.
   for(const asset of assets) {

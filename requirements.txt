@@ -6,5 +6,7 @@ pandas
 openpyxl
 matplotlib
 pillow
+# asset library: "Save to library" refines objects against the video frames (CPU is enough)
+torch>=2.4
 # optional: EmbeddingGemma semantic retrieval (falls back to TF-IDF if missing)
 # sentence-transformers>=5.0

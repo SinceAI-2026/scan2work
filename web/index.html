@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Field Atlas · Valmet Boiler Room — Equipment Review & Autonomous Field Copilot</title>
   <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="take-apart.css" />
+  <link rel="stylesheet" href="field-jobs.css" />
   <script type="importmap">
     {
       "imports": {
@@ -17,8 +19,8 @@
 <body>
   <div id="arrival-announcement" class="visually-hidden" role="status" aria-live="polite"></div>
   <header class="topbar">
-    <div class="topbar-left"><span class="diamond-logo">◆</span><strong class="brand-name">Field Atlas</strong><span class="room-name">Equipment Room</span></div>
-    <div class="topbar-right"><button id="btn-inspector" class="btn-export" aria-expanded="false">Equipment details</button></div>
+    <div class="topbar-left"><span class="diamond-logo">◆</span><strong class="brand-name">Field Atlas</strong><span class="room-name">Equipment Room</span><span id="room-object-count" class="room-object-count"></span></div>
+    <div class="topbar-right"><a class="btn-export topbar-link" href="library.html">Asset library</a><button id="btn-inspector" class="btn-export" aria-expanded="false">Equipment details</button></div>
   </header>
   <main class="workspace">
     <aside class="sidebar left-sidebar">
@@ -31,6 +33,9 @@
       <div class="filter-group"><label for="asset-search" class="field-label">Find equipment</label><input id="asset-search" class="clean-input" placeholder="Search tag or equipment…" type="search" /></div>
       <select id="select-visual-review" class="clean-select" aria-label="Equipment filter"><option value="mapped">Registered equipment</option><option value="alerts">Needs attention</option><option value="all">All detected objects</option></select>
       <div class="proposal-list" id="asset-list"></div>
+      <details class="room-changes" id="room-changes"><summary>Room changes <span id="room-change-count"></span></summary>
+        <p id="room-edit-status" role="status" hidden></p><div id="room-edit-list"></div>
+      </details>
       <details class="nearby-panel"><summary>Nearby equipment <span id="prox-count"></span></summary><div class="prox-mini-list" id="proximity-list"></div></details>
     </aside>
     <section class="viewport-col">
@@ -38,14 +43,38 @@
         <div class="viewport-Controls-overlay">
           <div class="vp-row">
             <button class="vp-btn active" data-cam="walk">Follow robot</button>
+            <button class="vp-btn" data-cam="first">First person</button>
             <button class="vp-btn" data-cam="overview">Free view</button>
             <button class="vp-btn" data-cam="inside">Target view</button>
+            <button class="vp-btn" id="btn-bim-back" data-cam="overview" hidden>Scan view</button>
+            <button class="vp-btn" data-cam="bim">BIM 3D</button>
+            <button class="vp-btn" id="btn-semantic-plan" disabled>Floor plan</button>
             <button class="vp-btn" id="btn-ar-view" hidden>AR view</button>
             <button class="vp-btn autoplay-chip" id="autoplay-chip" hidden>AUTOPLAY, click to take over</button>
+            <button class="vp-btn manual-walk-chip" id="btn-manual-walk" hidden>Manual walk · M = resume mission</button>
             <details class="display-options"><summary class="vp-btn">Display</summary><div class="display-options-body">
               <label for="select-splat-mode">Render quality</label><select id="select-splat-mode" class="vp-select"><option value="high">High detail</option><option value="balanced">Balanced</option></select>
               <span>Equipment frames</span><div class="vp-row"><button class="vp-btn active" id="btn-boxes-mode" data-bmode="proximity">Nearby</button><button class="vp-btn" id="btn-all-boxes" data-bmode="all">All</button><button class="vp-btn" id="btn-no-boxes" data-bmode="off">Off</button></div>
+              <label class="room-fill-toggle"><input type="checkbox" id="room-fill-debug"> Tint synthetic fill</label>
             </div></details>
+          </div>
+        </div>
+        <div id="bim-options" hidden>
+          <section class="bim-panel" aria-label="BIM layers">
+            <strong>Room model</strong>
+            <label><input type="checkbox" id="bim-walls" checked> Walls</label>
+            <label><input type="checkbox" id="bim-pipes"> All pipes and overhead</label>
+            <label><input type="checkbox" id="bim-all"> All equipment</label>
+            <label><input type="checkbox" id="bim-plane"> 1.1 m section plane</label>
+            <button id="btn-bim-reset" type="button">Reset view</button>
+          </section>
+          <p id="bim-selection" class="bim-selection" aria-live="polite" hidden></p>
+          <div class="bim-legend" aria-label="Model colours">
+            <span><i style="background:#58a9db"></i>Valves</span>
+            <span><i style="background:#3cbaa2"></i>Pumps and motors</span>
+            <span><i style="background:#e7a05a"></i>Vessels</span>
+            <span><i style="background:#aa7bd1"></i>Movables</span>
+            <span><i style="background:#ee705e"></i>Target</span>
           </div>
         </div>
         <div id="hud-overlay" class="hud-overlay"></div>
@@ -73,13 +102,28 @@
         <h2 class="insp-title" id="detail-title" tabindex="-1"></h2>
         <div class="insp-subhead" id="detail-subtitle">
         </div>
+        <div class="room-edit-actions"><button id="btn-room-location" class="btn-outline-full">View location</button><span id="room-edit-tooltip"><button id="btn-room-edit" class="btn-outline-full" disabled>Remove from room</button></span></div>
+        <div class="room-edit-actions"><button id="btn-move-object" class="btn-outline-full" disabled>Move in room</button><button id="btn-reset-position" class="btn-outline-full" hidden>Reset position</button></div>
+        <form id="room-move-form" class="room-move-form" hidden>
+          <p>Click the floor or map to place the outline. Adjust height and angle here.</p>
+          <div class="room-move-fields">
+            <label>X (m)<input id="room-move-x" type="number" step="0.01" required></label>
+            <label>Z (m)<input id="room-move-z" type="number" step="0.01" required></label>
+            <label>Base height (m)<input id="room-move-height" type="number" step="0.01" min="0" required></label>
+            <label>Rotation (°)<input id="room-move-yaw" type="number" step="1" required></label>
+          </div>
+          <p id="room-move-error" role="status"></p>
+          <div class="room-edit-actions"><button id="btn-cancel-move" type="button" class="btn-outline-full">Cancel move</button><button id="btn-place-object" class="btn-outline-full" type="submit">Place object</button></div>
+        </form>
+        <p id="room-edit-notice" class="room-edit-notice" role="status" hidden></p>
+        <div id="active-asset-details" class="active-asset-details">
         <figure id="asset-photo" class="asset-photo" hidden>
           <img alt="" decoding="async" referrerpolicy="no-referrer" hidden />
           <figcaption>Real walkthrough frame</figcaption>
         </figure>
         <p id="detail-match-note" hidden></p>
         <div class="action-bar-inline">
-          <button class="btn-outline-full" id="btn-navigate-selected">Navigate here</button><button class="btn-outline-full" id="btn-draft-wo">Draft work order</button>
+          <button class="btn-outline-full" id="btn-navigate-selected">Navigate here</button><button class="btn-outline-full" id="btn-take-apart" title="Show this object alone (T)">Take apart</button><button class="btn-outline-full" id="btn-draft-wo">Draft work order</button>
         </div>
 
         <p id="movable-notice" class="movable-notice" hidden>Movable object (not instrumented)</p>
@@ -159,9 +203,38 @@
           </div>
         </div>
 
-</details>      </div>
+</details>        </div>
+      </div>
     </aside>
   </main>
+  <dialog id="semantic-plan" class="semantic-plan-dialog" aria-labelledby="semantic-plan-title">
+    <header class="semantic-plan-header">
+      <div><h2 id="semantic-plan-title">Equipment Room</h2><p>Floor plan from the scan</p></div>
+      <div class="vp-row"><button class="btn-outline-full" id="semantic-plan-model">View 3D model</button><button class="btn-outline-full" id="semantic-plan-export">Download IFC4</button><button class="btn-outline-full" id="semantic-plan-close" autofocus>Close floor plan</button></div>
+    </header>
+    <div class="semantic-plan-layout">
+      <svg id="semantic-plan-drawing" aria-label="Plan of the equipment room"></svg>
+      <aside class="semantic-plan-tools">
+        <label for="semantic-plan-search">Find equipment on the plan</label>
+        <input id="semantic-plan-search" type="search" placeholder="Tag, name, or ID">
+        <div id="semantic-plan-results"></div>
+        <div class="semantic-plan-selected">
+          <strong id="semantic-plan-selection" aria-live="polite">Select equipment</strong>
+          <button class="btn-outline-full" id="semantic-plan-inspect" disabled>View equipment</button>
+          <button class="btn-outline-full" id="semantic-plan-navigate" disabled>Navigate to equipment</button>
+        </div>
+        <label><input type="checkbox" id="semantic-plan-all"> Show all floor objects</label>
+        <label><input type="checkbox" id="semantic-plan-overhead"> Show overhead objects</label>
+        <ul class="semantic-plan-legend" aria-label="Plan legend">
+          <li><i style="background:#b9d6f4"></i>Valves</li><li><i style="background:#a7ded2"></i>Pumps and motors</li>
+          <li><i style="background:#f3ce9d"></i>Tanks and vessels</li><li><i style="background:#d7c8ef"></i>Instruments</li>
+          <li><i style="background:#d2dbdf"></i>Fixtures and structure</li><li><i style="background:#eee5f4"></i>Movable objects</li>
+          <li><i style="background:#dcebe5"></i>Reachable floor</li><li><i style="background:#247384"></i>Robot and route</li>
+        </ul>
+        <p>IFC uses fitted pipes and vessel bodies, equipment envelopes, and approximate walls and slab.</p>
+      </aside>
+    </div>
+  </dialog>
   <dialog id="ar-view" class="ar-view" aria-labelledby="ar-view-title">
     <header class="ar-view-header">
       <h2 id="ar-view-title">AR walkthrough</h2>
@@ -169,6 +242,13 @@
     </header>
     <p id="ar-view-status" role="status" hidden></p>
     <video controls playsinline preload="none" aria-label="Walkthrough video with equipment overlay"></video>
+  </dialog>
+  <dialog id="confirm-room-removal" class="room-edit-dialog" aria-labelledby="room-remove-title">
+    <form method="dialog">
+      <h2 id="room-remove-title">Remove from room?</h2>
+      <p id="room-remove-message"></p>
+      <div class="room-edit-actions"><button class="btn-outline-full" value="cancel" autofocus>Cancel</button><button class="btn-outline-full" value="remove">Remove object</button></div>
+    </form>
   </dialog>
   <div class="modal-backdrop hidden" id="wo-modal">
     <div class="modal-card">
@@ -181,5 +261,6 @@
   </div>
 
   <script type="module" src="app.js"></script>
+  <script type="module" src="voice-assistant.mjs"></script>
 </body>
 </html>

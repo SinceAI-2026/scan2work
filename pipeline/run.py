@@ -19,7 +19,7 @@ from collections import Counter
 import numpy as np
 
 from . import config as C
-from . import ingest, perception, knowledge, navigation, diagnostics, semantic_labels, retrieval, decisions_client, detect_lift, walk_photos, pipes
+from . import ingest, perception, knowledge, navigation, diagnostics, semantic_labels, retrieval, decisions_client, detect_lift, walk_photos, pipes, floorplan
 
 
 def fill_object_membership(splat: dict, assets: list[dict], base_idx: np.ndarray, margin: float = 0.02) -> np.ndarray:
@@ -252,6 +252,10 @@ def main():
     render_verification_map(splat, assets, nav, C.OUT_DIR / "navigation_map_preview.png")
     export_floorplan(splat, nav, C.OUT_DIR / "floorplan_scan.png")
     nav["floorplan_image"] = "./data/floorplan_scan.png"
+    try:                                                # architectural-style plan for service workers (Valmet request)
+        nav["semantic_floorplan"] = floorplan.build(splat, assets, nav)
+    except Exception as err:                            # never let a drawing break the twin
+        print(f"   [floorplan] skipped: {err}")
 
     class_counts = dict(Counter(a["class"] for a in assets))
     state_counts = dict(Counter(a["condition_state"] for a in assets if a["mapped"]))

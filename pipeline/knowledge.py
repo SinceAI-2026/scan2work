@@ -425,6 +425,13 @@ def _preference_score(obj: dict, excel_rec: dict, used_centers: list) -> float:
             score -= 400.0
 
     # Prefer substantial, well-observed equipment clusters (not tiny noise crumbs)
+    # Physical size sanity: a transmitter or vibration sensor is hand-sized, a valve is not a room-sized object
+    ext = max(sx, sz)
+    if acls in ("PRESSURE_TRANSMITTER", "VIBRATION_SENSOR") and (ext > 0.6 or sy > 0.8):
+        score -= 120.0
+    elif acls == "CONTROL_VALVE" and ext > 1.2:
+        score -= 80.0
+
     # Prefer objects whose class the AI verified (from images or multi-view detection) over colour-rule guesses
     if obj.get("label_source", "geometric_rules") == "geometric_rules":
         score -= 35.0

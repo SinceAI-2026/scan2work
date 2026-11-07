@@ -40,6 +40,7 @@ function floatTex(data, w, h, format) {
 export async function loadInstanceUniforms(url, count, texW, texH, assets) {
   computeOffsets(assets);
   const instData = new Float32Array(texW * texH);
+  let complete = false;
   const tableW = 256, tableH = Math.ceil((assets.length + 1) / tableW);
   const table = new Float32Array(tableW * tableH * 4);
   try {
@@ -48,7 +49,11 @@ export async function loadInstanceUniforms(url, count, texW, texH, assets) {
       const buf = await res.arrayBuffer();
       const n = new DataView(buf).getUint32(8, true);
       const ids = new Uint16Array(buf, 12, Math.min(n, count));
-      for (let i = 0; i < ids.length; i++) instData[i] = ids[i] === 65535 ? 0 : ids[i] + 1;
+      complete = n === count;
+      for (let i = 0; i < ids.length; i++) {
+        if (ids[i] < assets.length) instData[i] = ids[i] + 1;
+        else if (ids[i] !== 65535) complete = false;
+      }
     }
   } catch (e) { console.warn("explode view: no splat_instance.bin", e); }
   assets.forEach((a, i) => {
@@ -56,12 +61,17 @@ export async function loadInstanceUniforms(url, count, texW, texH, assets) {
     table[k] = o.x; table[k + 1] = o.y; table[k + 2] = o.z;
     table[k + 3] = Math.round(c.r * 255) + Math.round(c.g * 255) * 256 + Math.round(c.b * 255) * 65536;
   });
+  const instanceTexture = floatTex(instData, texW, texH, THREE.RedFormat);
+  instanceTexture.userData.complete = complete;
   return {
-    uInstTex: { value: floatTex(instData, texW, texH, THREE.RedFormat) },
+    uInstTex: { value: instanceTexture },
     uInstTable: { value: floatTex(table, tableW, tableH, THREE.RGBAFormat) },
     uInstTableSize: { value: new THREE.Vector2(tableW, tableH) },
     uExplode: { value: 0 },
     uSegment: { value: 0 },
+    uApart: { value: 0 },      // take-apart view (take-apart.mjs): instance id + 1 of the isolated object, 0 = off
+    uApartRoom: { value: 0 },  // opacity left to every other splat while one object is taken apart
+    uApartSelf: { value: 1 },  // opacity of the isolated object's scan splats (0 while its saved model stands in)
   };
 }
 
@@ -71,23 +81,31 @@ export const SHADER_DECL = `
       uniform vec2 uInstTableSize;
       uniform float uExplode;
       uniform float uSegment;
+      uniform float uApart;
+      uniform float uApartRoom;
+      uniform float uApartSelf;
 `;
 export const SHADER_OFFSET = `
-        float instId = texture2D(uInstTex, uv).x;
+        float instId = synthetic ? floor(max(0.0, -fillCovB.w)) : texture2D(uInstTex, uv).x;
         vec4 instRow = vec4(0.0);
         if (instId > 0.5) {
           vec2 tuv = (vec2(mod(instId, uInstTableSize.x), floor(instId / uInstTableSize.x)) + 0.5) / uInstTableSize;
+          if (!synthetic && uHasRemoved > 0.5 && texture2D(uRemoved, tuv).x > 0.5) {
+            gl_Position = vec4(0.0, 0.0, 2.0, 1.0);
+            return;
+          }
           instRow = texture2D(uInstTable, tuv);
-          center += instRow.xyz * uExplode;
+          center += instRow.xyz * uExplode * step(uApart, 0.5);
         }
 `;
 export const SHADER_COLOR = `
-        if (instId > 0.5 && uSegment > 0.5) {
+        if (instId > 0.5 && uSegment > 0.5 && uApart < 0.5) {
           float p = instRow.w;
           vec3 ic = vec3(mod(p, 256.0), mod(floor(p / 256.0), 256.0), floor(p / 65536.0)) / 255.0;
           vColor.rgb = mix(vColor.rgb, ic, 0.85);
         }
-        if (instId < 0.5) vColor.a *= 1.0 - 0.85 * max(uExplode, uSegment * 0.6);
+        if (uApart > 0.5) vColor.a *= abs(instId - uApart) > 0.5 ? uApartRoom : uApartSelf;
+        else if (instId < 0.5) vColor.a *= 1.0 - 0.85 * max(uExplode, uSegment * 0.6);
 `;
 
 // Called once per frame after app.js has styled the boxes.
@@ -99,6 +117,7 @@ export function applyExplode(boxMeshes, splatMaterial) {
   }
   for (const entry of boxMeshes.values()) {
     const a = entry.asset;
+    if (entry.removed) continue;
     entry.group.position.set(a.center[0], a.center[1], a.center[2]).add(explodeOffset(a));
     if (!active) continue;
     const passiveColor = assetPresentation(a).frameColor;
