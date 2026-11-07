@@ -6,6 +6,7 @@
 // field-jobs.mjs shows the job log the agent writes (inspection queue, checklist, technician notes).
 
 import { mountFieldJobs, showEquipment } from "./field-jobs.mjs";
+import { voiceAssistantEnabled } from "./runtime-access.mjs";
 
 const AGENT_ID = "agent_5501m6v02k69e2r8fwc0hznmfda5";
 const WIDGET_SRC = "https://unpkg.com/@elevenlabs/convai-widget-embed@0.21.4/dist/index.js";
@@ -26,7 +27,8 @@ async function mount() {
     registeredTags=new Set(twin.assets.filter(asset=>asset.mapped).map(asset=>asset.tag));
   }
   catch { return; }
-  if (runtime?.public_demo || runtime?.offline || runtime?.external_models_enabled === false) {
+  // Offline imports and the hosted demo stay without it, unless the server opts in (runtime.voice_assistant).
+  if (!voiceAssistantEnabled(runtime)) {
     mountFieldJobs(selectedTag, runtime);
     return;
   }

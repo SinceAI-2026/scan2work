@@ -5,7 +5,7 @@
 // showEquipment(tag) selects the equipment and moves the camera to it; the assistant calls it as a client tool.
 // It drives the viewer through its own controls (the list cards and View location), so app.js needs no changes.
 
-import { canWriteSharedData, installAction, sharedWrite } from "./runtime-access.mjs";
+import { canWriteFieldJobs, installAction } from "./runtime-access.mjs";
 
 const POLL_MS = 3000;
 const STATE_TEXT = { attention_required: "Urgent", degraded: "Degraded", watch: "Watch" };
@@ -25,8 +25,13 @@ let runtime;
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 
 async function api(path, body) {
+  if (body && !canWriteFieldJobs(runtime)) {
+    const error = new Error("Install Scan2Work to save your own inspection jobs.");
+    error.code = "public_demo_read_only";
+    throw error;
+  }
   const res = body
-    ? await sharedWrite(runtime, path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
+    ? await fetch(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
     : await fetch(path);
   const out = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(out.error || `HTTP ${res.status}`);
@@ -110,7 +115,7 @@ function renderJob(root) {
   }
   root.hidden = tag === "none";
   if (root.hidden) return;
-  const readOnly = !canWriteSharedData(runtime);
+  const readOnly = !canWriteFieldJobs(runtime);
   root.querySelector(".fj-install").hidden = !readOnly;
   if (readOnly) {
     root.querySelector(".fj-status").textContent = "";

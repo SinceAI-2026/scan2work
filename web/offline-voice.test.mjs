@@ -2,16 +2,18 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import vm from "node:vm";
+import {voiceAssistantEnabled} from "./runtime-access.mjs";
 
 // Exercise the real bootstrap with an inert DOM: no widget, browser or network is launched.
 const source=fs.readFileSync(new URL("./voice-assistant.mjs",import.meta.url),"utf8")
   .replace(/^import .* from "\.\/field-jobs\.mjs";\n/m,"")
+  .replace(/^import .* from "\.\/runtime-access\.mjs";\n/m,"")
   .replace(/if \(document\.readyState === "loading"\)[\s\S]*$/, "globalThis.mountDone=mount();");
 async function boot(runtime) {
   const fetched=[],created=[],appended=[];let jobs=0;
   const context={
     fetch:async url=>{fetched.push(url);return {json:async()=>({runtime,assets:[{mapped:true,tag:"CV-003"}]})};},
-    mountFieldJobs:()=>jobs++,showEquipment:()=>{},
+    mountFieldJobs:()=>jobs++,showEquipment:()=>{},voiceAssistantEnabled,
     document:{getElementById:()=>null,createElement:tag=>{
       const element={tag,setAttribute(){}};created.push(element);return element;
     },body:{appendChild:el=>appended.push(el)},head:{appendChild:el=>appended.push(el)}},
@@ -35,4 +37,10 @@ test("unmarked online scenes retain the optional voice widget",async()=>{
   assert.equal(result.jobs,1);
   assert.deepEqual(result.created.map(el=>el.tag),["elevenlabs-convai","script"]);
   assert.equal(result.appended[1].src,"https://unpkg.com/@elevenlabs/convai-widget-embed@0.21.4/dist/index.js");
+});
+test("the hosted demo shows the widget only when the server opts in (voice_assistant)",async()=>{
+  const on=await boot({public_demo:true,offline:true,external_models_enabled:false,voice_assistant:true});
+  assert.ok(on.created.some(el=>el.tag==="elevenlabs-convai"),"widget created");
+  const off=await boot({public_demo:true,offline:true,external_models_enabled:false,voice_assistant:false});
+  assert.equal(off.created.length,0);
 });

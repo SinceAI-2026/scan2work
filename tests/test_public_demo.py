@@ -117,6 +117,7 @@ class PublicHTTPTests(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertEqual(manifest['runtime'], {'public_demo': True, 'offline': True,
             'external_models_enabled': False, 'shared_writes_enabled': False,
+            'voice_assistant': False, 'field_jobs_enabled': False,   # off unless VALMET_PUBLIC_ASSISTANT=1
             'install_url': 'https://downloads.example/releases/0.1.0/'})
         self.assertEqual(self.twin, before)
         self.assertEqual(self.manifest.read_bytes(), self.original)

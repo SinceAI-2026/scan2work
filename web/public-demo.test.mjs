@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import vm from "node:vm";
 import {roomEditStore} from "./room-edits.mjs";
-import {canWriteSharedData, installUrl, installAction, sharedWrite} from "./runtime-access.mjs";
+import {canWriteSharedData, canWriteFieldJobs, installUrl, installAction, sharedWrite} from "./runtime-access.mjs";
 
 const runtime={public_demo:true,install_url:"https://example.test/install/"};
 
@@ -58,12 +58,17 @@ test("shared write boundary rejects both library methods before fetch but preser
 test("real field job API rejects public mutations while keeping the inspection queue readable",async()=>{
   const source=fs.readFileSync(new URL("./field-jobs.mjs",import.meta.url),"utf8")
     .replace(/^import .*;\n/m,"").replace(/export /g,"");
-  const calls=[],context={canWriteSharedData,installAction,sharedWrite:(config,url,options)=>sharedWrite(config,url,options,context.fetch),
+  const calls=[],context={canWriteSharedData,canWriteFieldJobs,installAction,sharedWrite:(config,url,options)=>sharedWrite(config,url,options,context.fetch),
     fetch:async(url,options)=>{calls.push({url,options});return {ok:true,json:async()=>({jobs:{}})};}};
   vm.runInNewContext(`${source}\nruntime = ${JSON.stringify(runtime)}; globalThis.callApi=api;`,context);
   await assert.rejects(context.callApi("/api/field-jobs",{action:"start_job"}),{code:"public_demo_read_only"});
   await context.callApi("/api/field-jobs");
   assert.equal(calls.length,1);assert.equal(calls[0].options,undefined);
+  // The hosted demo can opt in to shared inspection jobs (server --assistant); other shared writes stay off.
+  vm.runInNewContext(`runtime = ${JSON.stringify({...runtime,field_jobs_enabled:true})};`,context);
+  await context.callApi("/api/field-jobs",{action:"start_job"});
+  assert.equal(calls.length,2);assert.equal(calls[1].options.method,"POST");
+  assert.equal(canWriteSharedData({...runtime,field_jobs_enabled:true}),false);
 });
 
 async function takeApartHarness(config, saved=[]) {

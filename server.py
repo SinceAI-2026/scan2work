@@ -27,6 +27,10 @@ from pipeline.asset_records import asset_for_api, route_for_api, UNMAPPED_NOTICE
 
 WEB_DIR = ROOT / "web"
 PUBLIC_DEMO = os.environ.get("VALMET_PUBLIC_DEMO") == "1"
+# Opt-in for the hosted demo: show the voice assistant and keep a shared inspection job log (field jobs only;
+# scene edits and library writes stay read-only). mcp_server.py on the same host writes the same log.
+PUBLIC_ASSISTANT = PUBLIC_DEMO and os.environ.get("VALMET_PUBLIC_ASSISTANT") == "1"
+PUBLIC_FIELD_TEXT_LIMIT = 1000   # characters per note, step result or summary sent from the public site
 PUBLIC_BODY_LIMIT = 16 * 1024
 _PUBLIC_WORK_SLOTS = threading.BoundedSemaphore(2)
 DATA_PATH = C.OUT_DIR / "digital_twin.json"
@@ -89,6 +93,7 @@ def served_manifest():
     if PUBLIC_DEMO:
         manifest['runtime'] = {**(manifest.get('runtime') or {}), 'public_demo': True,
             'offline': True, 'external_models_enabled': False, 'shared_writes_enabled': False,
+            'voice_assistant': PUBLIC_ASSISTANT, 'field_jobs_enabled': PUBLIC_ASSISTANT,
             'install_url': public_install_url()}
     return manifest
 
@@ -139,7 +144,7 @@ def load_data():
     ASSETS_BY_OBJ = {a["id"]: a for a in TWIN_DATA["assets"]}
     if len(ASSETS_BY_ID) != len(TWIN_DATA["assets"]) or len(ASSETS_BY_OBJ) != len(TWIN_DATA["assets"]):
         raise ValueError("Duplicate object or asset IDs in the imported scene")
-    FIELD = (PreviewFieldService if PUBLIC_DEMO else field_service.FieldService)(TWIN_DATA, RETRIEVER)
+    FIELD = (PreviewFieldService if PUBLIC_DEMO and not PUBLIC_ASSISTANT else field_service.FieldService)(TWIN_DATA, RETRIEVER)
 
 
 
@@ -434,7 +439,7 @@ class TwinRequestHandler(SimpleHTTPRequestHandler):
             return self.send_error(404, "Media not found in the active dataset")
 
         if path == "/api/field-log":  # the technician's job log, written by mcp_server.py
-            return self._send_json({'jobs': {}} if PUBLIC_DEMO else field_service.read_log())
+            return self._send_json({'jobs': {}} if PUBLIC_DEMO and not PUBLIC_ASSISTANT else field_service.read_log())
 
         if path == "/api/field-jobs":  # the viewer's inspection queue: needs inspection / done, with checks and notes
             return self._send_json(FIELD.inspection_queue())
@@ -504,7 +509,8 @@ class TwinRequestHandler(SimpleHTTPRequestHandler):
 
     def do_POST(self):
         parsed = urlparse(self.path)
-        if PUBLIC_DEMO and parsed.path not in {'/api/copilot/diagnose', '/api/work-orders/draft'}:
+        public_posts = {'/api/copilot/diagnose', '/api/work-orders/draft'} | ({'/api/field-jobs'} if PUBLIC_ASSISTANT else set())
+        if PUBLIC_DEMO and parsed.path not in public_posts:
             return self._public_read_only()
         try:
             length = int(self.headers.get("Content-Length", "0"))
@@ -568,6 +574,8 @@ class TwinRequestHandler(SimpleHTTPRequestHandler):
             action = body.pop("action", "")
             if action not in FIELD_ACTIONS:
                 return self._send_json({"error": f"action must be one of {sorted(FIELD_ACTIONS)}"}, 400)
+            if PUBLIC_DEMO and any(len(str(v)) > PUBLIC_FIELD_TEXT_LIMIT for v in body.values()):
+                return self._send_json({"error": f"Keep notes and results under {PUBLIC_FIELD_TEXT_LIMIT} characters."}, 413)
             try:
                 field_service.call(FIELD, action, body)
             except (ValueError, TypeError) as err:

@@ -1,6 +1,11 @@
 // One capability boundary for the shared demo; installed apps keep their existing write APIs.
 export const isPublicDemo = runtime => runtime?.public_demo === true;
 export const canWriteSharedData = runtime => !isPublicDemo(runtime) && runtime?.shared_writes_enabled !== false;
+// The hosted demo can opt in to the voice assistant and its job log (VALMET_PUBLIC_ASSISTANT=1 on the server):
+// inspection jobs and notes are then shared, while scene edits and library writes stay local.
+export const canWriteFieldJobs = runtime => canWriteSharedData(runtime) || runtime?.field_jobs_enabled === true;
+export const voiceAssistantEnabled = runtime => runtime?.voice_assistant === true
+  || !(isPublicDemo(runtime) || runtime?.offline || runtime?.external_models_enabled === false);
 
 const esc = value => String(value ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[c]);
 
