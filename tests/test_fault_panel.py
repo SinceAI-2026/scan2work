@@ -11,7 +11,7 @@ from pipeline import field_service
 
 def _asset(tag, state, health, stats=None):
     return {"tag": tag, "asset_id": f"ASSET-{tag}", "id": f"OBJ-{tag}", "mapped": True, "asset_class": "PROCESS_PUMP",
-            "label": "pump", "condition_state": state, "health_score": health, "issue_code": f"{tag}_ISSUE",
+            "label": "pump", "condition_state": state, "health_score": health, "issue_code": f"ISSUE_{tag[-1]}",
             "issue_summary": f"{tag} is off", "telemetry": {"stats": stats or {}},
             "diagnostics": {"verification_steps": [{"step": 1, "title": "Check it", "detail": "look"}]}}
 
@@ -59,6 +59,27 @@ class FaultPanelTests(unittest.TestCase):
         self.field = field_service.FieldService({"assets": [_asset("P-3", "healthy", 95)]})
         out, _ = self.call("POST", "/claim")
         self.assertEqual((out["status"], out["task"]), ("clear", None))
+
+    def test_claim_skips_faults_someone_is_working_on(self):
+        self.field.start_job("P-2")
+        out, _ = self.call("POST", "/claim")
+        self.assertEqual((out["status"], out["task"]["tag"]), ("fault", "P-1"))
+
+    def test_hold_with_nothing_left_starts_a_simulated_emergency(self):
+        self.field.start_job("P-1")
+        self.field.start_job("P-2")
+        out, _ = self.call("POST", "/claim")              # on start: nothing new, so the first open job (amber)
+        self.assertEqual(out["status"], "in_progress")
+        out, _ = self.call("POST", "/action", {"action": "claim"})   # a hold: a new emergency on the healthy P-3
+        self.assertEqual((out["status"], out["task"]["tag"]), ("fault", "P-3"))
+        p3 = self.field.asset("P-3")
+        self.assertTrue(p3["simulated_emergency"])
+        self.assertEqual((p3["condition_state"], p3["urgency"]), ("attention_required", "high"))
+        self.assertEqual(p3["issue_code"], "ISSUE_2")   # only P-2 is a scripted (attention/degraded) fault
+        self.assertTrue(p3["issue_summary"].startswith("P-3"))   # the scripted text names its new device
+        self.assertEqual(len(p3["diagnostics"]["verification_steps"]), 1)
+        self.assertIn("P-3", [r["tag"] for r in self.field.inspection_queue()["needs_inspection"]])
+        self.assertEqual(self.call("GET", "/events")[0]["events"][-2]["kind"], "simulated_emergency")
 
     def test_token_guards_the_board_calls_only(self):
         with mock.patch.dict(os.environ, {"LIVE_TOKEN": "s3cret"}):
