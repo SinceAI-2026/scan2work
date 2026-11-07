@@ -30,6 +30,8 @@ UNITS = {"B019p+A069_r2.glb", "B013+B013m.glb", "B156+B156m_r2.glb", "B149+B149m
 # AI 3D: scan2service's own Higgsfield index (read only), every unit it fitted in place
 HF3D = Path.home() / "sinceai-2026/data/private/out/equip_v1/assets_export/hf3d"
 MIN_IOU = 0.5  # silhouette fit against the real photos; below it the shape is not trusted
+ROOM_TEXTURE_PX = 1024  # AI 3D models in the room get their texture at this size (GPU memory on an 8 GB machine);
+                        # the split units for Take apart keep their full 2048 px texture
 
 
 def glb_boxes(path: Path) -> dict:
@@ -53,6 +55,40 @@ def glb_boxes(path: Path) -> dict:
     out = {nodes[i].get("name"): box(i) for i in j["scenes"][j.get("scene", 0)]["nodes"]}
     out["*"] = [[min(bx[0][k] for bx in out.values()) for k in range(3)], [max(bx[1][k] for bx in out.values()) for k in range(3)]]
     return out
+
+
+def shrink_glb(src: Path, dst: Path, px: int):
+    """Copy a GLB with every embedded image scaled down to at most px on its long side (re-encoded as JPEG)."""
+    import io
+    from PIL import Image
+    b = src.read_bytes()
+    jlen = struct.unpack("<I", b[12:16])[0]
+    j = json.loads(b[20:20 + jlen])
+    blen = struct.unpack("<I", b[20 + jlen:24 + jlen])[0]
+    binary = b[28 + jlen:28 + jlen + blen]
+    if len(j.get("buffers", [])) != 1:
+        raise ValueError(f"{src.name}: one buffer expected")
+    images = {im["bufferView"]: im for im in j.get("images", []) if "bufferView" in im}
+    out = bytearray()
+    for i, v in enumerate(j["bufferViews"]):
+        data = binary[v.get("byteOffset", 0):v.get("byteOffset", 0) + v["byteLength"]]
+        if i in images:
+            img = Image.open(io.BytesIO(data)).convert("RGB")
+            if max(img.size) > px:
+                img.thumbnail((px, px), Image.LANCZOS)
+            buf = io.BytesIO()
+            img.save(buf, "JPEG", quality=90)
+            data = buf.getvalue()
+            images[i]["mimeType"] = "image/jpeg"
+        out += b"\0" * (-len(out) % 4)
+        v["byteOffset"], v["byteLength"] = len(out), len(data)
+        out += data
+    out += b"\0" * (-len(out) % 4)
+    j["buffers"][0]["byteLength"] = len(out)
+    js = json.dumps(j, separators=(",", ":")).encode()
+    js += b" " * (-len(js) % 4)
+    dst.write_bytes(struct.pack("<4sII", b"glTF", 2, 12 + 8 + len(js) + 8 + len(out))
+                    + struct.pack("<I4s", len(js), b"JSON") + js + struct.pack("<I4s", len(out), b"BIN\0") + bytes(out))
 
 
 def pick_ai3d(index: dict) -> tuple[dict, dict]:
@@ -98,7 +134,7 @@ def main():
         models[name] = {**entry, "file": f"parts/{name}", "box": boxes["*"], "parts": parts}
     ai3d, skipped = pick_ai3d(json.loads((HF3D / "index.json").read_text()))
     for e in ai3d.values():
-        shutil.copyfile(HF3D / e.pop("src"), OUT / e["file"])
+        shrink_glb(HF3D / e.pop("src"), OUT / e["file"], ROOM_TEXTURE_PX)
     doc = {"version": 3, "source": "SinceAI-2026/mvp demo/web/public/data/s2s (scan2service, raw PLY coordinates)",
            "frame": cards.get("frame"), "models": models, "ai3d": ai3d}
     (OUT / "index.json").write_text(json.dumps(doc, indent=1))

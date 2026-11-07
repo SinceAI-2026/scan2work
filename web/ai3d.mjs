@@ -1,6 +1,6 @@
 // AI 3D in the room (scan2service's room view): every Higgsfield model of a scan2service device is drawn where it was
 // fitted (raw PLY of the same scan, so no shift), on this viewer's objects whose box centres lie inside it (or, for a
-// small model, the smallest of our boxes that holds the model's centre): their scan
+// small model, the smallest of our boxes that holds the model's centre; a model with none is skipped): their scan
 // splats are hidden under it and their room labels get an "AI 3D" badge. Matched by POSITION, never by tag (the two
 // repos tagged the Excel devices onto the scan independently). A pump + motor unit is one model, drawn once.
 // Loaded one by one after the splat; ?ai3d=0 turns it off. The models use their own lit glTF materials under this
@@ -18,6 +18,7 @@ const DATA = "./data/take_apart/";
 /** ctx: { scene, renderer, state, uniforms(), hudElements, roomAsset(a), removed(id), otherOpen(), ready (index promise) } */
 export function createAi3d(ctx) {
   const drawn = new Map(); // model file -> { node, owners (our objects inside it), main (the one it follows) }
+  const skipped = {};      // model file -> why it is not drawn
   const held = new Set();  // object ids whose model steps aside (the in-room Take apart stands there)
   const root = new THREE.Group();
   root.name = "ai3d";
@@ -52,7 +53,12 @@ export function createAi3d(ctx) {
           owners = ctx.state.twin.assets.filter(a => [0, 1, 2].every(k => c.getComponent(k) >= a.aabb_min[k] && c.getComponent(k) <= a.aabb_max[k]))
             .sort((a, b) => a.size[0] * a.size[1] * a.size[2] - b.size[0] * b.size[1] * b.size[2]).slice(0, 1);
         }
-        const main = owners.find(a => a.mapped) ?? owners[0] ?? null;
+        if (!owners.length) { // nothing of ours there: the scan would show through the model
+          skipped[name] = "no object of this viewer under it";
+          dispose(model);
+          continue;
+        }
+        const main = owners.find(a => a.mapped) ?? owners[0];
         node.userData = { name, label: e.label, owners: owners.map(a => a.tag || a.id) };
         root.add(node);
         drawn.set(name, { node, owners, main });
@@ -62,12 +68,19 @@ export function createAi3d(ctx) {
           if (el) { el.classList.add("ai3d"); el._size = null; }
         }
       } catch (err) {
-        console.warn(`AI 3D ${name} not loaded`, err);
+        skipped[name] = `not loaded: ${err.message}`;
       }
       await new Promise(r => setTimeout(r, 250)); // one at a time, the room keeps drawing in between
     }
   }
   ctx.ready.then(load);
+
+  function dispose(obj) {
+    obj.traverse(n => {
+      n.geometry?.dispose();
+      for (const m of [].concat(n.material ?? [])) { m.map?.dispose(); m.dispose(); }
+    });
+  }
 
   /** Every frame before the room is drawn. */
   function frame() {
@@ -76,14 +89,13 @@ export function createAi3d(ctx) {
     const u = ctx.uniforms();
     if (u?.uHasCovered) u.uHasCovered.value = show && drawn.size ? 1 : 0;
     for (const { node, owners, main } of drawn.values()) {
-      node.visible = !owners.some(a => held.has(a.id)) && !(main && ctx.removed(main.id));
-      if (!main) continue;
+      node.visible = !owners.some(a => held.has(a.id)) && !ctx.removed(main.id);
       const live = ctx.roomAsset(main);
       node.position.set(live.center[0] - main.center[0], live.center[1] - main.center[1], live.center[2] - main.center[2]).add(explodeOffset(live));
     }
   }
 
-  window.__ai3d = { drawn: () => [...drawn.values()].map(d => `${d.node.userData.name}: ${d.node.userData.owners.join(" + ") || "(no object)"}`) }; // checks
+  window.__ai3d = { drawn: () => [...drawn.values()].map(d => `${d.node.userData.name}: ${d.node.userData.owners.join(" + ")}`), skipped: () => ({ ...skipped }) }; // checks
   return {
     frame,
     /** The in-room Take apart: the model of the object taken apart steps aside while its parts stand there. */

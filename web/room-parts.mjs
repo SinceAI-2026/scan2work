@@ -22,6 +22,14 @@ const esc = s => String(s ?? "").replace(/[&<>"']/g, c => `&#${c.charCodeAt(0)};
 // The room blur: the frame just drawn (room, frames, AI 3D models) copied to a texture, blurred in two passes (across at
 // half resolution, then down onto the screen), before the parts are drawn sharp on top. Three cheap full-screen passes.
 let blur = null;
+function disposeBlur() {
+  if (!blur) return;
+  blur.frame?.dispose();
+  blur.half.dispose();
+  blur.mat.dispose();
+  blur.scene.children[0].geometry.dispose();
+  blur = null;
+}
 function blurRoom(r, sigmaCss) {
   const size = r.getDrawingBufferSize(new THREE.Vector2()), w = size.x, h = size.y;
   if (!blur) {
@@ -88,8 +96,12 @@ export function createRoomParts(ctx) {
       : near(a) ? "Take the unit apart here, in the room, from the technician's eyes (T; Esc or Done puts it back)"
       : "Walk there and take the unit apart in the room (T)";
     if (btn && btn.title !== title) btn.title = title;
-    if (btn && mine() && btn.textContent !== "Take apart") btn.textContent = "Take apart"; // Wael's label returns on the next selection
+    label();
   }
+  // the label: Wael's selectAsset writes "Isolate item" / "Isolate region" on every selection; an observer puts
+  // "Take apart" back before the panel is painted (microtask), so it never shows for a unit device
+  const label = () => { if (btn && mine() && btn.textContent !== "Take apart") btn.textContent = "Take apart"; };
+  if (btn) new MutationObserver(label).observe(btn, { childList: true, characterData: true, subtree: true });
 
   function open(asset) {
     if (!unitFor(doc, asset) || live || opening) return;
@@ -409,6 +421,7 @@ export function createRoomParts(ctx) {
       canvas.style.cursor = "";
       ui.remove();
       setRoom(false);
+      disposeBlur();
       ctx.onStage?.(asset, false);
       document.body.classList.remove("parts-mode");
       root.traverse(n => {
