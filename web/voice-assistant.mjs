@@ -22,7 +22,7 @@ function mount() {
   widget.setAttribute("action-text", "Call Ilkka for support");
   widget.setAttribute("start-call-text", "Start call");
   widget.setAttribute("end-call-text", "End call");
-  widget.setAttribute("placement", "bottom"); // bottom right would cover the Equipment details panel
+  widget.setAttribute("placement", "bottom-right"); // field-jobs.css moves it clear of Equipment details when that is open
   const sync = () => widget.setAttribute("dynamic-variables", JSON.stringify({ selected_equipment: selectedTag() }));
   sync();
   const title = document.getElementById("detail-title");
