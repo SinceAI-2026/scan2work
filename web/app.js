@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { makeTechnician, technicianCameraOffset } from "./technician-avatar.mjs";
+import { mountEquipmentMetrics } from "./equipment-metrics.mjs";
 import { withTechnicianProfile, TECHNICIAN_HEIGHT } from "./technician-navigation.mjs";
 import { createHazardLayer, energyDescription } from "./hazard-layer.mjs";
 import { renderDeviceSummary } from "./device-summary.mjs";
@@ -97,6 +98,7 @@ const movementKeys = ["w", "a", "s", "d", "arrowup", "arrowdown", "arrowleft", "
 let equipmentObstacles;
 let proposalReview = null;
 let manualAnnotations = null;
+const equipmentMetrics = mountEquipmentMetrics({button:document.getElementById('btn-equipment-metrics')});
 let takeApart = null; // one object alone, the room faded (take-apart.mjs)
 let roomParts = null; // a pump unit apart where it stands, in first person (room-parts.mjs)
 let ai3d = null; // Higgsfield models drawn in place of their devices (ai3d.mjs)
@@ -217,6 +219,7 @@ async function init() {
       },
       context(asset){
         state.selectedAsset=asset;copilotRequestId++;
+        equipmentMetrics.update(null,sceneContext);
         // The shared job card and Ilkka observe this heading. Clear the prior mapped device before publishing it.
         document.getElementById('detail-health-pill').hidden=true;
         document.getElementById('detail-title').textContent=asset.label+' · No workbook status linked';
@@ -1122,6 +1125,7 @@ function setupSceneContext(targetAsset) {
       button.disabled=Boolean(context.unavailable);play.disabled=Boolean(context.unavailable)||!state.navigationAvailable||!context.devices?.[targetAsset.id]?.hazards?.length;
       if(context.unavailable)hazardLayer.setEnabled(false);
       if(state.selectedAsset){
+        equipmentMetrics.update(roomAsset(state.selectedAsset),context,{removed:removedIds.has(state.selectedAsset.id)});
         renderDeviceSummary(document.getElementById('device-status-summary'),roomAsset(state.selectedAsset),context);
         if(!context.unavailable&&document.body.classList.contains('inspector-open')&&!takeApart?.isOpen&&!roomParts?.isOpen)selectAsset(state.selectedAsset,false);
       }
@@ -1610,6 +1614,7 @@ function selectAsset(asset, openInspector = false) {
   const presentation = assetPresentation(asset);
   renderDeviceSummary(document.getElementById("device-status-summary"),asset,sceneContext);
   const removed = removedIds.has(asset.id);
+  equipmentMetrics.update(asset,sceneContext,{removed});
   renderRoomEditControls();
   document.getElementById("active-asset-details").hidden = removed;
   document.getElementById("asset-summary").hidden = removed;
@@ -1754,13 +1759,13 @@ function renderTelemetryChart(asset) {
 
   const series = asset.telemetry?.series || {};
   let s1 = series.position_setpoint_pct || series.vibration_mm_s || series.process_pressure_bar || [];
-  let s2 = series.position_actual_pct || series.bearing_temp_c || [];
+  let s2 = series.position_setpoint_pct ? series.position_actual_pct || [] : [];
   let label = "Synthetic workbook snapshot";
 
   if (series.position_setpoint_pct && series.position_actual_pct) {
     label = "SP (forest) vs Actual PV (terracotta)";
   } else if (series.vibration_mm_s) {
-    label = "Vibration mm/s (forest) & Temp (terracotta)";
+    label = "Vibration · mm/s";
   }
   document.getElementById("chart-metric-label").textContent = label;
 

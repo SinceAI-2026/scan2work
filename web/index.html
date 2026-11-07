@@ -24,6 +24,7 @@
   <link rel="stylesheet" href="./scene-context.css">
   <link rel="stylesheet" href="./presentation-mode.css">
   <link rel="stylesheet" href="./manual-annotations.css">
+  <link rel="stylesheet" href="./equipment-metrics.css">
 </head>
 <body>
   <div id="arrival-announcement" class="visually-hidden" role="status" aria-live="polite"></div>
@@ -144,6 +145,7 @@
         <div id="asset-summary" class="asset-summary">
           <dl id="detail-specs" class="insp-specs"></dl>
           <section id="device-status-summary" class="device-summary" aria-label="Device status summary" hidden></section>
+          <button id="btn-equipment-metrics" class="btn-outline-full" type="button" hidden>Metrics &amp; trends</button>
           <p id="detail-match-note" class="insp-note" hidden></p>
           <button class="btn-primary-full btn-take-apart" id="btn-take-apart" title="Hide the room and show this region alone (T)">Isolate region</button>
         </div>
@@ -181,9 +183,9 @@
           <p id="triage-severity" class="field-label" hidden></p>
           <p id="arrival-safety" class="arrival-safety" hidden></p>
 
-<details id="arrival-evidence"><summary>Telemetry and evidence</summary>          <!-- 3-Day Telemetry Sparkline -->
+<details id="arrival-evidence"><summary>Telemetry and evidence</summary>          <!-- Supplied Telemetry Samples -->
           <div class="field-label-row" style="margin-top:6px;">
-            <span class="field-label">3-day telemetry trend</span>
+            <span class="field-label">Recorded telemetry trend</span>
             <span class="mono-small" id="chart-metric-label">Setpoint vs Actual</span>
           </div>
           <canvas id="telemetry-chart" width="310" height="82"></canvas>

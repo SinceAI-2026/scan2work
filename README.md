@@ -55,7 +55,7 @@ scene changes and exact-source object exports. See
 | Navigation | A* with the original room clearances and a compact walking technician; follow, first-person and aerial views | [Technical notes](docs/technical-notes.md#navigation-and-collision-model) |
 | Information levels | Simplified technician workspace by default; Settings restores the complete Extended toolset | [View guide](docs/features.md#simplified-and-extended-information) |
 | Guided demo and hazards | Rasmus’s walking service technician, interruptible walkthrough and optional energy illustrations | [Integration and reuse](docs/rasmus-integration.md) |
-| Device summary | Canonical condition, one relevant reading/comparison, recorded time and next check; full evidence remains expandable | [Display decisions](docs/rasmus-integration.md#what-belongs-in-the-default-device-view) |
+| Device metrics | Canonical condition and next check, plus **Metrics & trends** for Excel readings, gauges and signal history in both information modes | [Metrics guide](docs/features.md#equipment-metrics-and-trends) |
 | Manual object label | Find the washing machine, inspect its original scan region and test browser-local removal/restoration | [Manual washer](docs/features.md#manually-identified-washing-machine) |
 | Room layers | Scan / Coloured by class / BIM masks of the same view, explode, Show in room filters, floor plan and IFC export | [Features](docs/features.md#room-controls) |
 | AI diagnosis | Grounded triage and LOTO-first verification steps; tested blind on the 13 faulty devices | [Technical notes](docs/technical-notes.md#diagnostics-and-optional-ai) |

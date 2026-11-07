@@ -635,3 +635,39 @@ raw occupied-cell squares are respectively 0.259128, 0.157270, 0.215054 and
 0.144461 scene units, all above the source capsule plus margin (0.11). These
 simulation checks do not establish real-world walking clearances or physical
 scale. No source assets or stored navigation were rewritten.
+
+## Workbook metrics presentation audit
+
+A read-only comparison of the prepared baseline and extraction datasets against
+both hosted `/api/assets?mapped=true` responses found all 30 mapped records on
+each host, with identical telemetry and object bindings. Every mapped record
+still has latest readings, a recorded series, diagnostics, maintenance history
+and data-quality flags. Unmapped objects and manual annotations intentionally
+have no borrowed workbook telemetry. The missing expanded metrics display was a
+presentation gap, not loss of these records.
+
+`pipeline.knowledge` computes summary statistics from the complete supplied
+telemetry group, but exports only its final 24 samples for the chart. In the
+current data these samples run from `2026-10-07 12:00` to `23:30` at 30-minute
+intervals: an 11.5-hour span. The stored three-day aggregate and the displayed
+sample window must not be described as the same period. Position-error percentage
+is a derived latest value; no separate historical series is supplied for it.
+The active asset schema supplies no engineering operating-limit fields. Recorded
+minimum/maximum values are observed ranges, not safe limits or a healthy baseline.
+`stiction_index` is an index; `sensor_bias` has no declared unit in this schema.
+
+The optional scene-context response adds provenance, but its unavailability does
+not erase the already loaded snapshot. A fallback must identify that snapshot
+and say current scenario status could not be checked. Both the asset's
+`simulated_emergency` flag and scene-context provenance must be honoured: the
+Arduino demo can copy an entire scripted telemetry profile onto a same-class
+recipient in memory. Those values and their history cannot be attributed to the
+recipient's original workbook record. No runtime scenarios were active during
+this audit; no jobs, board heartbeats, source data or server settings were changed.
+
+`node --test tests/test_equipment_metrics_data.mjs` passed five actual-data
+regression checks with no skips: both sets of 30 bindings retain exact latest
+readings, all supplied series and timestamps; unmapped objects cannot borrow
+metrics; the latest-only position error gains no fabricated trend; removed
+objects cannot open device metrics; and the two scene bindings retain identical
+workbook records. The test reads prepared files and does not rewrite them.

@@ -12,6 +12,7 @@ Ilkka, shared inspection jobs and Arduino panel.
 | Hazard views | `hazards/rules.json`, `demo/web/src/hazardFx.ts` | Focused energy annotations, amber rings and a selected illustrative danger boundary at our equipment positions. Optional while browsing. |
 | Guided demo | `maintenance/web/demo.ts`, `demo/web/src/stage.ts`, `camera.ts` | One interruptible walkthrough with a short explanation at each stage. Demonstration state stays separate from shared jobs and Arduino. |
 | Device summary | `backend/status.py`, `demo/web/src/devices.ts`, `xr/hub.ts` | One canonical status, the reason, one relevant reading, its recorded source/time and the next check. Existing detailed evidence remains available. |
+| Metrics popup | `xr/hub.ts`, `xr/xr.css` | A dark **Metrics & trends** dialog for the selected device's own workbook readings, observed-range gauges and signal history, available in both information modes. |
 
 These are adaptations of Rasmus Mäkinen's implementation and presentation
 patterns. The entire second viewer and its generated asset catalog are not
@@ -26,7 +27,8 @@ dependencies of the main app.
 | Most relevant reading | One value and one comparison | Explain the issue using the device's own recorded setpoint or baseline. |
 | Source and snapshot time | Compact line beside the reading | Recorded synthetic telemetry must not look like a live plant feed. |
 | Next inspection check | One clear action | Give the user a useful next step. |
-| Full trends, alarms and service history | Expandable evidence | Available without crowding the first view. |
+| Full signal readings and trends | **Metrics & trends** in both information modes | Explicit access to the workbook values, gauges and charts without crowding the first view. |
+| Alarms and service history | Expandable evidence | Available without crowding the first view. |
 | Model confidence | Preserve upstream specifications, labeled condition-model confidence and only for mapped equipment | This is not measured object-recognition accuracy. |
 | Raw geometry and classification details | Secondary scan details | Keep extraction internals out of the main service summary. |
 | Device readings for unmapped objects | Show no linked workbook status | Avoid inventing equipment records for scene objects. |
@@ -79,6 +81,7 @@ Those existing workflows remain available for deliberate user interaction.
 - `pipeline.scene_context.build_scene_context(twin)` returns JSON-ready context without side effects. The server exposes it at `GET /api/scene-context`.
 - `makeTechnician(THREE, {height, footprintRadius})` returns the avatar root, fitted footprint and displacement-driven animation. `withTechnicianProfile(navigation, {height})` derives the visual profile without changing either walkable grid or the source clearance metadata. The earlier `withTechnicianClearance` name remains an alias.
 - `summaryFor(asset, context)` produces the compact device view; `renderDeviceSummary(...)` renders it. `createContextRefresh(...)` follows existing fault-panel notifications, drops stale responses and clears unavailable readings without adding a polling loop.
+- `metricsFor(asset, context)` and `metricChartSvg(model, key)` prepare the equipment readings and selected trend; `mountEquipmentMetrics({button, document})` mounts the metrics dialog. It uses the active twin's workbook binding, labels scripted scenarios separately and treats gauge ranges as observed history rather than safety limits.
 - `createHazardLayer(THREE, host)` uses callbacks for the current objects, selection and position. Moving/removing an object updates its annotation.
 - `createSafetyStory(host)` needs only navigation and presentation callbacks. `mountSafetyDemo(...)` adds the interruptible controls and captions. Neither receives a job, sensor or persistence API.
 

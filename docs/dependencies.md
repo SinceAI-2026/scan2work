@@ -36,6 +36,7 @@ These versions were resolved and installed in a new Python 3.12 environment on m
 | `pipeline/retrieval.py` | `rag_index.json` → TF-IDF grounded evidence | scikit-learn; no downloaded embedding model in offline mode |
 | `pipeline/asset_records.py`, `pipeline/field_service.py` | canonical workbook bindings → operational API, checklist and local job log | Synthetic workbook values; prevents borrowed health on unmapped objects |
 | `pipeline/scene_context.py`, `web/device-summary.mjs` | active twin → read-only operator context and compact device summary | Standard library backend; no workbook rebuild, model calls or generated records |
+| `web/equipment-metrics.mjs`, `web/equipment-metrics.css` | selected workbook-linked asset/context → readings, observed-range gauges and selectable SVG trends | Browser APIs only; no chart CDN, polling loop or device/job/scene-write capability |
 | `web/technician-avatar.mjs`, `web/technician-navigation.mjs` | Three.js + existing room clearance profile → compact walking technician, preserving the prepared walkable grids | Procedural model adapted from Rasmus; independent height and footprint fit; scan scale remains unverified |
 | `web/presentation-mode.mjs`, `web/presentation-mode.css` | browser preference + selected equipment → Simplified/Extended presentation | Browser APIs; no job, device or scene-write capability |
 | `web/hazard-layer.mjs` | operator context + current object geometry → optional energy annotations | Three.js/DOM; generic demonstration assumptions, no isolation authorization |

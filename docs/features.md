@@ -12,7 +12,7 @@ changes presentation only: it does not edit scene objects, start/close jobs, or 
 | --- | --- | --- |
 | Find the next device | Search, inspection queue and explicit filters when browsing all equipment | Same, plus extraction review tools |
 | Reach the device | Selected destination, drawn route and camera/map controls | Same, plus room tour and additional display tools |
-| Understand its condition | Issue, relevant recorded reading, timestamp, next check and expandable evidence | Same, plus specifications, confidence and extraction details |
+| Understand its condition | Issue, relevant recorded reading, timestamp, next check, **Metrics & trends** and expandable evidence | Same, plus specifications, confidence and extraction details |
 | Do the inspection | Source photo, checklist, safety prerequisites, notes and assistant | Same workflow |
 | Show the prototype | Clearly separate guided demo entry; pause/stop/take over | Same walkthrough |
 | Analyse or edit the room | Keep the main room focused | Candidate review, library, BIM/AR, editing and render controls |
@@ -75,6 +75,29 @@ The original photo remains above the job checklist. Full evidence is still avail
 
 Reusable modules, attribution, data-selection decisions and current route checks are in the
 [Rasmus integration guide](rasmus-integration.md).
+
+## Equipment metrics and trends
+
+Select workbook-linked equipment, open **Equipment details**, then choose **Metrics & trends**.
+The dark purple dialog is available in both Simplified and Extended. It brings the selected device's
+Excel readings together with gauges and a selectable signal chart, including flow where supplied.
+The compact summary and the existing **Telemetry and evidence** section remain available.
+
+Readings come from the active room's workbook binding. The dialog shows units, recorded time, source,
+sample counts and data-quality flags. Gauge ranges describe the observed history; they are not operating
+limits or a safe/unsafe assessment. Setpoint comparisons use compatible units. Missing values stay
+unavailable, and any scripted runtime scenario is labeled separately from the recorded workbook history.
+Objects without a workbook binding, including the manually identified washer, receive no borrowed readings.
+
+The reusable module is `web/equipment-metrics.mjs`, styled by `web/equipment-metrics.css`.
+`metricsFor(asset, context)` prepares the view, `metricChartSvg(model, key)` renders the selected trend,
+and `mountEquipmentMetrics({button, document})` mounts the dialog. These modules do not write scene edits,
+service jobs or device state and require no additional service or chart library.
+
+The actual-data regression checks cover all 30 bindings in both room datasets, exact supplied readings and
+series, unmapped/removed objects, and the real 24-sample chart window. Run
+`node --test web/equipment-metrics.test.mjs tests/test_equipment_metrics_data.mjs` with the prepared data installed;
+the latter accepts `VALMET_BASELINE_DATA_DIR` and `VALMET_REVIEW_DATA_DIR` for alternate locations.
 
 ## Manually identified washing machine
 
