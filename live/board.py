@@ -10,8 +10,9 @@ built from. It then sends a heartbeat every second and gets back what to show:
   clear        nothing is broken                                                  green; matrix: a tick
   waiting      (viewer only) no board has claimed a fault since the server started
 
-A done task stays done; the board claims the newest fault the next time it starts (or on a hold). Tap = start the
-job (technician on site). The job itself is closed in the app as usual, which is what turns the board green.
+A done task stays done; the board claims the newest fault nobody is working on the next time it starts (or on a
+hold). With none left, a hold starts a simulated emergency: a scripted fault from the pack on a random healthy asset.
+Tap = start the job (technician on site). The job is closed in the app as usual, which turns the board green.
 
 Self-contained: server.py routes /api/live/* here; nothing else in Field Atlas imports live/.
 """
@@ -19,13 +20,18 @@ from __future__ import annotations
 
 import json
 import os
+import random
 import threading
 import time
 
 from .stores import snowflake, tiger
 
 BOARD_TIMEOUT_S = 5.0   # no heartbeat for this long -> the board is shown offline
-EVENT_TYPE = {"claimed": "FAULT_DETECTED", "acknowledged": "ACKNOWLEDGED", "done": "RESTORED"}
+EVENT_TYPE = {"claimed": "FAULT_DETECTED", "acknowledged": "ACKNOWLEDGED", "done": "RESTORED",
+              "simulated_emergency": "SIMULATED_FAULT"}
+# What a scripted fault carries over to the asset that plays it in a simulated emergency
+SCRIPTED_FIELDS = ("health_score", "issue_code", "issue_summary", "recommended_next_check", "telemetry", "alarms",
+                   "diagnostics", "event_code")
 RUN_ID = time.strftime("%H%M%S")   # keeps Snowflake event ids unique across server restarts
 
 
@@ -73,9 +79,15 @@ class Board:
     def _queue(self) -> dict:
         return self.field.inspection_queue()
 
-    def claim(self, by: str = "board") -> dict:
-        """Take the first broken item (or none) as the board's task."""
-        first = next(iter(self._queue()["needs_inspection"]), None)
+    def claim(self, by: str = "board", simulate_if_idle: bool = False) -> dict:
+        """Take the first broken item nobody is working on as the board's task. With none left: on a hold
+        (simulate_if_idle) start a simulated emergency; on start, show the first open job, or nothing."""
+        rows = self._queue()["needs_inspection"]
+        first = next((r for r in rows if (r.get("job") or {}).get("status") != "in_progress"), None)
+        if first is None and simulate_if_idle:
+            first = self.simulate_emergency(by)
+        if first is None:
+            first = next(iter(rows), None)
         with self.lock:
             self.task = first and {"tag": first["tag"], "asset_id": first["asset_id"],
                                    "claimed_at": time.strftime("%Y-%m-%d %H:%M:%S")}
@@ -84,6 +96,26 @@ class Board:
         if first:
             self.log("claimed", first["tag"], by, first.get("issue") or "")
         return self.state()
+
+    def simulate_emergency(self, by: str) -> dict | None:
+        """A new emergency for the demo: one of the pack's scripted faults (issue, urgency, readings and verification
+        steps of a faulty asset, preferably of the same class) is given to a random healthy asset with no job, in
+        memory only (a server restart clears it). It then shows everywhere the inspection queue does."""
+        jobs = self._queue()["jobs"]
+        assets = self.field.assets
+        healthy = [a for a in assets if a["condition_state"] == "healthy" and a["tag"] not in jobs]
+        scripted = [a for a in assets if a["condition_state"] in ("attention_required", "degraded") and not a.get("simulated_emergency")]
+        if not healthy or not scripted:
+            return None
+        target = random.choice(healthy)
+        same = [a for a in scripted if a.get("asset_class") == target.get("asset_class")]
+        src = random.choice(same or scripted)
+        moved = json.loads(json.dumps({k: src.get(k) for k in SCRIPTED_FIELDS if k in src}).replace(src["tag"], target["tag"]))
+        if not same:   # another class's readings would not fit this device: keep its own
+            moved.pop("telemetry", None)
+        target.update(moved, condition_state="attention_required", urgency="high", simulated_emergency=True)
+        self.log("simulated_emergency", target["tag"], by, f"{src.get('issue_code')} copied from {src['tag']}")
+        return next((r for r in self._queue()["needs_inspection"] if r["tag"] == target["tag"]), None)
 
     def acknowledge(self, by: str = "board") -> dict:
         """Tap: the technician is on site, so the job starts (a no-op if one is already open)."""
@@ -174,8 +206,8 @@ def handle(method: str, path: str, body: dict | None, field, token: str | None =
             action, by = str(body.get("action", "")), str(body.get("by", "viewer"))
             if action == "ack":
                 return b.acknowledge(by), 200
-            if action == "claim":
-                return b.claim(by), 200
+            if action == "claim":   # a hold, or the card's Show newest: with nothing left, a simulated emergency
+                return b.claim(by, simulate_if_idle=True), 200
             return {"error": "action must be ack or claim"}, 400
     except ValueError as err:   # e.g. the claimed tag is not in this twin's data
         return {"error": str(err)}, 422
