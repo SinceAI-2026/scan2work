@@ -1,0 +1,3477 @@
+[
+ {
+  "id": "pump-1",
+  "class": "pump",
+  "name": "pump \u00b7 type 1",
+  "named": false,
+  "instances": [
+   "obj-101",
+   "obj-214",
+   "obj-230",
+   "obj-370"
+  ],
+  "representative": "obj-214",
+  "model": "data/pipeline/models/pump-1.ply",
+  "model_gaussians": 1400,
+  "model_center": [
+   -1.887,
+   0.071,
+   -1.426
+  ],
+  "model_radius": 0.242
+ },
+ {
+  "id": "pump-2",
+  "class": "pump",
+  "name": "pump \u00b7 type 2",
+  "named": false,
+  "instances": [
+   "obj-047",
+   "obj-078",
+   "obj-338"
+  ],
+  "representative": "obj-078",
+  "model": "data/pipeline/models/pump-2.ply",
+  "model_gaussians": 1801,
+  "model_center": [
+   -1.878,
+   0.058,
+   -1.334
+  ],
+  "model_radius": 0.248
+ },
+ {
+  "id": "pump-3",
+  "class": "pump",
+  "name": "pump \u00b7 type 3",
+  "named": false,
+  "instances": [
+   "obj-054",
+   "obj-129",
+   "obj-371"
+  ],
+  "representative": "obj-129",
+  "model": "data/pipeline/models/pump-3.ply",
+  "model_gaussians": 1241,
+  "model_center": [
+   -3.765,
+   -0.439,
+   1.255
+  ],
+  "model_radius": 0.301
+ },
+ {
+  "id": "pump-4",
+  "class": "pump",
+  "name": "pump \u00b7 type 4",
+  "named": false,
+  "instances": [
+   "obj-070",
+   "obj-171"
+  ],
+  "representative": "obj-070",
+  "model": "data/pipeline/models/pump-4.ply",
+  "model_gaussians": 2556,
+  "model_center": [
+   -2.624,
+   -0.214,
+   0.079
+  ],
+  "model_radius": 0.24
+ },
+ {
+  "id": "pump-5",
+  "class": "pump",
+  "name": "pump \u00b7 type 5",
+  "named": false,
+  "instances": [
+   "obj-053"
+  ],
+  "representative": "obj-053",
+  "model": "data/pipeline/models/pump-5.ply",
+  "model_gaussians": 1904,
+  "model_center": [
+   3.839,
+   0.056,
+   2.037
+  ],
+  "model_radius": 0.202
+ },
+ {
+  "id": "valve-1",
+  "class": "valve",
+  "name": "valve with an orange actuator",
+  "named": true,
+  "instances": [
+   "obj-160",
+   "obj-174",
+   "obj-222",
+   "obj-277"
+  ],
+  "representative": "obj-160",
+  "model": "data/pipeline/models/valve-1.ply",
+  "model_gaussians": 735,
+  "model_center": [
+   -0.272,
+   0.018,
+   -1.469
+  ],
+  "model_radius": 0.128
+ },
+ {
+  "id": "valve-2",
+  "class": "valve",
+  "name": "valve \u00b7 type 2",
+  "named": false,
+  "instances": [
+   "obj-041",
+   "obj-120",
+   "obj-220"
+  ],
+  "representative": "obj-041",
+  "model": "data/pipeline/models/valve-2.ply",
+  "model_gaussians": 3472,
+  "model_center": [
+   -1.692,
+   -1.019,
+   -1.38
+  ],
+  "model_radius": 0.358
+ },
+ {
+  "id": "valve-3",
+  "class": "valve",
+  "name": "valve \u00b7 type 3",
+  "named": false,
+  "instances": [
+   "obj-033"
+  ],
+  "representative": "obj-033",
+  "model": "data/pipeline/models/valve-3.ply",
+  "model_gaussians": 2442,
+  "model_center": [
+   1.159,
+   0.052,
+   3.395
+  ],
+  "model_radius": 0.256
+ },
+ {
+  "id": "valve-4",
+  "class": "valve",
+  "name": "valve \u00b7 type 4",
+  "named": false,
+  "instances": [
+   "obj-080"
+  ],
+  "representative": "obj-080",
+  "model": "data/pipeline/models/valve-4.ply",
+  "model_gaussians": 1743,
+  "model_center": [
+   -3.232,
+   -0.708,
+   0.876
+  ],
+  "model_radius": 0.234
+ },
+ {
+  "id": "valve-5",
+  "class": "valve",
+  "name": "valve \u00b7 type 5",
+  "named": false,
+  "instances": [
+   "obj-094"
+  ],
+  "representative": "obj-094",
+  "model": "data/pipeline/models/valve-5.ply",
+  "model_gaussians": 1137,
+  "model_center": [
+   -1.761,
+   -0.072,
+   -1.213
+  ],
+  "model_radius": 0.16
+ },
+ {
+  "id": "valve-6",
+  "class": "valve",
+  "name": "valve \u00b7 type 6",
+  "named": false,
+  "instances": [
+   "obj-114"
+  ],
+  "representative": "obj-114",
+  "model": "data/pipeline/models/valve-6.ply",
+  "model_gaussians": 1407,
+  "model_center": [
+   0.92,
+   -0.156,
+   3.44
+  ],
+  "model_radius": 0.237
+ },
+ {
+  "id": "valve-7",
+  "class": "valve",
+  "name": "valve \u00b7 type 7",
+  "named": false,
+  "instances": [
+   "obj-128"
+  ],
+  "representative": "obj-128",
+  "model": "data/pipeline/models/valve-7.ply",
+  "model_gaussians": 1748,
+  "model_center": [
+   -1.67,
+   -0.147,
+   0.034
+  ],
+  "model_radius": 0.289
+ },
+ {
+  "id": "valve-8",
+  "class": "valve",
+  "name": "valve \u00b7 type 8",
+  "named": false,
+  "instances": [
+   "obj-195"
+  ],
+  "representative": "obj-195",
+  "model": "data/pipeline/models/valve-8.ply",
+  "model_gaussians": 666,
+  "model_center": [
+   -4.805,
+   -0.391,
+   -2.52
+  ],
+  "model_radius": 0.212
+ },
+ {
+  "id": "valve-9",
+  "class": "valve",
+  "name": "valve \u00b7 type 9",
+  "named": false,
+  "instances": [
+   "obj-208"
+  ],
+  "representative": "obj-208",
+  "model": "data/pipeline/models/valve-9.ply",
+  "model_gaussians": 415,
+  "model_center": [
+   -1.578,
+   -0.544,
+   3.231
+  ],
+  "model_radius": 0.117
+ },
+ {
+  "id": "valve-10",
+  "class": "valve",
+  "name": "valve \u00b7 type 10",
+  "named": false,
+  "instances": [
+   "obj-233"
+  ],
+  "representative": "obj-233",
+  "model": "data/pipeline/models/valve-10.ply",
+  "model_gaussians": 1085,
+  "model_center": [
+   2.153,
+   0.029,
+   -1.657
+  ],
+  "model_radius": 0.125
+ },
+ {
+  "id": "valve-11",
+  "class": "valve",
+  "name": "valve \u00b7 type 11",
+  "named": false,
+  "instances": [
+   "obj-249"
+  ],
+  "representative": "obj-249",
+  "model": "data/pipeline/models/valve-11.ply",
+  "model_gaussians": 945,
+  "model_center": [
+   3.824,
+   -0.379,
+   1.975
+  ],
+  "model_radius": 0.179
+ },
+ {
+  "id": "valve-12",
+  "class": "valve",
+  "name": "valve \u00b7 type 12",
+  "named": false,
+  "instances": [
+   "obj-263"
+  ],
+  "representative": "obj-263",
+  "model": "data/pipeline/models/valve-12.ply",
+  "model_gaussians": 865,
+  "model_center": [
+   -1.157,
+   -0.858,
+   -0.187
+  ],
+  "model_radius": 0.162
+ },
+ {
+  "id": "valve-13",
+  "class": "valve",
+  "name": "valve \u00b7 type 13",
+  "named": false,
+  "instances": [
+   "obj-286"
+  ],
+  "representative": "obj-286",
+  "model": "data/pipeline/models/valve-13.ply",
+  "model_gaussians": 474,
+  "model_center": [
+   3.861,
+   -0.432,
+   2.969
+  ],
+  "model_radius": 0.137
+ },
+ {
+  "id": "pressure-transmitter-1",
+  "class": "pressure transmitter",
+  "name": "pressure transmitter \u00b7 type 1",
+  "named": false,
+  "instances": [
+   "obj-287"
+  ],
+  "representative": "obj-287",
+  "model": "data/pipeline/models/pressure-transmitter-1.ply",
+  "model_gaussians": 455,
+  "model_center": [
+   3.792,
+   -0.156,
+   -2.506
+  ],
+  "model_radius": 0.129
+ },
+ {
+  "id": "unclassified-1",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 1",
+  "named": false,
+  "instances": [
+   "obj-039",
+   "obj-044",
+   "obj-063",
+   "obj-068",
+   "obj-071",
+   "obj-081",
+   "obj-082",
+   "obj-132",
+   "obj-207",
+   "obj-212",
+   "obj-219",
+   "obj-232",
+   "obj-255",
+   "obj-256",
+   "obj-259",
+   "obj-261",
+   "obj-306",
+   "obj-328",
+   "obj-342",
+   "obj-349",
+   "obj-362",
+   "obj-383",
+   "obj-384",
+   "obj-402",
+   "obj-410"
+  ],
+  "representative": "obj-044",
+  "model": "data/pipeline/models/unclassified-1.ply",
+  "model_gaussians": 1339,
+  "model_center": [
+   1.921,
+   -0.364,
+   2.045
+  ],
+  "model_radius": 0.298
+ },
+ {
+  "id": "unclassified-2",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 2",
+  "named": false,
+  "instances": [
+   "obj-021",
+   "obj-074",
+   "obj-102",
+   "obj-116",
+   "obj-126",
+   "obj-235",
+   "obj-236",
+   "obj-238",
+   "obj-258",
+   "obj-267",
+   "obj-270",
+   "obj-294",
+   "obj-311",
+   "obj-325",
+   "obj-360",
+   "obj-367",
+   "obj-374",
+   "obj-399",
+   "obj-400"
+  ],
+  "representative": "obj-126",
+  "model": "data/pipeline/models/unclassified-2.ply",
+  "model_gaussians": 1673,
+  "model_center": [
+   -1.079,
+   0.567,
+   -0.13
+  ],
+  "model_radius": 0.271
+ },
+ {
+  "id": "unclassified-3",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 3",
+  "named": false,
+  "instances": [
+   "obj-165",
+   "obj-178",
+   "obj-181",
+   "obj-250",
+   "obj-280",
+   "obj-304",
+   "obj-330",
+   "obj-336",
+   "obj-353",
+   "obj-368",
+   "obj-376",
+   "obj-391",
+   "obj-393"
+  ],
+  "representative": "obj-165",
+  "model": "data/pipeline/models/unclassified-3.ply",
+  "model_gaussians": 825,
+  "model_center": [
+   -4.734,
+   0.171,
+   1.947
+  ],
+  "model_radius": 0.246
+ },
+ {
+  "id": "unclassified-4",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 4",
+  "named": false,
+  "instances": [
+   "obj-012",
+   "obj-014",
+   "obj-017",
+   "obj-061",
+   "obj-092",
+   "obj-096",
+   "obj-145",
+   "obj-184",
+   "obj-251"
+  ],
+  "representative": "obj-017",
+  "model": "data/pipeline/models/unclassified-4.ply",
+  "model_gaussians": 2798,
+  "model_center": [
+   1.98,
+   0.139,
+   -1.396
+  ],
+  "model_radius": 0.636
+ },
+ {
+  "id": "unclassified-5",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 5",
+  "named": false,
+  "instances": [
+   "obj-024",
+   "obj-049",
+   "obj-051",
+   "obj-079",
+   "obj-084",
+   "obj-121",
+   "obj-196",
+   "obj-285",
+   "obj-404"
+  ],
+  "representative": "obj-079",
+  "model": "data/pipeline/models/unclassified-5.ply",
+  "model_gaussians": 1895,
+  "model_center": [
+   -0.302,
+   0.392,
+   -1.631
+  ],
+  "model_radius": 0.316
+ },
+ {
+  "id": "unclassified-6",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 6",
+  "named": false,
+  "instances": [
+   "obj-016",
+   "obj-075",
+   "obj-166",
+   "obj-205",
+   "obj-217",
+   "obj-247",
+   "obj-265",
+   "obj-276"
+  ],
+  "representative": "obj-016",
+  "model": "data/pipeline/models/unclassified-6.ply",
+  "model_gaussians": 4241,
+  "model_center": [
+   1.902,
+   -0.971,
+   3.054
+  ],
+  "model_radius": 0.427
+ },
+ {
+  "id": "unclassified-7",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 7",
+  "named": false,
+  "instances": [
+   "obj-036",
+   "obj-043",
+   "obj-066",
+   "obj-242",
+   "obj-243",
+   "obj-269",
+   "obj-397",
+   "obj-413"
+  ],
+  "representative": "obj-066",
+  "model": "data/pipeline/models/unclassified-7.ply",
+  "model_gaussians": 2334,
+  "model_center": [
+   3.069,
+   -0.359,
+   3.49
+  ],
+  "model_radius": 0.29
+ },
+ {
+  "id": "unclassified-8",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 8",
+  "named": false,
+  "instances": [
+   "obj-069",
+   "obj-146",
+   "obj-200",
+   "obj-348",
+   "obj-363",
+   "obj-381",
+   "obj-385",
+   "obj-406"
+  ],
+  "representative": "obj-146",
+  "model": "data/pipeline/models/unclassified-8.ply",
+  "model_gaussians": 1211,
+  "model_center": [
+   -4.381,
+   0.117,
+   1.48
+  ],
+  "model_radius": 0.246
+ },
+ {
+  "id": "unclassified-9",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 9",
+  "named": false,
+  "instances": [
+   "obj-087",
+   "obj-147",
+   "obj-161",
+   "obj-182",
+   "obj-194",
+   "obj-209",
+   "obj-221",
+   "obj-246"
+  ],
+  "representative": "obj-161",
+  "model": "data/pipeline/models/unclassified-9.ply",
+  "model_gaussians": 834,
+  "model_center": [
+   -4.674,
+   -0.739,
+   -0.141
+  ],
+  "model_radius": 0.222
+ },
+ {
+  "id": "unclassified-10",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 10",
+  "named": false,
+  "instances": [
+   "obj-105",
+   "obj-134",
+   "obj-149",
+   "obj-185",
+   "obj-288",
+   "obj-297",
+   "obj-299",
+   "obj-316"
+  ],
+  "representative": "obj-185",
+  "model": "data/pipeline/models/unclassified-10.ply",
+  "model_gaussians": 822,
+  "model_center": [
+   2.193,
+   -0.742,
+   3.417
+  ],
+  "model_radius": 0.253
+ },
+ {
+  "id": "unclassified-11",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 11",
+  "named": false,
+  "instances": [
+   "obj-122",
+   "obj-139",
+   "obj-192",
+   "obj-241",
+   "obj-290",
+   "obj-310",
+   "obj-335",
+   "obj-365"
+  ],
+  "representative": "obj-192",
+  "model": "data/pipeline/models/unclassified-11.ply",
+  "model_gaussians": 1897,
+  "model_center": [
+   3.573,
+   -0.607,
+   0.281
+  ],
+  "model_radius": 0.301
+ },
+ {
+  "id": "unclassified-12",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 12",
+  "named": false,
+  "instances": [
+   "obj-002",
+   "obj-030",
+   "obj-035",
+   "obj-037",
+   "obj-072",
+   "obj-091",
+   "obj-343"
+  ],
+  "representative": "obj-035",
+  "model": "data/pipeline/models/unclassified-12.ply",
+  "model_gaussians": 3944,
+  "model_center": [
+   2.305,
+   -1.004,
+   -2.08
+  ],
+  "model_radius": 0.366
+ },
+ {
+  "id": "unclassified-13",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 13",
+  "named": false,
+  "instances": [
+   "obj-135",
+   "obj-199",
+   "obj-223",
+   "obj-226",
+   "obj-229",
+   "obj-264",
+   "obj-415"
+  ],
+  "representative": "obj-199",
+  "model": "data/pipeline/models/unclassified-13.ply",
+  "model_gaussians": 644,
+  "model_center": [
+   -4.376,
+   -0.378,
+   -3.059
+  ],
+  "model_radius": 0.227
+ },
+ {
+  "id": "unclassified-14",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 14",
+  "named": false,
+  "instances": [
+   "obj-010",
+   "obj-228",
+   "obj-257",
+   "obj-275",
+   "obj-340",
+   "obj-392"
+  ],
+  "representative": "obj-010",
+  "model": "data/pipeline/models/unclassified-14.ply",
+  "model_gaussians": 3299,
+  "model_center": [
+   1.138,
+   -0.445,
+   3.216
+  ],
+  "model_radius": 0.34
+ },
+ {
+  "id": "unclassified-15",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 15",
+  "named": false,
+  "instances": [
+   "obj-032",
+   "obj-244",
+   "obj-262",
+   "obj-278",
+   "obj-295",
+   "obj-327"
+  ],
+  "representative": "obj-262",
+  "model": "data/pipeline/models/unclassified-15.ply",
+  "model_gaussians": 1513,
+  "model_center": [
+   -1.123,
+   -0.832,
+   -1.257
+  ],
+  "model_radius": 0.415
+ },
+ {
+  "id": "unclassified-16",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 16",
+  "named": false,
+  "instances": [
+   "obj-198",
+   "obj-216",
+   "obj-253",
+   "obj-334",
+   "obj-358",
+   "obj-377"
+  ],
+  "representative": "obj-253",
+  "model": "data/pipeline/models/unclassified-16.ply",
+  "model_gaussians": 779,
+  "model_center": [
+   0.742,
+   -0.976,
+   3.634
+  ],
+  "model_radius": 0.288
+ },
+ {
+  "id": "unclassified-17",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 17",
+  "named": false,
+  "instances": [
+   "obj-008",
+   "obj-011",
+   "obj-018",
+   "obj-127",
+   "obj-254"
+  ],
+  "representative": "obj-008",
+  "model": "data/pipeline/models/unclassified-17.ply",
+  "model_gaussians": 4969,
+  "model_center": [
+   1.367,
+   0.625,
+   -0.712
+  ],
+  "model_radius": 0.815
+ },
+ {
+  "id": "unclassified-18",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 18",
+  "named": false,
+  "instances": [
+   "obj-013",
+   "obj-077",
+   "obj-124",
+   "obj-125",
+   "obj-355"
+  ],
+  "representative": "obj-124",
+  "model": "data/pipeline/models/unclassified-18.ply",
+  "model_gaussians": 1625,
+  "model_center": [
+   -2.243,
+   -0.072,
+   3.486
+  ],
+  "model_radius": 0.866
+ },
+ {
+  "id": "unclassified-19",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 19",
+  "named": false,
+  "instances": [
+   "obj-046",
+   "obj-137",
+   "obj-170",
+   "obj-309",
+   "obj-344"
+  ],
+  "representative": "obj-137",
+  "model": "data/pipeline/models/unclassified-19.ply",
+  "model_gaussians": 1386,
+  "model_center": [
+   1.232,
+   -0.725,
+   1.713
+  ],
+  "model_radius": 0.288
+ },
+ {
+  "id": "unclassified-20",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 20",
+  "named": false,
+  "instances": [
+   "obj-095",
+   "obj-112",
+   "obj-252",
+   "obj-324",
+   "obj-372"
+  ],
+  "representative": "obj-112",
+  "model": "data/pipeline/models/unclassified-20.ply",
+  "model_gaussians": 1828,
+  "model_center": [
+   2.09,
+   0.794,
+   -3.158
+  ],
+  "model_radius": 0.841
+ },
+ {
+  "id": "unclassified-21",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 21",
+  "named": false,
+  "instances": [
+   "obj-100",
+   "obj-155",
+   "obj-186",
+   "obj-225",
+   "obj-271"
+  ],
+  "representative": "obj-186",
+  "model": "data/pipeline/models/unclassified-21.ply",
+  "model_gaussians": 568,
+  "model_center": [
+   -1.036,
+   0.172,
+   -1.431
+  ],
+  "model_radius": 0.139
+ },
+ {
+  "id": "unclassified-22",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 22",
+  "named": false,
+  "instances": [
+   "obj-289",
+   "obj-305",
+   "obj-321",
+   "obj-351",
+   "obj-408"
+  ],
+  "representative": "obj-289",
+  "model": "data/pipeline/models/unclassified-22.ply",
+  "model_gaussians": 480,
+  "model_center": [
+   2.178,
+   0.502,
+   -1.444
+  ],
+  "model_radius": 0.293
+ },
+ {
+  "id": "unclassified-23",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 23",
+  "named": false,
+  "instances": [
+   "obj-059",
+   "obj-142",
+   "obj-268",
+   "obj-302"
+  ],
+  "representative": "obj-142",
+  "model": "data/pipeline/models/unclassified-23.ply",
+  "model_gaussians": 1827,
+  "model_center": [
+   -3.428,
+   -0.907,
+   -2.686
+  ],
+  "model_radius": 0.356
+ },
+ {
+  "id": "unclassified-24",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 24",
+  "named": false,
+  "instances": [
+   "obj-086",
+   "obj-151",
+   "obj-189",
+   "obj-354"
+  ],
+  "representative": "obj-151",
+  "model": "data/pipeline/models/unclassified-24.ply",
+  "model_gaussians": 1944,
+  "model_center": [
+   -0.086,
+   0.735,
+   3.64
+  ],
+  "model_radius": 0.595
+ },
+ {
+  "id": "unclassified-25",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 25",
+  "named": false,
+  "instances": [
+   "obj-026",
+   "obj-164",
+   "obj-301"
+  ],
+  "representative": "obj-164",
+  "model": "data/pipeline/models/unclassified-25.ply",
+  "model_gaussians": 1470,
+  "model_center": [
+   -0.922,
+   -0.943,
+   -1.502
+  ],
+  "model_radius": 0.272
+ },
+ {
+  "id": "unclassified-26",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 26",
+  "named": false,
+  "instances": [
+   "obj-042",
+   "obj-045",
+   "obj-215"
+  ],
+  "representative": "obj-042",
+  "model": "data/pipeline/models/unclassified-26.ply",
+  "model_gaussians": 1855,
+  "model_center": [
+   -1.907,
+   0.342,
+   -1.436
+  ],
+  "model_radius": 0.344
+ },
+ {
+  "id": "unclassified-27",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 27",
+  "named": false,
+  "instances": [
+   "obj-052",
+   "obj-111",
+   "obj-339"
+  ],
+  "representative": "obj-052",
+  "model": "data/pipeline/models/unclassified-27.ply",
+  "model_gaussians": 4103,
+  "model_center": [
+   -0.957,
+   0.715,
+   -0.672
+  ],
+  "model_radius": 0.762
+ },
+ {
+  "id": "unclassified-28",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 28",
+  "named": false,
+  "instances": [
+   "obj-058",
+   "obj-108",
+   "obj-395"
+  ],
+  "representative": "obj-058",
+  "model": "data/pipeline/models/unclassified-28.ply",
+  "model_gaussians": 2127,
+  "model_center": [
+   -0.899,
+   -0.157,
+   -1.242
+  ],
+  "model_radius": 0.36
+ },
+ {
+  "id": "unclassified-29",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 29",
+  "named": false,
+  "instances": [
+   "obj-060",
+   "obj-104",
+   "obj-136"
+  ],
+  "representative": "obj-104",
+  "model": "data/pipeline/models/unclassified-29.ply",
+  "model_gaussians": 1022,
+  "model_center": [
+   -4.728,
+   -0.28,
+   -0.981
+  ],
+  "model_radius": 0.254
+ },
+ {
+  "id": "unclassified-30",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 30",
+  "named": false,
+  "instances": [
+   "obj-110",
+   "obj-158",
+   "obj-373"
+  ],
+  "representative": "obj-158",
+  "model": "data/pipeline/models/unclassified-30.ply",
+  "model_gaussians": 896,
+  "model_center": [
+   1.046,
+   -0.376,
+   1.917
+  ],
+  "model_radius": 0.216
+ },
+ {
+  "id": "unclassified-31",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 31",
+  "named": false,
+  "instances": [
+   "obj-001",
+   "obj-107"
+  ],
+  "representative": "obj-001",
+  "model": "data/pipeline/models/unclassified-31.ply",
+  "model_gaussians": 13479,
+  "model_center": [
+   1.275,
+   -0.741,
+   -0.473
+  ],
+  "model_radius": 0.662
+ },
+ {
+  "id": "unclassified-32",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 32",
+  "named": false,
+  "instances": [
+   "obj-004",
+   "obj-085"
+  ],
+  "representative": "obj-004",
+  "model": "data/pipeline/models/unclassified-32.ply",
+  "model_gaussians": 8763,
+  "model_center": [
+   -1.913,
+   -0.435,
+   1.093
+  ],
+  "model_radius": 0.754
+ },
+ {
+  "id": "unclassified-33",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 33",
+  "named": false,
+  "instances": [
+   "obj-005",
+   "obj-055"
+  ],
+  "representative": "obj-005",
+  "model": "data/pipeline/models/unclassified-33.ply",
+  "model_gaussians": 4462,
+  "model_center": [
+   -0.897,
+   0.11,
+   3.761
+  ],
+  "model_radius": 0.312
+ },
+ {
+  "id": "unclassified-34",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 34",
+  "named": false,
+  "instances": [
+   "obj-020",
+   "obj-141"
+  ],
+  "representative": "obj-020",
+  "model": "data/pipeline/models/unclassified-34.ply",
+  "model_gaussians": 4414,
+  "model_center": [
+   -2.477,
+   0.063,
+   -1.001
+  ],
+  "model_radius": 0.481
+ },
+ {
+  "id": "unclassified-35",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 35",
+  "named": false,
+  "instances": [
+   "obj-022",
+   "obj-157"
+  ],
+  "representative": "obj-022",
+  "model": "data/pipeline/models/unclassified-35.ply",
+  "model_gaussians": 6485,
+  "model_center": [
+   2.584,
+   -1.008,
+   2.467
+  ],
+  "model_radius": 0.519
+ },
+ {
+  "id": "unclassified-36",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 36",
+  "named": false,
+  "instances": [
+   "obj-023",
+   "obj-260"
+  ],
+  "representative": "obj-023",
+  "model": "data/pipeline/models/unclassified-36.ply",
+  "model_gaussians": 1836,
+  "model_center": [
+   0.896,
+   -0.436,
+   3.064
+  ],
+  "model_radius": 0.619
+ },
+ {
+  "id": "unclassified-37",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 37",
+  "named": false,
+  "instances": [
+   "obj-027",
+   "obj-144"
+  ],
+  "representative": "obj-027",
+  "model": "data/pipeline/models/unclassified-37.ply",
+  "model_gaussians": 3252,
+  "model_center": [
+   2.733,
+   0.447,
+   3.476
+  ],
+  "model_radius": 0.539
+ },
+ {
+  "id": "unclassified-38",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 38",
+  "named": false,
+  "instances": [
+   "obj-028",
+   "obj-050"
+  ],
+  "representative": "obj-028",
+  "model": "data/pipeline/models/unclassified-38.ply",
+  "model_gaussians": 4500,
+  "model_center": [
+   -0.675,
+   -0.568,
+   -2.13
+  ],
+  "model_radius": 0.402
+ },
+ {
+  "id": "unclassified-39",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 39",
+  "named": false,
+  "instances": [
+   "obj-031",
+   "obj-067"
+  ],
+  "representative": "obj-031",
+  "model": "data/pipeline/models/unclassified-39.ply",
+  "model_gaussians": 3372,
+  "model_center": [
+   -1.226,
+   0.201,
+   -0.127
+  ],
+  "model_radius": 0.549
+ },
+ {
+  "id": "unclassified-40",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 40",
+  "named": false,
+  "instances": [
+   "obj-034",
+   "obj-062"
+  ],
+  "representative": "obj-034",
+  "model": "data/pipeline/models/unclassified-40.ply",
+  "model_gaussians": 6429,
+  "model_center": [
+   2.507,
+   -0.337,
+   -3.146
+  ],
+  "model_radius": 0.678
+ },
+ {
+  "id": "unclassified-41",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 41",
+  "named": false,
+  "instances": [
+   "obj-038",
+   "obj-345"
+  ],
+  "representative": "obj-038",
+  "model": "data/pipeline/models/unclassified-41.ply",
+  "model_gaussians": 3486,
+  "model_center": [
+   -1.724,
+   0.248,
+   -0.186
+  ],
+  "model_radius": 0.469
+ },
+ {
+  "id": "unclassified-42",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 42",
+  "named": false,
+  "instances": [
+   "obj-040",
+   "obj-123"
+  ],
+  "representative": "obj-040",
+  "model": "data/pipeline/models/unclassified-42.ply",
+  "model_gaussians": 3318,
+  "model_center": [
+   -1.211,
+   -0.915,
+   -2.091
+  ],
+  "model_radius": 0.343
+ },
+ {
+  "id": "unclassified-43",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 43",
+  "named": false,
+  "instances": [
+   "obj-065",
+   "obj-176"
+  ],
+  "representative": "obj-065",
+  "model": "data/pipeline/models/unclassified-43.ply",
+  "model_gaussians": 3586,
+  "model_center": [
+   -1.668,
+   -0.931,
+   -0.014
+  ],
+  "model_radius": 0.428
+ },
+ {
+  "id": "unclassified-44",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 44",
+  "named": false,
+  "instances": [
+   "obj-073",
+   "obj-409"
+  ],
+  "representative": "obj-073",
+  "model": "data/pipeline/models/unclassified-44.ply",
+  "model_gaussians": 2244,
+  "model_center": [
+   -2.667,
+   -0.028,
+   -2.874
+  ],
+  "model_radius": 0.626
+ },
+ {
+  "id": "unclassified-45",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 45",
+  "named": false,
+  "instances": [
+   "obj-076",
+   "obj-197"
+  ],
+  "representative": "obj-076",
+  "model": "data/pipeline/models/unclassified-45.ply",
+  "model_gaussians": 1324,
+  "model_center": [
+   -0.695,
+   -0.839,
+   -3.142
+  ],
+  "model_radius": 0.266
+ },
+ {
+  "id": "unclassified-46",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 46",
+  "named": false,
+  "instances": [
+   "obj-097",
+   "obj-177"
+  ],
+  "representative": "obj-097",
+  "model": "data/pipeline/models/unclassified-46.ply",
+  "model_gaussians": 1488,
+  "model_center": [
+   -2.447,
+   0.024,
+   -0.359
+  ],
+  "model_radius": 0.255
+ },
+ {
+  "id": "unclassified-47",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 47",
+  "named": false,
+  "instances": [
+   "obj-106",
+   "obj-201"
+  ],
+  "representative": "obj-106",
+  "model": "data/pipeline/models/unclassified-47.ply",
+  "model_gaussians": 1070,
+  "model_center": [
+   -2.65,
+   -0.675,
+   -0.046
+  ],
+  "model_radius": 0.513
+ },
+ {
+  "id": "unclassified-48",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 48",
+  "named": false,
+  "instances": [
+   "obj-109",
+   "obj-150"
+  ],
+  "representative": "obj-109",
+  "model": "data/pipeline/models/unclassified-48.ply",
+  "model_gaussians": 2068,
+  "model_center": [
+   1.033,
+   -1.1,
+   2.85
+  ],
+  "model_radius": 0.335
+ },
+ {
+  "id": "unclassified-49",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 49",
+  "named": false,
+  "instances": [
+   "obj-117",
+   "obj-317"
+  ],
+  "representative": "obj-117",
+  "model": "data/pipeline/models/unclassified-49.ply",
+  "model_gaussians": 1377,
+  "model_center": [
+   3.095,
+   -0.512,
+   2.068
+  ],
+  "model_radius": 0.365
+ },
+ {
+  "id": "unclassified-50",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 50",
+  "named": false,
+  "instances": [
+   "obj-130",
+   "obj-298"
+  ],
+  "representative": "obj-130",
+  "model": "data/pipeline/models/unclassified-50.ply",
+  "model_gaussians": 1317,
+  "model_center": [
+   3.777,
+   -0.451,
+   1.935
+  ],
+  "model_radius": 0.151
+ },
+ {
+  "id": "unclassified-51",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 51",
+  "named": false,
+  "instances": [
+   "obj-133",
+   "obj-292"
+  ],
+  "representative": "obj-133",
+  "model": "data/pipeline/models/unclassified-51.ply",
+  "model_gaussians": 1575,
+  "model_center": [
+   -2.412,
+   -0.862,
+   -1.417
+  ],
+  "model_radius": 0.316
+ },
+ {
+  "id": "unclassified-52",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 52",
+  "named": false,
+  "instances": [
+   "obj-153",
+   "obj-308"
+  ],
+  "representative": "obj-153",
+  "model": "data/pipeline/models/unclassified-52.ply",
+  "model_gaussians": 1880,
+  "model_center": [
+   3.662,
+   -0.554,
+   -2.331
+  ],
+  "model_radius": 0.292
+ },
+ {
+  "id": "unclassified-53",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 53",
+  "named": false,
+  "instances": [
+   "obj-167",
+   "obj-206"
+  ],
+  "representative": "obj-167",
+  "model": "data/pipeline/models/unclassified-53.ply",
+  "model_gaussians": 977,
+  "model_center": [
+   -1.405,
+   -0.95,
+   3.579
+  ],
+  "model_radius": 0.285
+ },
+ {
+  "id": "unclassified-54",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 54",
+  "named": false,
+  "instances": [
+   "obj-175",
+   "obj-274"
+  ],
+  "representative": "obj-175",
+  "model": "data/pipeline/models/unclassified-54.ply",
+  "model_gaussians": 2876,
+  "model_center": [
+   -0.74,
+   -0.057,
+   -1.453
+  ],
+  "model_radius": 0.387
+ },
+ {
+  "id": "unclassified-55",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 55",
+  "named": false,
+  "instances": [
+   "obj-183",
+   "obj-266"
+  ],
+  "representative": "obj-183",
+  "model": "data/pipeline/models/unclassified-55.ply",
+  "model_gaussians": 1130,
+  "model_center": [
+   -3.825,
+   -0.473,
+   -3.158
+  ],
+  "model_radius": 0.259
+ },
+ {
+  "id": "unclassified-56",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 56",
+  "named": false,
+  "instances": [
+   "obj-187",
+   "obj-364"
+  ],
+  "representative": "obj-187",
+  "model": "data/pipeline/models/unclassified-56.ply",
+  "model_gaussians": 980,
+  "model_center": [
+   3.745,
+   -0.96,
+   2.713
+  ],
+  "model_radius": 0.395
+ },
+ {
+  "id": "unclassified-57",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 57",
+  "named": false,
+  "instances": [
+   "obj-190",
+   "obj-398"
+  ],
+  "representative": "obj-190",
+  "model": "data/pipeline/models/unclassified-57.ply",
+  "model_gaussians": 1662,
+  "model_center": [
+   1.162,
+   -0.069,
+   -2.25
+  ],
+  "model_radius": 0.411
+ },
+ {
+  "id": "unclassified-58",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 58",
+  "named": false,
+  "instances": [
+   "obj-193",
+   "obj-378"
+  ],
+  "representative": "obj-193",
+  "model": "data/pipeline/models/unclassified-58.ply",
+  "model_gaussians": 806,
+  "model_center": [
+   -2.699,
+   -1.075,
+   2.239
+  ],
+  "model_radius": 0.197
+ },
+ {
+  "id": "unclassified-59",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 59",
+  "named": false,
+  "instances": [
+   "obj-203",
+   "obj-307"
+  ],
+  "representative": "obj-203",
+  "model": "data/pipeline/models/unclassified-59.ply",
+  "model_gaussians": 358,
+  "model_center": [
+   -2.014,
+   -0.865,
+   -1.854
+  ],
+  "model_radius": 0.206
+ },
+ {
+  "id": "unclassified-60",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 60",
+  "named": false,
+  "instances": [
+   "obj-210",
+   "obj-322"
+  ],
+  "representative": "obj-210",
+  "model": "data/pipeline/models/unclassified-60.ply",
+  "model_gaussians": 1065,
+  "model_center": [
+   3.574,
+   -0.892,
+   2.029
+  ],
+  "model_radius": 0.211
+ },
+ {
+  "id": "unclassified-61",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 61",
+  "named": false,
+  "instances": [
+   "obj-211",
+   "obj-366"
+  ],
+  "representative": "obj-211",
+  "model": "data/pipeline/models/unclassified-61.ply",
+  "model_gaussians": 1928,
+  "model_center": [
+   -3.12,
+   -1.038,
+   1.17
+  ],
+  "model_radius": 0.411
+ },
+ {
+  "id": "unclassified-62",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 62",
+  "named": false,
+  "instances": [
+   "obj-218",
+   "obj-390"
+  ],
+  "representative": "obj-218",
+  "model": "data/pipeline/models/unclassified-62.ply",
+  "model_gaussians": 987,
+  "model_center": [
+   -0.18,
+   -1.09,
+   -1.316
+  ],
+  "model_radius": 0.22
+ },
+ {
+  "id": "unclassified-63",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 63",
+  "named": false,
+  "instances": [
+   "obj-231",
+   "obj-234"
+  ],
+  "representative": "obj-231",
+  "model": "data/pipeline/models/unclassified-63.ply",
+  "model_gaussians": 2748,
+  "model_center": [
+   -1.093,
+   -0.237,
+   -0.119
+  ],
+  "model_radius": 0.202
+ },
+ {
+  "id": "unclassified-64",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 64",
+  "named": false,
+  "instances": [
+   "obj-239",
+   "obj-405"
+  ],
+  "representative": "obj-239",
+  "model": "data/pipeline/models/unclassified-64.ply",
+  "model_gaussians": 873,
+  "model_center": [
+   0.008,
+   -0.375,
+   -1.681
+  ],
+  "model_radius": 0.363
+ },
+ {
+  "id": "unclassified-65",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 65",
+  "named": false,
+  "instances": [
+   "obj-279",
+   "obj-379"
+  ],
+  "representative": "obj-279",
+  "model": "data/pipeline/models/unclassified-65.ply",
+  "model_gaussians": 839,
+  "model_center": [
+   -3.125,
+   -1.089,
+   1.818
+  ],
+  "model_radius": 0.212
+ },
+ {
+  "id": "unclassified-66",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 66",
+  "named": false,
+  "instances": [
+   "obj-291",
+   "obj-396"
+  ],
+  "representative": "obj-291",
+  "model": "data/pipeline/models/unclassified-66.ply",
+  "model_gaussians": 372,
+  "model_center": [
+   -0.939,
+   -0.079,
+   0.597
+  ],
+  "model_radius": 0.185
+ },
+ {
+  "id": "unclassified-67",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 67",
+  "named": false,
+  "instances": [
+   "obj-300",
+   "obj-318"
+  ],
+  "representative": "obj-300",
+  "model": "data/pipeline/models/unclassified-67.ply",
+  "model_gaussians": 1161,
+  "model_center": [
+   -1.44,
+   -0.75,
+   0.361
+  ],
+  "model_radius": 0.32
+ },
+ {
+  "id": "unclassified-68",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 68",
+  "named": false,
+  "instances": [
+   "obj-303",
+   "obj-414"
+  ],
+  "representative": "obj-303",
+  "model": "data/pipeline/models/unclassified-68.ply",
+  "model_gaussians": 567,
+  "model_center": [
+   -2.33,
+   -0.986,
+   0.029
+  ],
+  "model_radius": 0.222
+ },
+ {
+  "id": "unclassified-69",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 69",
+  "named": false,
+  "instances": [
+   "obj-333",
+   "obj-388"
+  ],
+  "representative": "obj-333",
+  "model": "data/pipeline/models/unclassified-69.ply",
+  "model_gaussians": 809,
+  "model_center": [
+   -2.065,
+   0.012,
+   0.386
+  ],
+  "model_radius": 0.196
+ },
+ {
+  "id": "unclassified-70",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 70",
+  "named": false,
+  "instances": [
+   "obj-347",
+   "obj-394"
+  ],
+  "representative": "obj-347",
+  "model": "data/pipeline/models/unclassified-70.ply",
+  "model_gaussians": 391,
+  "model_center": [
+   -3.129,
+   -0.942,
+   -2.894
+  ],
+  "model_radius": 0.338
+ },
+ {
+  "id": "unclassified-71",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 71",
+  "named": false,
+  "instances": [
+   "obj-382",
+   "obj-386"
+  ],
+  "representative": "obj-382",
+  "model": "data/pipeline/models/unclassified-71.ply",
+  "model_gaussians": 564,
+  "model_center": [
+   -4.033,
+   -0.994,
+   0.166
+  ],
+  "model_radius": 0.324
+ },
+ {
+  "id": "unclassified-72",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 72",
+  "named": false,
+  "instances": [
+   "obj-003"
+  ],
+  "representative": "obj-003",
+  "model": "data/pipeline/models/unclassified-72.ply",
+  "model_gaussians": 13541,
+  "model_center": [
+   -1.297,
+   0.151,
+   -1.284
+  ],
+  "model_radius": 0.602
+ },
+ {
+  "id": "unclassified-73",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 73",
+  "named": false,
+  "instances": [
+   "obj-006"
+  ],
+  "representative": "obj-006",
+  "model": "data/pipeline/models/unclassified-73.ply",
+  "model_gaussians": 10444,
+  "model_center": [
+   -1.855,
+   -0.48,
+   1.054
+  ],
+  "model_radius": 0.823
+ },
+ {
+  "id": "unclassified-74",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 74",
+  "named": false,
+  "instances": [
+   "obj-007"
+  ],
+  "representative": "obj-007",
+  "model": "data/pipeline/models/unclassified-74.ply",
+  "model_gaussians": 8177,
+  "model_center": [
+   -1.247,
+   0.148,
+   0.415
+  ],
+  "model_radius": 0.357
+ },
+ {
+  "id": "unclassified-75",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 75",
+  "named": false,
+  "instances": [
+   "obj-009"
+  ],
+  "representative": "obj-009",
+  "model": "data/pipeline/models/unclassified-75.ply",
+  "model_gaussians": 8486,
+  "model_center": [
+   3.585,
+   -0.502,
+   -0.988
+  ],
+  "model_radius": 0.639
+ },
+ {
+  "id": "unclassified-76",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 76",
+  "named": false,
+  "instances": [
+   "obj-015"
+  ],
+  "representative": "obj-015",
+  "model": "data/pipeline/models/unclassified-76.ply",
+  "model_gaussians": 3300,
+  "model_center": [
+   0.837,
+   -0.667,
+   -1.05
+  ],
+  "model_radius": 0.411
+ },
+ {
+  "id": "unclassified-77",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 77",
+  "named": false,
+  "instances": [
+   "obj-019"
+  ],
+  "representative": "obj-019",
+  "model": "data/pipeline/models/unclassified-77.ply",
+  "model_gaussians": 3337,
+  "model_center": [
+   -4.679,
+   -0.257,
+   -0.415
+  ],
+  "model_radius": 0.247
+ },
+ {
+  "id": "unclassified-78",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 78",
+  "named": false,
+  "instances": [
+   "obj-025"
+  ],
+  "representative": "obj-025",
+  "model": "data/pipeline/models/unclassified-78.ply",
+  "model_gaussians": 5539,
+  "model_center": [
+   3.812,
+   -0.94,
+   1.324
+  ],
+  "model_radius": 0.318
+ },
+ {
+  "id": "unclassified-79",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 79",
+  "named": false,
+  "instances": [
+   "obj-029"
+  ],
+  "representative": "obj-029",
+  "model": "data/pipeline/models/unclassified-79.ply",
+  "model_gaussians": 4012,
+  "model_center": [
+   0.396,
+   -0.961,
+   -1.38
+  ],
+  "model_radius": 0.38
+ },
+ {
+  "id": "unclassified-80",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 80",
+  "named": false,
+  "instances": [
+   "obj-048"
+  ],
+  "representative": "obj-048",
+  "model": "data/pipeline/models/unclassified-80.ply",
+  "model_gaussians": 2251,
+  "model_center": [
+   -0.449,
+   -1.055,
+   0.456
+  ],
+  "model_radius": 0.25
+ },
+ {
+  "id": "unclassified-81",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 81",
+  "named": false,
+  "instances": [
+   "obj-056"
+  ],
+  "representative": "obj-056",
+  "model": "data/pipeline/models/unclassified-81.ply",
+  "model_gaussians": 3527,
+  "model_center": [
+   -1.623,
+   -1.042,
+   -1.624
+  ],
+  "model_radius": 0.717
+ },
+ {
+  "id": "unclassified-82",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 82",
+  "named": false,
+  "instances": [
+   "obj-057"
+  ],
+  "representative": "obj-057",
+  "model": "data/pipeline/models/unclassified-82.ply",
+  "model_gaussians": 1747,
+  "model_center": [
+   1.991,
+   -1.036,
+   2.017
+  ],
+  "model_radius": 0.207
+ },
+ {
+  "id": "unclassified-83",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 83",
+  "named": false,
+  "instances": [
+   "obj-064"
+  ],
+  "representative": "obj-064",
+  "model": "data/pipeline/models/unclassified-83.ply",
+  "model_gaussians": 2118,
+  "model_center": [
+   -4.292,
+   -0.758,
+   -2.904
+  ],
+  "model_radius": 0.322
+ },
+ {
+  "id": "unclassified-84",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 84",
+  "named": false,
+  "instances": [
+   "obj-083"
+  ],
+  "representative": "obj-083",
+  "model": "data/pipeline/models/unclassified-84.ply",
+  "model_gaussians": 5807,
+  "model_center": [
+   3.021,
+   -0.39,
+   2.43
+  ],
+  "model_radius": 0.388
+ },
+ {
+  "id": "unclassified-85",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 85",
+  "named": false,
+  "instances": [
+   "obj-088"
+  ],
+  "representative": "obj-088",
+  "model": "data/pipeline/models/unclassified-85.ply",
+  "model_gaussians": 2476,
+  "model_center": [
+   3.901,
+   -0.163,
+   2.252
+  ],
+  "model_radius": 0.281
+ },
+ {
+  "id": "unclassified-86",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 86",
+  "named": false,
+  "instances": [
+   "obj-089"
+  ],
+  "representative": "obj-089",
+  "model": "data/pipeline/models/unclassified-86.ply",
+  "model_gaussians": 1725,
+  "model_center": [
+   1.075,
+   -1.033,
+   2.538
+  ],
+  "model_radius": 0.339
+ },
+ {
+  "id": "unclassified-87",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 87",
+  "named": false,
+  "instances": [
+   "obj-090"
+  ],
+  "representative": "obj-090",
+  "model": "data/pipeline/models/unclassified-87.ply",
+  "model_gaussians": 2205,
+  "model_center": [
+   -1.588,
+   0.307,
+   0.017
+  ],
+  "model_radius": 0.332
+ },
+ {
+  "id": "unclassified-88",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 88",
+  "named": false,
+  "instances": [
+   "obj-093"
+  ],
+  "representative": "obj-093",
+  "model": "data/pipeline/models/unclassified-88.ply",
+  "model_gaussians": 2336,
+  "model_center": [
+   -0.968,
+   -0.916,
+   -2.101
+  ],
+  "model_radius": 0.385
+ },
+ {
+  "id": "unclassified-89",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 89",
+  "named": false,
+  "instances": [
+   "obj-098"
+  ],
+  "representative": "obj-098",
+  "model": "data/pipeline/models/unclassified-89.ply",
+  "model_gaussians": 1844,
+  "model_center": [
+   2.627,
+   -0.941,
+   3.108
+  ],
+  "model_radius": 0.256
+ },
+ {
+  "id": "unclassified-90",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 90",
+  "named": false,
+  "instances": [
+   "obj-099"
+  ],
+  "representative": "obj-099",
+  "model": "data/pipeline/models/unclassified-90.ply",
+  "model_gaussians": 1713,
+  "model_center": [
+   -3.57,
+   -0.808,
+   -2.772
+  ],
+  "model_radius": 0.306
+ },
+ {
+  "id": "unclassified-91",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 91",
+  "named": false,
+  "instances": [
+   "obj-103"
+  ],
+  "representative": "obj-103",
+  "model": "data/pipeline/models/unclassified-91.ply",
+  "model_gaussians": 1664,
+  "model_center": [
+   1.558,
+   -1.049,
+   2.119
+  ],
+  "model_radius": 0.201
+ },
+ {
+  "id": "unclassified-92",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 92",
+  "named": false,
+  "instances": [
+   "obj-113"
+  ],
+  "representative": "obj-113",
+  "model": "data/pipeline/models/unclassified-92.ply",
+  "model_gaussians": 1132,
+  "model_center": [
+   -2.069,
+   -0.055,
+   0.833
+  ],
+  "model_radius": 0.188
+ },
+ {
+  "id": "unclassified-93",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 93",
+  "named": false,
+  "instances": [
+   "obj-115"
+  ],
+  "representative": "obj-115",
+  "model": "data/pipeline/models/unclassified-93.ply",
+  "model_gaussians": 1537,
+  "model_center": [
+   -0.922,
+   -1.013,
+   -0.244
+  ],
+  "model_radius": 0.254
+ },
+ {
+  "id": "unclassified-94",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 94",
+  "named": false,
+  "instances": [
+   "obj-118"
+  ],
+  "representative": "obj-118",
+  "model": "data/pipeline/models/unclassified-94.ply",
+  "model_gaussians": 1731,
+  "model_center": [
+   2.896,
+   -0.809,
+   3.15
+  ],
+  "model_radius": 0.241
+ },
+ {
+  "id": "unclassified-95",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 95",
+  "named": false,
+  "instances": [
+   "obj-119"
+  ],
+  "representative": "obj-119",
+  "model": "data/pipeline/models/unclassified-95.ply",
+  "model_gaussians": 2706,
+  "model_center": [
+   -0.693,
+   -0.047,
+   -1.422
+  ],
+  "model_radius": 0.41
+ },
+ {
+  "id": "unclassified-96",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 96",
+  "named": false,
+  "instances": [
+   "obj-131"
+  ],
+  "representative": "obj-131",
+  "model": "data/pipeline/models/unclassified-96.ply",
+  "model_gaussians": 1071,
+  "model_center": [
+   -3.805,
+   -0.701,
+   1.58
+  ],
+  "model_radius": 0.262
+ },
+ {
+  "id": "unclassified-97",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 97",
+  "named": false,
+  "instances": [
+   "obj-138"
+  ],
+  "representative": "obj-138",
+  "model": "data/pipeline/models/unclassified-97.ply",
+  "model_gaussians": 1521,
+  "model_center": [
+   -0.615,
+   -1.027,
+   0.474
+  ],
+  "model_radius": 0.334
+ },
+ {
+  "id": "unclassified-98",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 98",
+  "named": false,
+  "instances": [
+   "obj-140"
+  ],
+  "representative": "obj-140",
+  "model": "data/pipeline/models/unclassified-98.ply",
+  "model_gaussians": 1482,
+  "model_center": [
+   -4.702,
+   -0.796,
+   -2.523
+  ],
+  "model_radius": 0.369
+ },
+ {
+  "id": "unclassified-99",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 99",
+  "named": false,
+  "instances": [
+   "obj-143"
+  ],
+  "representative": "obj-143",
+  "model": "data/pipeline/models/unclassified-99.ply",
+  "model_gaussians": 1078,
+  "model_center": [
+   -1.422,
+   -0.946,
+   -1.435
+  ],
+  "model_radius": 0.234
+ },
+ {
+  "id": "unclassified-100",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 100",
+  "named": false,
+  "instances": [
+   "obj-148"
+  ],
+  "representative": "obj-148",
+  "model": "data/pipeline/models/unclassified-100.ply",
+  "model_gaussians": 1376,
+  "model_center": [
+   -0.759,
+   -1.015,
+   -1.61
+  ],
+  "model_radius": 0.333
+ },
+ {
+  "id": "unclassified-101",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 101",
+  "named": false,
+  "instances": [
+   "obj-152"
+  ],
+  "representative": "obj-152",
+  "model": "data/pipeline/models/unclassified-101.ply",
+  "model_gaussians": 2011,
+  "model_center": [
+   -0.861,
+   -0.406,
+   0.772
+  ],
+  "model_radius": 0.374
+ },
+ {
+  "id": "unclassified-102",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 102",
+  "named": false,
+  "instances": [
+   "obj-154"
+  ],
+  "representative": "obj-154",
+  "model": "data/pipeline/models/unclassified-102.ply",
+  "model_gaussians": 723,
+  "model_center": [
+   -2.682,
+   -0.039,
+   -2.613
+  ],
+  "model_radius": 0.099
+ },
+ {
+  "id": "unclassified-103",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 103",
+  "named": false,
+  "instances": [
+   "obj-156"
+  ],
+  "representative": "obj-156",
+  "model": "data/pipeline/models/unclassified-103.ply",
+  "model_gaussians": 1118,
+  "model_center": [
+   -0.152,
+   -1.004,
+   -1.987
+  ],
+  "model_radius": 0.283
+ },
+ {
+  "id": "unclassified-104",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 104",
+  "named": false,
+  "instances": [
+   "obj-159"
+  ],
+  "representative": "obj-159",
+  "model": "data/pipeline/models/unclassified-104.ply",
+  "model_gaussians": 1063,
+  "model_center": [
+   2.893,
+   -0.892,
+   -2.938
+  ],
+  "model_radius": 0.262
+ },
+ {
+  "id": "unclassified-105",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 105",
+  "named": false,
+  "instances": [
+   "obj-162"
+  ],
+  "representative": "obj-162",
+  "model": "data/pipeline/models/unclassified-105.ply",
+  "model_gaussians": 697,
+  "model_center": [
+   2.729,
+   -0.459,
+   3.339
+  ],
+  "model_radius": 0.157
+ },
+ {
+  "id": "unclassified-106",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 106",
+  "named": false,
+  "instances": [
+   "obj-163"
+  ],
+  "representative": "obj-163",
+  "model": "data/pipeline/models/unclassified-106.ply",
+  "model_gaussians": 1644,
+  "model_center": [
+   1.21,
+   -0.036,
+   -3.449
+  ],
+  "model_radius": 0.272
+ },
+ {
+  "id": "unclassified-107",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 107",
+  "named": false,
+  "instances": [
+   "obj-168"
+  ],
+  "representative": "obj-168",
+  "model": "data/pipeline/models/unclassified-107.ply",
+  "model_gaussians": 1127,
+  "model_center": [
+   -2.16,
+   -0.458,
+   0.43
+  ],
+  "model_radius": 0.17
+ },
+ {
+  "id": "unclassified-108",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 108",
+  "named": false,
+  "instances": [
+   "obj-169"
+  ],
+  "representative": "obj-169",
+  "model": "data/pipeline/models/unclassified-108.ply",
+  "model_gaussians": 1420,
+  "model_center": [
+   3.958,
+   -0.59,
+   1.751
+  ],
+  "model_radius": 0.491
+ },
+ {
+  "id": "unclassified-109",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 109",
+  "named": false,
+  "instances": [
+   "obj-172"
+  ],
+  "representative": "obj-172",
+  "model": "data/pipeline/models/unclassified-109.ply",
+  "model_gaussians": 504,
+  "model_center": [
+   1.605,
+   -0.105,
+   2.12
+  ],
+  "model_radius": 0.129
+ },
+ {
+  "id": "unclassified-110",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 110",
+  "named": false,
+  "instances": [
+   "obj-173"
+  ],
+  "representative": "obj-173",
+  "model": "data/pipeline/models/unclassified-110.ply",
+  "model_gaussians": 1532,
+  "model_center": [
+   -0.34,
+   0.058,
+   -1.581
+  ],
+  "model_radius": 0.202
+ },
+ {
+  "id": "unclassified-111",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 111",
+  "named": false,
+  "instances": [
+   "obj-179"
+  ],
+  "representative": "obj-179",
+  "model": "data/pipeline/models/unclassified-111.ply",
+  "model_gaussians": 578,
+  "model_center": [
+   -2.594,
+   0.088,
+   -0.148
+  ],
+  "model_radius": 0.151
+ },
+ {
+  "id": "unclassified-112",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 112",
+  "named": false,
+  "instances": [
+   "obj-180"
+  ],
+  "representative": "obj-180",
+  "model": "data/pipeline/models/unclassified-112.ply",
+  "model_gaussians": 452,
+  "model_center": [
+   1.371,
+   -0.651,
+   2.308
+  ],
+  "model_radius": 0.236
+ },
+ {
+  "id": "unclassified-113",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 113",
+  "named": false,
+  "instances": [
+   "obj-188"
+  ],
+  "representative": "obj-188",
+  "model": "data/pipeline/models/unclassified-113.ply",
+  "model_gaussians": 1259,
+  "model_center": [
+   -2.818,
+   -0.977,
+   2.16
+  ],
+  "model_radius": 0.312
+ },
+ {
+  "id": "unclassified-114",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 114",
+  "named": false,
+  "instances": [
+   "obj-191"
+  ],
+  "representative": "obj-191",
+  "model": "data/pipeline/models/unclassified-114.ply",
+  "model_gaussians": 1893,
+  "model_center": [
+   -1.447,
+   -1.057,
+   -0.204
+  ],
+  "model_radius": 0.291
+ },
+ {
+  "id": "unclassified-115",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 115",
+  "named": false,
+  "instances": [
+   "obj-202"
+  ],
+  "representative": "obj-202",
+  "model": "data/pipeline/models/unclassified-115.ply",
+  "model_gaussians": 866,
+  "model_center": [
+   -4.136,
+   -1.083,
+   -2.018
+  ],
+  "model_radius": 0.214
+ },
+ {
+  "id": "unclassified-116",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 116",
+  "named": false,
+  "instances": [
+   "obj-204"
+  ],
+  "representative": "obj-204",
+  "model": "data/pipeline/models/unclassified-116.ply",
+  "model_gaussians": 670,
+  "model_center": [
+   -4.715,
+   -0.644,
+   1.006
+  ],
+  "model_radius": 0.265
+ },
+ {
+  "id": "unclassified-117",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 117",
+  "named": false,
+  "instances": [
+   "obj-213"
+  ],
+  "representative": "obj-213",
+  "model": "data/pipeline/models/unclassified-117.ply",
+  "model_gaussians": 966,
+  "model_center": [
+   -1.62,
+   -0.104,
+   -1.218
+  ],
+  "model_radius": 0.181
+ },
+ {
+  "id": "unclassified-118",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 118",
+  "named": false,
+  "instances": [
+   "obj-224"
+  ],
+  "representative": "obj-224",
+  "model": "data/pipeline/models/unclassified-118.ply",
+  "model_gaussians": 1118,
+  "model_center": [
+   1.524,
+   0.109,
+   -3.476
+  ],
+  "model_radius": 0.202
+ },
+ {
+  "id": "unclassified-119",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 119",
+  "named": false,
+  "instances": [
+   "obj-227"
+  ],
+  "representative": "obj-227",
+  "model": "data/pipeline/models/unclassified-119.ply",
+  "model_gaussians": 874,
+  "model_center": [
+   -2.051,
+   -1.049,
+   0.433
+  ],
+  "model_radius": 0.214
+ },
+ {
+  "id": "unclassified-120",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 120",
+  "named": false,
+  "instances": [
+   "obj-237"
+  ],
+  "representative": "obj-237",
+  "model": "data/pipeline/models/unclassified-120.ply",
+  "model_gaussians": 2446,
+  "model_center": [
+   3.012,
+   -0.509,
+   2.697
+  ],
+  "model_radius": 0.267
+ },
+ {
+  "id": "unclassified-121",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 121",
+  "named": false,
+  "instances": [
+   "obj-240"
+  ],
+  "representative": "obj-240",
+  "model": "data/pipeline/models/unclassified-121.ply",
+  "model_gaussians": 773,
+  "model_center": [
+   2.083,
+   0.119,
+   3.409
+  ],
+  "model_radius": 0.165
+ },
+ {
+  "id": "unclassified-122",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 122",
+  "named": false,
+  "instances": [
+   "obj-245"
+  ],
+  "representative": "obj-245",
+  "model": "data/pipeline/models/unclassified-122.ply",
+  "model_gaussians": 840,
+  "model_center": [
+   0.92,
+   -0.911,
+   -3.041
+  ],
+  "model_radius": 0.263
+ },
+ {
+  "id": "unclassified-123",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 123",
+  "named": false,
+  "instances": [
+   "obj-248"
+  ],
+  "representative": "obj-248",
+  "model": "data/pipeline/models/unclassified-123.ply",
+  "model_gaussians": 2110,
+  "model_center": [
+   3.289,
+   -0.65,
+   -3.014
+  ],
+  "model_radius": 0.356
+ },
+ {
+  "id": "unclassified-124",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 124",
+  "named": false,
+  "instances": [
+   "obj-272"
+  ],
+  "representative": "obj-272",
+  "model": "data/pipeline/models/unclassified-124.ply",
+  "model_gaussians": 856,
+  "model_center": [
+   -2.643,
+   0.217,
+   -2.715
+  ],
+  "model_radius": 0.167
+ },
+ {
+  "id": "unclassified-125",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 125",
+  "named": false,
+  "instances": [
+   "obj-273"
+  ],
+  "representative": "obj-273",
+  "model": "data/pipeline/models/unclassified-125.ply",
+  "model_gaussians": 768,
+  "model_center": [
+   2.933,
+   -0.51,
+   2.781
+  ],
+  "model_radius": 0.159
+ },
+ {
+  "id": "unclassified-126",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 126",
+  "named": false,
+  "instances": [
+   "obj-281"
+  ],
+  "representative": "obj-281",
+  "model": "data/pipeline/models/unclassified-126.ply",
+  "model_gaussians": 493,
+  "model_center": [
+   -4.336,
+   0.314,
+   1.449
+  ],
+  "model_radius": 0.185
+ },
+ {
+  "id": "unclassified-127",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 127",
+  "named": false,
+  "instances": [
+   "obj-282"
+  ],
+  "representative": "obj-282",
+  "model": "data/pipeline/models/unclassified-127.ply",
+  "model_gaussians": 812,
+  "model_center": [
+   0.874,
+   -0.956,
+   -3.408
+  ],
+  "model_radius": 0.307
+ },
+ {
+  "id": "unclassified-128",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 128",
+  "named": false,
+  "instances": [
+   "obj-283"
+  ],
+  "representative": "obj-283",
+  "model": "data/pipeline/models/unclassified-128.ply",
+  "model_gaussians": 797,
+  "model_center": [
+   -1.471,
+   -0.349,
+   0.165
+  ],
+  "model_radius": 0.2
+ },
+ {
+  "id": "unclassified-129",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 129",
+  "named": false,
+  "instances": [
+   "obj-284"
+  ],
+  "representative": "obj-284",
+  "model": "data/pipeline/models/unclassified-129.ply",
+  "model_gaussians": 753,
+  "model_center": [
+   -4.61,
+   -0.373,
+   -0.06
+  ],
+  "model_radius": 0.172
+ },
+ {
+  "id": "unclassified-130",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 130",
+  "named": false,
+  "instances": [
+   "obj-293"
+  ],
+  "representative": "obj-293",
+  "model": "data/pipeline/models/unclassified-130.ply",
+  "model_gaussians": 553,
+  "model_center": [
+   -0.1,
+   0.134,
+   -1.578
+  ],
+  "model_radius": 0.085
+ },
+ {
+  "id": "unclassified-131",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 131",
+  "named": false,
+  "instances": [
+   "obj-296"
+  ],
+  "representative": "obj-296",
+  "model": "data/pipeline/models/unclassified-131.ply",
+  "model_gaussians": 443,
+  "model_center": [
+   2.034,
+   0.148,
+   -1.781
+  ],
+  "model_radius": 0.095
+ },
+ {
+  "id": "unclassified-132",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 132",
+  "named": false,
+  "instances": [
+   "obj-312"
+  ],
+  "representative": "obj-312",
+  "model": "data/pipeline/models/unclassified-132.ply",
+  "model_gaussians": 751,
+  "model_center": [
+   2.536,
+   -0.905,
+   3.221
+  ],
+  "model_radius": 0.19
+ },
+ {
+  "id": "unclassified-133",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 133",
+  "named": false,
+  "instances": [
+   "obj-314"
+  ],
+  "representative": "obj-314",
+  "model": "data/pipeline/models/unclassified-133.ply",
+  "model_gaussians": 951,
+  "model_center": [
+   1.011,
+   -0.772,
+   -2.974
+  ],
+  "model_radius": 0.262
+ },
+ {
+  "id": "unclassified-134",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 134",
+  "named": false,
+  "instances": [
+   "obj-313"
+  ],
+  "representative": "obj-313",
+  "model": "data/pipeline/models/unclassified-134.ply",
+  "model_gaussians": 865,
+  "model_center": [
+   -3.391,
+   -0.654,
+   -2.709
+  ],
+  "model_radius": 0.142
+ },
+ {
+  "id": "unclassified-135",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 135",
+  "named": false,
+  "instances": [
+   "obj-315"
+  ],
+  "representative": "obj-315",
+  "model": "data/pipeline/models/unclassified-135.ply",
+  "model_gaussians": 433,
+  "model_center": [
+   -3.247,
+   -0.682,
+   2.361
+  ],
+  "model_radius": 0.258
+ },
+ {
+  "id": "unclassified-136",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 136",
+  "named": false,
+  "instances": [
+   "obj-319"
+  ],
+  "representative": "obj-319",
+  "model": "data/pipeline/models/unclassified-136.ply",
+  "model_gaussians": 295,
+  "model_center": [
+   1.272,
+   -0.53,
+   2.342
+  ],
+  "model_radius": 0.186
+ },
+ {
+  "id": "unclassified-137",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 137",
+  "named": false,
+  "instances": [
+   "obj-320"
+  ],
+  "representative": "obj-320",
+  "model": "data/pipeline/models/unclassified-137.ply",
+  "model_gaussians": 393,
+  "model_center": [
+   1.227,
+   -0.652,
+   3.131
+  ],
+  "model_radius": 0.152
+ },
+ {
+  "id": "unclassified-138",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 138",
+  "named": false,
+  "instances": [
+   "obj-323"
+  ],
+  "representative": "obj-323",
+  "model": "data/pipeline/models/unclassified-138.ply",
+  "model_gaussians": 628,
+  "model_center": [
+   1.629,
+   -0.107,
+   -3.5
+  ],
+  "model_radius": 0.18
+ },
+ {
+  "id": "unclassified-139",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 139",
+  "named": false,
+  "instances": [
+   "obj-326"
+  ],
+  "representative": "obj-326",
+  "model": "data/pipeline/models/unclassified-139.ply",
+  "model_gaussians": 555,
+  "model_center": [
+   -4.507,
+   -1.028,
+   -2.224
+  ],
+  "model_radius": 0.27
+ },
+ {
+  "id": "unclassified-140",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 140",
+  "named": false,
+  "instances": [
+   "obj-329"
+  ],
+  "representative": "obj-329",
+  "model": "data/pipeline/models/unclassified-140.ply",
+  "model_gaussians": 849,
+  "model_center": [
+   0.981,
+   -0.625,
+   -2.974
+  ],
+  "model_radius": 0.208
+ },
+ {
+  "id": "unclassified-141",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 141",
+  "named": false,
+  "instances": [
+   "obj-331"
+  ],
+  "representative": "obj-331",
+  "model": "data/pipeline/models/unclassified-141.ply",
+  "model_gaussians": 321,
+  "model_center": [
+   -1.896,
+   0.585,
+   -1.299
+  ],
+  "model_radius": 0.111
+ },
+ {
+  "id": "unclassified-142",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 142",
+  "named": false,
+  "instances": [
+   "obj-332"
+  ],
+  "representative": "obj-332",
+  "model": "data/pipeline/models/unclassified-142.ply",
+  "model_gaussians": 589,
+  "model_center": [
+   -1.958,
+   -0.37,
+   0.719
+  ],
+  "model_radius": 0.121
+ },
+ {
+  "id": "unclassified-143",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 143",
+  "named": false,
+  "instances": [
+   "obj-337"
+  ],
+  "representative": "obj-337",
+  "model": "data/pipeline/models/unclassified-143.ply",
+  "model_gaussians": 998,
+  "model_center": [
+   2.997,
+   -0.731,
+   -3.04
+  ],
+  "model_radius": 0.214
+ },
+ {
+  "id": "unclassified-144",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 144",
+  "named": false,
+  "instances": [
+   "obj-341"
+  ],
+  "representative": "obj-341",
+  "model": "data/pipeline/models/unclassified-144.ply",
+  "model_gaussians": 1364,
+  "model_center": [
+   -1.012,
+   -0.996,
+   -0.198
+  ],
+  "model_radius": 0.298
+ },
+ {
+  "id": "unclassified-145",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 145",
+  "named": false,
+  "instances": [
+   "obj-346"
+  ],
+  "representative": "obj-346",
+  "model": "data/pipeline/models/unclassified-145.ply",
+  "model_gaussians": 620,
+  "model_center": [
+   -2.153,
+   -0.643,
+   -0.078
+  ],
+  "model_radius": 0.274
+ },
+ {
+  "id": "unclassified-146",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 146",
+  "named": false,
+  "instances": [
+   "obj-350"
+  ],
+  "representative": "obj-350",
+  "model": "data/pipeline/models/unclassified-146.ply",
+  "model_gaussians": 251,
+  "model_center": [
+   1.455,
+   -0.209,
+   2.245
+  ],
+  "model_radius": 0.082
+ },
+ {
+  "id": "unclassified-147",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 147",
+  "named": false,
+  "instances": [
+   "obj-352"
+  ],
+  "representative": "obj-352",
+  "model": "data/pipeline/models/unclassified-147.ply",
+  "model_gaussians": 556,
+  "model_center": [
+   -4.866,
+   -0.182,
+   0.229
+  ],
+  "model_radius": 0.295
+ },
+ {
+  "id": "unclassified-148",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 148",
+  "named": false,
+  "instances": [
+   "obj-356"
+  ],
+  "representative": "obj-356",
+  "model": "data/pipeline/models/unclassified-148.ply",
+  "model_gaussians": 812,
+  "model_center": [
+   4.159,
+   -0.683,
+   1.077
+  ],
+  "model_radius": 0.17
+ },
+ {
+  "id": "unclassified-149",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 149",
+  "named": false,
+  "instances": [
+   "obj-359"
+  ],
+  "representative": "obj-359",
+  "model": "data/pipeline/models/unclassified-149.ply",
+  "model_gaussians": 359,
+  "model_center": [
+   -3.961,
+   -0.434,
+   -3.121
+  ],
+  "model_radius": 0.149
+ },
+ {
+  "id": "unclassified-150",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 150",
+  "named": false,
+  "instances": [
+   "obj-357"
+  ],
+  "representative": "obj-357",
+  "model": "data/pipeline/models/unclassified-150.ply",
+  "model_gaussians": 944,
+  "model_center": [
+   3.614,
+   -0.762,
+   -2.266
+  ],
+  "model_radius": 0.268
+ },
+ {
+  "id": "unclassified-151",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 151",
+  "named": false,
+  "instances": [
+   "obj-361"
+  ],
+  "representative": "obj-361",
+  "model": "data/pipeline/models/unclassified-151.ply",
+  "model_gaussians": 1751,
+  "model_center": [
+   -0.246,
+   -0.152,
+   -1.614
+  ],
+  "model_radius": 0.248
+ },
+ {
+  "id": "unclassified-152",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 152",
+  "named": false,
+  "instances": [
+   "obj-369"
+  ],
+  "representative": "obj-369",
+  "model": "data/pipeline/models/unclassified-152.ply",
+  "model_gaussians": 254,
+  "model_center": [
+   -4.815,
+   -0.399,
+   -2.159
+  ],
+  "model_radius": 0.181
+ },
+ {
+  "id": "unclassified-153",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 153",
+  "named": false,
+  "instances": [
+   "obj-375"
+  ],
+  "representative": "obj-375",
+  "model": "data/pipeline/models/unclassified-153.ply",
+  "model_gaussians": 455,
+  "model_center": [
+   -2.276,
+   0.296,
+   0.427
+  ],
+  "model_radius": 0.142
+ },
+ {
+  "id": "unclassified-154",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 154",
+  "named": false,
+  "instances": [
+   "obj-380"
+  ],
+  "representative": "obj-380",
+  "model": "data/pipeline/models/unclassified-154.ply",
+  "model_gaussians": 470,
+  "model_center": [
+   -3.228,
+   -0.708,
+   2.578
+  ],
+  "model_radius": 0.227
+ },
+ {
+  "id": "unclassified-155",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 155",
+  "named": false,
+  "instances": [
+   "obj-387"
+  ],
+  "representative": "obj-387",
+  "model": "data/pipeline/models/unclassified-155.ply",
+  "model_gaussians": 185,
+  "model_center": [
+   -1.531,
+   -0.719,
+   0.103
+  ],
+  "model_radius": 0.173
+ },
+ {
+  "id": "unclassified-156",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 156",
+  "named": false,
+  "instances": [
+   "obj-389"
+  ],
+  "representative": "obj-389",
+  "model": "data/pipeline/models/unclassified-156.ply",
+  "model_gaussians": 684,
+  "model_center": [
+   -1.434,
+   -0.594,
+   0.249
+  ],
+  "model_radius": 0.335
+ },
+ {
+  "id": "unclassified-157",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 157",
+  "named": false,
+  "instances": [
+   "obj-401"
+  ],
+  "representative": "obj-401",
+  "model": "data/pipeline/models/unclassified-157.ply",
+  "model_gaussians": 2096,
+  "model_center": [
+   -1.05,
+   -0.444,
+   -0.136
+  ],
+  "model_radius": 0.416
+ },
+ {
+  "id": "unclassified-158",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 158",
+  "named": false,
+  "instances": [
+   "obj-403"
+  ],
+  "representative": "obj-403",
+  "model": "data/pipeline/models/unclassified-158.ply",
+  "model_gaussians": 463,
+  "model_center": [
+   -0.964,
+   -0.938,
+   -1.918
+  ],
+  "model_radius": 0.303
+ },
+ {
+  "id": "unclassified-159",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 159",
+  "named": false,
+  "instances": [
+   "obj-407"
+  ],
+  "representative": "obj-407",
+  "model": "data/pipeline/models/unclassified-159.ply",
+  "model_gaussians": 337,
+  "model_center": [
+   3.809,
+   -0.899,
+   1.93
+  ],
+  "model_radius": 0.184
+ },
+ {
+  "id": "unclassified-160",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 160",
+  "named": false,
+  "instances": [
+   "obj-411"
+  ],
+  "representative": "obj-411",
+  "model": "data/pipeline/models/unclassified-160.ply",
+  "model_gaussians": 383,
+  "model_center": [
+   1.078,
+   -0.213,
+   3.435
+  ],
+  "model_radius": 0.136
+ },
+ {
+  "id": "unclassified-161",
+  "class": "unclassified",
+  "name": "unclassified \u00b7 group 161",
+  "named": false,
+  "instances": [
+   "obj-412"
+  ],
+  "representative": "obj-412",
+  "model": "data/pipeline/models/unclassified-161.ply",
+  "model_gaussians": 498,
+  "model_center": [
+   3.751,
+   -0.308,
+   -1.809
+  ],
+  "model_radius": 0.098
+ }
+]

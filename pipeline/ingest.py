@@ -76,6 +76,7 @@ def load_splat(ply_path=C.PLY_PATH) -> dict:
         "scale": scale_mean,
         "scales_3d": scales_3d,
         "rots": rots,
+        "ply_rows": np.flatnonzero(row_ok),   # PLY row of every kept Gaussian (local_objects.py maps by row)
         "stats": {
             "declared_vertices": int(declared_vertices),
             "binary_rows_present": int(available_rows),

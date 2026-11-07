@@ -1,4 +1,5 @@
 """Central configuration for the Valmet Industrial Twin pipeline."""
+import os as _os
 from pathlib import Path
 import os
 
@@ -31,6 +32,12 @@ SPLIT_MAX_EXTENT = 0.95       # clusters larger than this are re-segmented into 
 SPLIT_MIN_EPS = 0.028
 MIN_CLUSTER_PTS = 18
 MIN_CLUSTER_EXTENT = 0.07
+
+# Which segmenter produces the objects (README "Two pipelines"):
+#   heuristic - perception.py colour/geometry clustering, named by Gemini or the Decisions API (or their cached answers)
+#   local     - local_models/: SAM 2.1 + SigLIP 2 + DINOv2 + OWLv2, open weights on this machine, no API key
+SEGMENTER = _os.environ.get("VALMET_SEGMENTER", "heuristic")
+LOCAL_OBJECTS_DIR = Path(_os.environ.get("VALMET_LOCAL_OBJECTS", ROOT / "local_models" / "data" / "pipeline"))
 
 # --- Navigation ------------------------------------------------------------
 GRID_RES = 0.05

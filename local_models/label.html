@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Label objects</title>
+  <style>
+    body { margin: 0; padding: 16px 24px 48px; background: #111; color: #eee; font: 14px/1.4 system-ui, sans-serif; }
+    a { color: #8cf; }
+    header { display: flex; gap: 16px; align-items: baseline; flex-wrap: wrap; }
+    h1 { font-size: 20px; margin: 0 0 8px; }
+    #progress { display: flex; gap: 14px; flex-wrap: wrap; font-size: 13px; opacity: 0.8; margin-bottom: 12px; }
+    #progress i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 4px; }
+    h3 { display: flex; gap: 10px; align-items: baseline; font-size: 18px; margin: 0 0 4px; }
+    #facts { margin: 0 0 12px; opacity: 0.7; font-size: 13px; }
+    #crops { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+    #crops img { display: block; width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 8px; background: #000; }
+    #actions { display: flex; gap: 8px; flex-wrap: wrap; margin: 16px 0; }
+    button {
+      padding: 6px 10px; border: 1px solid #333; border-radius: 6px; background: #1c1c1c; color: inherit;
+      font: inherit; font-size: 13px; cursor: pointer;
+    }
+    button:hover { border-color: #8cf; }
+    button.guess { border-color: #8cf; background: #1d2a36; }
+    button kbd { opacity: 0.6; margin-right: 4px; font: inherit; }
+    #status { font-size: 13px; opacity: 0.7; }
+    @media (max-width: 720px) { body { padding: 16px; } #crops { grid-template-columns: repeat(2, 1fr); } }
+  </style>
+</head>
+<body>
+  <header><h1>Label objects</h1><a href="index.html">Viewer</a><a href="library.html">Library</a></header>
+  <div id="progress"></div>
+  <h3><span id="title"></span><a id="viewer" target="_blank">show in viewer</a></h3>
+  <p id="facts"></p>
+  <div id="crops"></div>
+  <div id="actions"></div>
+  <div id="status"></div>
+  <script type="module">
+    import { classColor } from "./class-colors.js";
+
+    // Needs tools/label_server.py (it saves labels and retrains); labels go to data/pipeline/labels.json.
+    const LABELS = [
+      ["1", "pump"], ["2", "motor"], ["3", "valve"], ["4", "pressure transmitter"],
+      ["5", "vibration sensor"], ["0", "other"], ["x", "bad piece"],
+    ];
+    const RETRAIN_EVERY = 10;
+    const json = (url, options) => fetch(url, { cache: "no-store", ...options }).then((r) => (r.ok ? r.json() : null));
+    const post = (url, body) => json(url, { method: "POST", body: JSON.stringify(body) });
+
+    let objects, byId, labels, queue, report;
+    let position = 0; // into the queue
+    const done = []; // ids labelled this session, for undo
+    let sinceTraining = 0;
+
+    async function load() {
+      [objects, labels, queue, report] = await Promise.all([
+        json("data/pipeline/objects.json"), json("/labels"),
+        json("data/pipeline/label_queue.json"), json("data/pipeline/eval/classifier.json"),
+      ]);
+      byId = new Map(objects.map((object) => [object.id, object]));
+      queue = queue ?? objects.map((object) => object.id);
+      labels = labels ?? {};
+    }
+
+    // An existing label (an AI's, until an expert's replaces it) or the classifier's guess.
+    function guess(object) {
+      const label = labels[object.id];
+      if (label) return { label: label.label, why: `labelled by ${label.source}`, confidence: 1 };
+      return { label: object.class === "unclassified" ? "other" : object.class, why: object.reasons?.[0] ?? "", confidence: object.confidence };
+    }
+
+    function current() {
+      const hashed = byId.get(location.hash.slice(1));
+      if (hashed) return hashed;
+      while (position < queue.length && labels[queue[position]]?.source === "expert") position++;
+      return byId.get(queue[position]);
+    }
+
+    function render() {
+      const counts = new Map(LABELS.map(([, name]) => [name, 0]));
+      for (const { label } of Object.values(labels)) counts.set(label, (counts.get(label) ?? 0) + 1);
+      const accuracy = report?.cross_validation ? `CV accuracy ${report.cross_validation.accuracy.toFixed(2)}` : "no CV yet";
+      const expert = Object.values(labels).filter((label) => label.source === "expert").length;
+      document.getElementById("progress").innerHTML = [...counts]
+        .map(([name, count]) => `<span><i style="background:${classColor(name === "other" || name === "bad piece" ? "unclassified" : name)}"></i>${name} ${count}</span>`)
+        .join("") + `<span>${expert} by expert of ${Object.keys(labels).length}</span><span>${accuracy}</span>`;
+
+      const object = current();
+      if (!object) {
+        document.getElementById("title").textContent = "Queue done";
+        return;
+      }
+      const { label, why, confidence } = guess(object);
+      const size = [...object.size].sort((a, b) => b - a).map((side) => side.toFixed(2)).join(" × ");
+      document.getElementById("title").textContent = `${object.id} · ${label} ${confidence.toFixed(2)}`;
+      document.getElementById("viewer").href = `index.html#${object.id}`;
+      document.getElementById("facts").textContent = `${size} m · ${why} · looks like ${object.label}`;
+      document.getElementById("crops").innerHTML = object.crops.map((src) => `<img src="${src}" alt="">`).join("");
+      const actions = document.getElementById("actions");
+      actions.replaceChildren();
+      for (const [key, name] of LABELS) {
+        const button = document.createElement("button");
+        button.innerHTML = `<kbd>${key.toUpperCase()}</kbd>${name}`;
+        button.classList.toggle("guess", name === label);
+        button.addEventListener("click", () => save(name));
+        actions.appendChild(button);
+      }
+      for (const [key, name, action] of [["Enter", "accept", () => save(label)], ["S", "skip", skip], ["⌫", "undo", undo], ["", "retrain", train]]) {
+        const button = document.createElement("button");
+        button.innerHTML = `${key ? `<kbd>${key}</kbd>` : ""}${name}`;
+        button.addEventListener("click", action);
+        actions.appendChild(button);
+      }
+    }
+
+    async function save(label) {
+      const object = current();
+      if (!object) return;
+      await post("/labels", { id: object.id, label, merged_from: object.merged_from });
+      labels[object.id] = { label, source: "expert" };
+      done.push(object.id);
+      leave();
+      if (++sinceTraining >= RETRAIN_EVERY) await train();
+      else render();
+    }
+
+    // Past the current object: off the linked one (#obj-xxx) back to the queue, or one on in it.
+    function leave() {
+      if (location.hash) history.replaceState(null, "", location.pathname);
+      else position++;
+    }
+
+    function skip() {
+      leave();
+      render();
+    }
+
+    async function undo() {
+      const id = done.pop();
+      if (!id) return;
+      await post("/labels", { id, label: null });
+      sinceTraining = Math.max(0, sinceTraining - 1);
+      await load();
+      history.replaceState(null, "", `#${id}`);
+      render();
+    }
+
+    async function train() {
+      document.getElementById("status").textContent = "training…";
+      const result = await json("/train", { method: "POST" });
+      sinceTraining = 0;
+      await load();
+      position = 0;
+      document.getElementById("status").textContent = result ? `trained on ${result.report.model?.trained_on ?? 0} labels` : "training failed";
+      render();
+    }
+
+    document.addEventListener("keydown", (event) => {
+      if (event.metaKey || event.ctrlKey || event.altKey) return;
+      const key = event.key.toLowerCase();
+      const label = LABELS.find(([k]) => k === key);
+      if (label) save(label[1]);
+      else if (key === "enter" && current()) save(guess(current()).label);
+      else if (key === "s") skip();
+      else if (key === "backspace") undo();
+      else return;
+      event.preventDefault();
+    });
+
+    await load();
+    render();
+  </script>
+</body>
+</html>

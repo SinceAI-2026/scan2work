@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Boiler room</title>
+  <style>
+    html, body { margin: 0; height: 100%; overflow: hidden; background: #000; }
+    #minimap { position: fixed; top: 16px; right: 16px; width: 280px; border-radius: 8px; background: rgb(0 0 0 / 0.6); }
+    #sidebar {
+      position: fixed; top: 16px; bottom: 16px; left: 16px; width: 260px; overflow-y: auto;
+      border-radius: 8px; background: rgb(0 0 0 / 0.7); color: #eee; font: 13px/1.4 system-ui, sans-serif;
+    }
+    #sidebar:empty { display: none; }
+    #sidebar header { position: sticky; top: 0; display: flex; justify-content: space-between; padding: 12px; background: rgb(20 20 20 / 0.95); }
+    #sidebar a { color: #8cf; }
+    #sidebar h3 { margin: 0; padding: 10px 12px 4px; font-size: 12px; font-weight: 600; display: flex; gap: 8px; align-items: center; }
+    #sidebar h3 i { width: 10px; height: 10px; border-radius: 2px; }
+    #sidebar h3 span { margin-left: auto; opacity: 0.6; font-weight: 400; }
+    #sidebar button {
+      display: flex; gap: 8px; align-items: center; width: 100%; padding: 4px 12px; border: 0;
+      background: none; color: inherit; font: inherit; text-align: left; cursor: pointer;
+    }
+    #sidebar button:hover, #sidebar button.selected { background: rgb(255 255 255 / 0.12); }
+    #sidebar button img { width: 36px; height: 36px; object-fit: cover; border-radius: 4px; }
+    #sidebar button span { margin-left: auto; opacity: 0.6; }
+    #sidebar h4 { margin: 0; padding: 6px 12px 2px; display: flex; gap: 8px; align-items: center; font-size: 12px; font-weight: 500; opacity: 0.85; }
+    #sidebar h4 img { width: 28px; height: 28px; object-fit: cover; border-radius: 4px; }
+    #sidebar h4 span { margin-left: auto; opacity: 0.6; }
+    #sidebar button.member { padding-left: 28px; }
+    #sidebar summary { list-style: none; cursor: pointer; }
+    #sidebar summary::-webkit-details-marker { display: none; }
+    #sidebar summary:hover { background: rgb(255 255 255 / 0.06); }
+    #sidebar summary > ::before { content: "▸"; width: 10px; opacity: 0.6; }
+    #sidebar details[open] > summary > ::before { content: "▾"; }
+  </style>
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/",
+      "@sparkjsdev/spark": "https://cdn.jsdelivr.net/npm/@sparkjsdev/spark@2.4.0/dist/spark.module.js"
+    }
+  }
+  </script>
+</head>
+<body>
+  <script type="module">
+    import * as THREE from "three";
+    import { SparkControls, SparkRenderer, SplatMesh } from "@sparkjsdev/spark";
+    import { classColor } from "./class-colors.js";
+
+    const renderer = new THREE.WebGLRenderer({ antialias: false });
+    renderer.setPixelRatio(window.devicePixelRatio);
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    document.body.appendChild(renderer.domElement);
+
+    const scene = new THREE.Scene();
+    scene.add(new SparkRenderer({ renderer }));
+
+    // The splat is y-down (COLMAP style); flip it 180° around x.
+    const room = new SplatMesh({ url: "data/equipment-room.ply" });
+    room.quaternion.set(1, 0, 0, 0);
+    scene.add(room);
+
+    // Stand in the middle of the room, looking down its long (x) axis.
+    const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 100);
+    camera.position.set(-0.4, 0.2, 2.15);
+    camera.lookAt(3, 0.2, 2.15);
+
+    // Objects (pipeline/cluster.py, named by pipeline/fuse.py): a box per object and a sidebar grouped by class.
+    // Clicking an object flies to it; B toggles the boxes.
+    const objects = await fetch("data/pipeline/objects.json")
+      .then((response) => (response.ok ? response.json() : []))
+      .catch(() => []);
+    // Walkable area, roadmap and a route to every object (pipeline/navigate.py).
+    const nav = await fetch("data/pipeline/nav.json")
+      .then((response) => (response.ok ? response.json() : null))
+      .catch(() => null);
+    const boxes = new THREE.Group();
+    scene.add(boxes);
+    const boxById = new Map();
+    for (const object of objects) {
+      const box = new THREE.LineSegments(
+        new THREE.EdgesGeometry(new THREE.BoxGeometry(...object.size)),
+        new THREE.LineBasicMaterial({ color: new THREE.Color(classColor(object.class)), transparent: true, opacity: 0.8 }),
+      );
+      box.position.fromArray(object.center);
+      box.rotation.y = -object.yaw;
+      boxes.add(box);
+      boxById.set(object.id, box);
+    }
+
+    const sidebar = document.createElement("aside");
+    sidebar.id = "sidebar";
+    document.body.appendChild(sidebar);
+    // Look-alike types within each class (pipeline/catalog.py): the sidebar lists class → type → instances.
+    const types = await fetch("data/pipeline/types.json")
+      .then((response) => (response.ok ? response.json() : []))
+      .catch(() => []);
+    const objectById = new Map(objects.map((object) => [object.id, object]));
+    function objectRow(object, member) {
+      const row = document.createElement("button");
+      row.id = `row-${object.id}`;
+      if (member) row.classList.add("member");
+      row.innerHTML = `<img src="${object.crop}" alt="">${object.id}<span>${object.score.toFixed(2)}</span>`;
+      if (object.reasons) row.title = object.reasons.join(" · "); // pipeline/fuse.py: why it got its class
+      row.addEventListener("click", () => selectObject(object));
+      return row;
+    }
+    if (objects.length) {
+      const byClass = Map.groupBy(objects, (object) => object.class);
+      const typesByClass = Map.groupBy(types, (type) => type.class);
+      sidebar.innerHTML = `<header><b>${objects.length} objects</b></header>`;
+      const order = ([name, members]) => (name === "unclassified" ? -1 : members.length); // unclassified last
+      for (const [name, members] of [...byClass].sort((a, b) => order(b) - order(a))) {
+        // Classes and types fold open and shut; all start closed.
+        const classGroup = document.createElement("details");
+        classGroup.innerHTML = `<summary><h3><i style="background:${classColor(name)}"></i>${name}<span>${members.length}</span></h3></summary>`;
+        sidebar.appendChild(classGroup);
+        const classTypes = (typesByClass.get(name) ?? []).toSorted((a, b) => b.instances.length - a.instances.length);
+        const typed = new Set();
+        for (const type of classTypes) {
+          const instances = type.instances.map((id) => objectById.get(id)).filter(Boolean);
+          if (!instances.length) continue;
+          const typeGroup = document.createElement("details");
+          const representative = objectById.get(type.representative) ?? instances[0];
+          typeGroup.innerHTML = `<summary><h4><img src="${representative.crop}" alt="">${type.name}<span>${instances.length}</span></h4></summary>`;
+          classGroup.appendChild(typeGroup);
+          for (const object of instances) {
+            typeGroup.appendChild(objectRow(object, true));
+            typed.add(object.id);
+          }
+        }
+        // Without types.json (or for objects catalog.py left out) the class lists its objects directly.
+        for (const object of members) if (!typed.has(object.id)) classGroup.appendChild(objectRow(object, false));
+      }
+    }
+
+    let selected = null;
+    let flight = null;
+    function selectObject(object) {
+      sidebar.querySelector(".selected")?.classList.remove("selected");
+      const row = document.getElementById(`row-${object.id}`);
+      for (let group = row.closest("details"); group; group = group.parentElement.closest("details")) group.open = true;
+      row.classList.add("selected");
+      row.scrollIntoView({ block: "nearest" });
+      if (selected) selected.material.opacity = 0.8;
+      selected = boxById.get(object.id);
+      selected.material.opacity = 1;
+      boxes.visible = true;
+      showRoute(nav?.routes[object.id]);
+      setWalking(false);
+      // Stand where the phone was when it saw the object best (its view is known to be clear),
+      // a bit closer if that was far away, and look at the object.
+      const target = new THREE.Vector3().fromArray(object.center);
+      const seenFrom = walk.find((frame) => Math.round(frame.t * 3) + 1 === Number(object.best_frame));
+      const position = new THREE.Vector3().fromArray(seenFrom.position);
+      const distance = position.distanceTo(target);
+      const closest = Math.max(0.6, Math.max(...object.size) * 2);
+      if (distance > closest) position.lerp(target, 1 - closest / distance);
+      const look = new THREE.Matrix4().lookAt(position, target, camera.up); // camera convention: -z at target
+      flight = {
+        start: performance.now(),
+        from: camera.position.clone(), to: position,
+        fromQuaternion: camera.quaternion.clone(), toQuaternion: new THREE.Quaternion().setFromRotationMatrix(look),
+      };
+    }
+
+    const FLIGHT_MS = 700;
+    function updateFlight() {
+      const f = Math.min((performance.now() - flight.start) / FLIGHT_MS, 1);
+      const eased = 1 - (1 - f) ** 3;
+      camera.position.lerpVectors(flight.from, flight.to, eased);
+      camera.quaternion.slerpQuaternions(flight.fromQuaternion, flight.toQuaternion, eased);
+      if (f === 1) flight = null;
+    }
+
+    // P toggles a point view: one dot per Gaussian centre, in its base colour.
+    const points = new THREE.Points(
+      new THREE.BufferGeometry(),
+      new THREE.PointsMaterial({ size: 2, sizeAttenuation: false, vertexColors: true }),
+    );
+    points.visible = false;
+    points.quaternion.copy(room.quaternion);
+    scene.add(points);
+    room.initialized.then(() => {
+      const positions = [];
+      const colors = [];
+      const opacities = [];
+      room.forEachSplat((i, center, scales, quaternion, opacity, color) => {
+        positions.push(center.x, center.y, center.z);
+        colors.push(color.r, color.g, color.b);
+        opacities.push(opacity);
+      });
+      points.geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+      points.geometry.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3));
+      drawMinimapRoom(positions, colors, opacities);
+    });
+
+    // Minimap: the room from above (world x right, world z down), the walk path and where you are.
+    const minimap = document.createElement("canvas");
+    minimap.id = "minimap";
+    document.body.appendChild(minimap);
+    const mapContext = minimap.getContext("2d");
+    const MAP_WIDTH = 560; // canvas pixels; shown at half size for a sharp image
+    const MAP_MARGIN = 1; // world units of space around the room
+    const NAV_MAP_MARGIN = 0.2; // with nav.json the room's outline is known, so less is needed
+    const WALKABLE_COLOR = "rgb(70 200 130 / 0.22)";
+    const GRAPH_COLOR = "rgb(120 220 255 / 0.75)";
+    const ROUTE_COLOR = "#ff4fa3";
+    let mapRoom = null;
+    let toMap = null;
+
+    function percentile(values, p) {
+      const sorted = Float32Array.from(values).sort();
+      return sorted[Math.floor(p * (sorted.length - 1))];
+    }
+
+    // nav.json grid cell codes: outside the room, blocked, too close to something for a body, walkable.
+    const OUTSIDE = 0;
+    const WALKABLE = 3;
+    const MIN_OPACITY = 0.3; // fainter Gaussians are mostly floaters
+    const FLOOR_TOLERANCE = 0.08; // Gaussians this close to the floor height are floor
+    const FLOOR_SHADE = 0.45; // the floor is drawn darker so what stands on it reads
+
+    function navCode(x, z) {
+      const column = Math.floor((x - nav.grid.origin[0]) / nav.grid.cell);
+      const row = Math.floor((z - nav.grid.origin[1]) / nav.grid.cell);
+      return Number(nav.grid.rows[row]?.[column] ?? OUTSIDE);
+    }
+
+    // Top of the band where things block a walker: head height, or just under a lower ceiling.
+    function bandTop(x, z) {
+      const column = Math.floor((x - nav.grid.origin[0]) / nav.ceilings.cell);
+      const row = Math.floor((z - nav.grid.origin[1]) / nav.ceilings.cell);
+      const ceiling = nav.ceilings.rows[row]?.[column] ?? nav.ceiling;
+      return Math.min(nav.floor + nav.head_height, ceiling - nav.head_room);
+    }
+
+    function roomBounds() {
+      let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+      nav.grid.rows.forEach((row, r) => {
+        for (let c = 0; c < row.length; c++) {
+          if (Number(row[c]) === OUTSIDE) continue;
+          minX = Math.min(minX, c);
+          maxX = Math.max(maxX, c + 1);
+          minZ = Math.min(minZ, r);
+          maxZ = Math.max(maxZ, r + 1);
+        }
+      });
+      const [x0, z0] = nav.grid.origin;
+      const cell = nav.grid.cell;
+      return [x0 + minX * cell, x0 + maxX * cell, z0 + minZ * cell, z0 + maxZ * cell];
+    }
+
+    function drawMinimapRoom(positions, colors, opacities) {
+      // Splat coordinates are flipped to world: world x = x, world y = -y, world z = -z.
+      const xs = positions.filter((v, i) => i % 3 === 0);
+      const ys = positions.filter((v, i) => i % 3 === 1).map((y) => -y);
+      const zs = positions.filter((v, i) => i % 3 === 2).map((z) => -z);
+      const margin = nav ? NAV_MAP_MARGIN : MAP_MARGIN;
+      let [minX, maxX, minZ, maxZ] = nav
+        ? roomBounds()
+        : [percentile(xs, 0.01), percentile(xs, 0.99), percentile(zs, 0.01), percentile(zs, 0.99)];
+      minX -= margin;
+      maxX += margin;
+      minZ -= margin;
+      maxZ += margin;
+      const scale = MAP_WIDTH / (maxX - minX);
+      minimap.width = MAP_WIDTH;
+      minimap.height = Math.ceil((maxZ - minZ) * scale);
+      toMap = (x, z) => [(x - minX) * scale, (z - minZ) * scale];
+
+      // From above, keep the highest Gaussian per pixel between ankle and head height, so ceiling
+      // pipes don't hide the floor plan; under them, the floor is drawn dark. Floaters outside the
+      // room are dropped.
+      const floorImage = mapContext.createImageData(minimap.width, minimap.height);
+      const standing = mapContext.createImageData(minimap.width, minimap.height);
+      const highest = new Float32Array(minimap.width * minimap.height).fill(-Infinity);
+      for (let i = 0; i < xs.length; i++) {
+        const [u, v] = toMap(xs[i], zs[i]).map(Math.floor);
+        if (u < 0 || v < 0 || u >= minimap.width || v >= minimap.height) continue;
+        let image = standing;
+        let shade = 1;
+        if (nav) {
+          if (opacities[i] < MIN_OPACITY || navCode(xs[i], zs[i]) === OUTSIDE) continue;
+          if (Math.abs(ys[i] - nav.floor) < FLOOR_TOLERANCE) {
+            image = floorImage;
+            shade = FLOOR_SHADE;
+          } else if (ys[i] < nav.floor + nav.step_height || ys[i] > bandTop(xs[i], zs[i])) continue;
+          else if (ys[i] < highest[v * minimap.width + u]) continue;
+          else highest[v * minimap.width + u] = ys[i];
+        }
+        const pixel = (v * minimap.width + u) * 4;
+        image.data[pixel] = colors[i * 3] * 255 * shade;
+        image.data[pixel + 1] = colors[i * 3 + 1] * 255 * shade;
+        image.data[pixel + 2] = colors[i * 3 + 2] * 255 * shade;
+        image.data[pixel + 3] = 255;
+      }
+      mapRoom = document.createElement("canvas");
+      mapRoom.width = minimap.width;
+      mapRoom.height = minimap.height;
+      const roomContext = mapRoom.getContext("2d");
+      const layer = document.createElement("canvas");
+      layer.width = minimap.width;
+      layer.height = minimap.height;
+      for (const image of nav ? [floorImage, null, standing] : [standing]) {
+        if (image) {
+          layer.getContext("2d").putImageData(image, 0, 0);
+          roomContext.drawImage(layer, 0, 0);
+          continue;
+        }
+        // The walkable area between the floor and what stands on it.
+        roomContext.fillStyle = WALKABLE_COLOR;
+        const cell = nav.grid.cell * scale;
+        nav.grid.rows.forEach((row, r) => {
+          for (let c = 0; c < row.length; c++) {
+            if (Number(row[c]) !== WALKABLE) continue;
+            const [u, v] = toMap(nav.grid.origin[0] + c * nav.grid.cell, nav.grid.origin[1] + r * nav.grid.cell);
+            roomContext.fillRect(u, v, cell + 0.5, cell + 0.5);
+          }
+        });
+      }
+      if (!nav) return;
+      roomContext.strokeStyle = GRAPH_COLOR;
+      roomContext.lineWidth = 1.5;
+      for (const edge of nav.edges) {
+        roomContext.beginPath();
+        for (const [x, z] of edge.points) roomContext.lineTo(...toMap(x, z));
+        roomContext.stroke();
+      }
+      roomContext.fillStyle = GRAPH_COLOR;
+      for (const node of nav.nodes) {
+        roomContext.beginPath();
+        roomContext.arc(...toMap(node.x, node.z), 3, 0, Math.PI * 2);
+        roomContext.fill();
+      }
+    }
+
+    const lookDirection = new THREE.Vector3();
+    function drawMinimap() {
+      if (!mapRoom) return;
+      mapContext.clearRect(0, 0, minimap.width, minimap.height);
+      mapContext.drawImage(mapRoom, 0, 0);
+
+      mapContext.strokeStyle = "rgb(255 200 0 / 0.7)";
+      mapContext.lineWidth = 2;
+      mapContext.beginPath();
+      for (const frame of walk) mapContext.lineTo(...toMap(frame.position[0], frame.position[2]));
+      mapContext.stroke();
+
+      if (route) {
+        mapContext.strokeStyle = ROUTE_COLOR;
+        mapContext.lineWidth = 4;
+        mapContext.lineJoin = "round";
+        mapContext.beginPath();
+        for (const [x, z] of route.points) mapContext.lineTo(...toMap(x, z));
+        mapContext.stroke();
+      }
+
+      if (boxes.visible) {
+        for (const object of objects) {
+          const [x, y] = toMap(object.center[0], object.center[2]);
+          mapContext.fillStyle = classColor(object.class);
+          mapContext.fillRect(x - 3, y - 3, 6, 6);
+        }
+      }
+
+      const [u, v] = toMap(camera.position.x, camera.position.z);
+      camera.getWorldDirection(lookDirection);
+      const heading = Math.atan2(lookDirection.z, lookDirection.x);
+      mapContext.fillStyle = "rgb(0 200 255 / 0.35)";
+      mapContext.beginPath();
+      mapContext.moveTo(u, v);
+      mapContext.arc(u, v, 40, heading - 0.4, heading + 0.4);
+      mapContext.fill();
+      mapContext.fillStyle = "#00c8ff";
+      mapContext.beginPath();
+      mapContext.arc(u, v, 6, 0, Math.PI * 2);
+      mapContext.fill();
+    }
+    // N shows the walkable area and its roadmap on the floor. Selecting an object draws the route to
+    // it from where the walkthrough starts, on the floor and in the minimap.
+    const NAV_LIFT = 0.06; // above the floor so the overlay isn't buried in floor Gaussians, which rise a few cm in places
+    const ROUTE_RADIUS = 0.03;
+    const navFloor = new THREE.Group();
+    navFloor.visible = false;
+    scene.add(navFloor);
+    const routeLine = new THREE.Mesh(new THREE.BufferGeometry(), new THREE.MeshBasicMaterial({ color: ROUTE_COLOR }));
+    scene.add(routeLine);
+    let route = null;
+
+    if (nav) {
+      const rows = nav.grid.rows;
+      const texture = document.createElement("canvas");
+      texture.width = rows[0].length;
+      texture.height = rows.length;
+      const textureContext = texture.getContext("2d");
+      textureContext.fillStyle = "rgb(70 200 130)";
+      rows.forEach((row, r) => {
+        for (let c = 0; c < row.length; c++) if (Number(row[c]) === WALKABLE) textureContext.fillRect(c, r, 1, 1);
+      });
+      const map = new THREE.CanvasTexture(texture);
+      map.magFilter = THREE.NearestFilter;
+      const width = texture.width * nav.grid.cell;
+      const depth = texture.height * nav.grid.cell;
+      const area = new THREE.Mesh(
+        new THREE.PlaneGeometry(width, depth),
+        new THREE.MeshBasicMaterial({ map, transparent: true, opacity: 0.35, depthWrite: false }),
+      );
+      area.rotation.x = -Math.PI / 2; // image rows run along +z, like the grid
+      area.renderOrder = 1; // after the splat, which would otherwise paint over a transparent plane
+      area.position.set(nav.grid.origin[0] + width / 2, nav.floor + NAV_LIFT, nav.grid.origin[1] + depth / 2);
+      navFloor.add(area);
+
+      const lines = [];
+      for (const edge of nav.edges) {
+        for (let i = 1; i < edge.points.length; i++) {
+          for (const [x, z] of [edge.points[i - 1], edge.points[i]]) lines.push(x, nav.floor + NAV_LIFT, z);
+        }
+      }
+      const graph = new THREE.BufferGeometry();
+      graph.setAttribute("position", new THREE.Float32BufferAttribute(lines, 3));
+      navFloor.add(new THREE.LineSegments(graph, new THREE.LineBasicMaterial({ color: GRAPH_COLOR })));
+      const nodes = new THREE.BufferGeometry();
+      nodes.setAttribute(
+        "position",
+        new THREE.Float32BufferAttribute(nav.nodes.flatMap((node) => [node.x, nav.floor + NAV_LIFT, node.z]), 3),
+      );
+      navFloor.add(new THREE.Points(nodes, new THREE.PointsMaterial({ color: GRAPH_COLOR, size: 6, sizeAttenuation: false })));
+    }
+
+    function showRoute(next) {
+      route = next ?? null;
+      routeLine.visible = Boolean(route);
+      if (!route) return;
+      const path = new THREE.CurvePath();
+      const lift = nav.floor + NAV_LIFT;
+      for (let i = 1; i < route.points.length; i++) {
+        const [ax, az] = route.points[i - 1];
+        const [bx, bz] = route.points[i];
+        path.add(new THREE.LineCurve3(new THREE.Vector3(ax, lift, az), new THREE.Vector3(bx, lift, bz)));
+      }
+      routeLine.geometry.dispose();
+      routeLine.geometry = new THREE.TubeGeometry(path, route.points.length * 16, ROUTE_RADIUS, 6);
+    }
+
+    // V replays the walkthrough video's camera path (walk.json, from tools/align.py); V again stops.
+    const walk = await fetch("walk.json").then((response) => response.json());
+    let walkStart = null;
+    const nextQuaternion = new THREE.Quaternion();
+    const VIDEO_FOV = 43; // vertical field of view of the phone that filmed the walkthrough
+    const FREE_FOV = camera.fov;
+
+    function setWalking(walking) {
+      walkStart = walking ? performance.now() : null;
+      camera.fov = walking ? VIDEO_FOV : FREE_FOV;
+      camera.updateProjectionMatrix();
+    }
+
+    function followWalk(seconds) {
+      const next = walk.findIndex((frame) => frame.t > seconds);
+      if (next === -1) {
+        setWalking(false);
+        return;
+      }
+      const a = walk[Math.max(next - 1, 0)];
+      const b = walk[next];
+      const f = b.t === a.t ? 1 : (seconds - a.t) / (b.t - a.t);
+      camera.position.fromArray(a.position).lerp(new THREE.Vector3().fromArray(b.position), f);
+      camera.quaternion.fromArray(a.quaternion).slerp(nextQuaternion.fromArray(b.quaternion), f);
+    }
+
+    window.addEventListener("keydown", (event) => {
+      if (event.code === "KeyP") {
+        points.visible = !points.visible;
+        room.visible = !points.visible;
+      }
+      if (event.code === "KeyV") setWalking(walkStart === null);
+      if (event.code === "KeyB") boxes.visible = !boxes.visible;
+      if (event.code === "KeyN") navFloor.visible = !navFloor.visible;
+    });
+
+    window.viewer = { camera, boxes, navFloor }; // for tools/render_views.py and tools/record_walk.py
+
+    // WASD/QE to move, drag to look, scroll to dolly, shift to go faster.
+    const controls = new SparkControls({ canvas: renderer.domElement });
+
+    window.addEventListener("resize", () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    // index.html#obj-012 opens that object
+    const linked = objects.find((object) => `#${object.id}` === location.hash);
+    if (linked) selectObject(linked);
+
+    renderer.setAnimationLoop(() => {
+      if (walkStart !== null) followWalk((performance.now() - walkStart) / 1000);
+      else if (flight) updateFlight();
+      else controls.update(camera);
+      renderer.render(scene, camera);
+      drawMinimap();
+    });
+  </script>
+</body>
+</html>

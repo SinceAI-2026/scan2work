@@ -1,0 +1,201 @@
+{
+ "about": "classes: the only classes an object can end up in (the client's Excel asset classes); anything else that is real is unclassified. prompts: SigLIP's prompt ensemble per class (each prompt in every template). size_m: the plausible longest side in metres (pipeline/plausibility.py), size_why its basis. shape: optional limits on the thinnest side and on longest/middle side, shape_why their basis. detector_prompts and other_prompts: the things an object can be instead of a class (main's OWLv2 list; this branch uses them for SigLIP only).",
+ "classes": [
+  {
+   "name": "pump",
+   "excel_class": "PROCESS_PUMP",
+   "prompts": [
+    "pump",
+    "circulation pump",
+    "inline circulator pump on a pipe",
+    "centrifugal pump"
+   ],
+   "types": [
+    "red inline circulator pump",
+    "black vertical inline pump",
+    "grey pump with a digital display",
+    "large centrifugal pump",
+    "pump with an electric motor"
+   ],
+   "size_m": [
+    0.15,
+    0.9
+   ],
+   "size_why": "inline circulators are ~0.2-0.4 m, a pump with its motor up to ~0.9 m",
+   "shape": {
+    "min_side_m": 0.08
+   },
+   "shape_why": "a pump unit's thinnest side is a casing several cm deep; no elongation limit: splat boxes come out front-heavy and elongated, and a 3x limit dropped real inline pumps"
+  },
+  {
+   "name": "motor",
+   "excel_class": "ELECTRIC_MOTOR",
+   "prompts": [
+    "electric motor"
+   ],
+   "types": [
+    "small electric motor",
+    "large electric motor",
+    "motor with a fan cover"
+   ],
+   "size_m": [
+    0.15,
+    0.8
+   ],
+   "size_why": "small fan-cooled motors ~0.2 m to ~0.8 m frames"
+  },
+  {
+   "name": "valve",
+   "excel_class": "CONTROL_VALVE",
+   "prompts": [
+    "valve",
+    "ball valve",
+    "gate valve",
+    "valve with a handwheel",
+    "valve with an actuator"
+   ],
+   "types": [
+    "brass ball valve",
+    "blue flanged valve",
+    "valve with a red handwheel",
+    "valve with an orange actuator",
+    "valve with a blue actuator",
+    "valve with a lever handle",
+    "butterfly valve",
+    "steel flanged valve"
+   ],
+   "size_m": [
+    0.05,
+    0.5
+   ],
+   "size_why": "ball valves from ~5 cm; a flanged valve with its actuator or handwheel ~0.5 m",
+   "shape": {
+    "max_elongation": 3
+   },
+   "shape_why": "a valve body with its actuator or handwheel is compact; a part much longer than it is wide is a pipe or a stem"
+  },
+  {
+   "name": "pressure transmitter",
+   "excel_class": "PRESSURE_TRANSMITTER",
+   "prompts": [
+    "pressure gauge",
+    "pressure transmitter",
+    "round dial gauge"
+   ],
+   "types": [
+    "round dial pressure gauge",
+    "dial thermometer",
+    "pressure transmitter"
+   ],
+   "size_m": [
+    0.05,
+    0.25
+   ],
+   "size_why": "dial gauges are 6-16 cm across, transmitters ~0.1-0.2 m"
+  },
+  {
+   "name": "vibration sensor",
+   "excel_class": "VIBRATION_SENSOR",
+   "prompts": [
+    "vibration sensor",
+    "accelerometer sensor with a cable"
+   ],
+   "types": [],
+   "size_m": [
+    0.02,
+    0.1
+   ],
+   "size_why": "accelerometers are a few cm"
+  }
+ ],
+ "detector_prompts": [
+  {
+   "name": "pump",
+   "prompt": "pump",
+   "counts_as": "pump"
+  },
+  {
+   "name": "motor",
+   "prompt": "electric motor",
+   "counts_as": "motor"
+  },
+  {
+   "name": "valve",
+   "prompt": "valve",
+   "counts_as": "valve"
+  },
+  {
+   "name": "pressure gauge",
+   "prompt": "pressure gauge",
+   "counts_as": "pressure transmitter"
+  },
+  {
+   "name": "tank",
+   "prompt": "tank"
+  },
+  {
+   "name": "electrical cabinet",
+   "prompt": "electrical cabinet"
+  },
+  {
+   "name": "control panel",
+   "prompt": "control panel"
+  },
+  {
+   "name": "box",
+   "prompt": "cardboard box"
+  },
+  {
+   "name": "crate",
+   "prompt": "plastic crate"
+  },
+  {
+   "name": "bucket",
+   "prompt": "bucket"
+  },
+  {
+   "name": "cage cart",
+   "prompt": "wire cage cart"
+  },
+  {
+   "name": "pallet jack",
+   "prompt": "pallet jack"
+  },
+  {
+   "name": "hand truck",
+   "prompt": "hand truck"
+  },
+  {
+   "name": "cable reel",
+   "prompt": "cable reel"
+  },
+  {
+   "name": "washing machine",
+   "prompt": "washing machine"
+  },
+  {
+   "name": "door",
+   "prompt": "door"
+  }
+ ],
+ "other_prompts": [
+  "expansion vessel",
+  "pressure vessel",
+  "fire extinguisher",
+  "roll container",
+  "sack truck",
+  "coil of cable",
+  "plastic pail",
+  "radiator",
+  "spray bottle",
+  "pipe",
+  "pipe elbow",
+  "cable tray"
+ ],
+ "templates": [
+  "a photo of a {}.",
+  "a close-up photo of a {}.",
+  "a photo of a {} in a boiler room.",
+  "a {} in an industrial plant room."
+ ]
+}
