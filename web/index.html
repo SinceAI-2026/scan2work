@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-information-mode="simple">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -22,20 +22,31 @@
   <link rel="stylesheet" href="./view-switch.css">
   <link rel="stylesheet" href="./fault-panel.css">
   <link rel="stylesheet" href="./scene-context.css">
+  <link rel="stylesheet" href="./presentation-mode.css">
 </head>
 <body>
   <div id="arrival-announcement" class="visually-hidden" role="status" aria-live="polite"></div>
   <header class="topbar">
     <div class="topbar-left"><span class="brand" aria-label="Scan2Work"><svg class="brand-mark" viewBox="0 0 24 24" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9V4.5A1.5 1.5 0 0 1 4.5 3H9"/><path d="M15 3h4.5A1.5 1.5 0 0 1 21 4.5V9"/><path d="M21 15v4.5a1.5 1.5 0 0 1-1.5 1.5H15"/><path d="M9 21H4.5A1.5 1.5 0 0 1 3 19.5V15"/></g></svg><strong class="brand-name">Scan2Work</strong></span><span class="room-name">Equipment Room</span><span id="room-object-count" class="room-object-count"></span></div>
-    <div class="topbar-right"><button id="btn-review-proposals" class="btn-export" aria-expanded="false" hidden>Review candidates</button><a class="btn-export topbar-link" href="library.html">Asset library</a><button id="btn-inspector" class="btn-export" aria-expanded="false">Equipment details</button></div>
+    <div class="topbar-right"><button id="btn-review-proposals" class="btn-export" aria-expanded="false" hidden>Review candidates</button><a class="btn-export topbar-link" href="library.html">Asset library</a><button id="btn-inspector" class="btn-export" aria-expanded="false">Equipment details</button><button id="btn-settings" class="btn-export" type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="information-settings" data-preserve-demo>Settings</button></div>
   </header>
+  <dialog id="information-settings" class="information-settings" aria-labelledby="information-settings-title" data-preserve-demo>
+    <header><h2 id="information-settings-title">Settings</h2><button id="btn-close-settings" type="button" aria-label="Close settings">×</button></header>
+    <fieldset><legend>Information level</legend>
+      <label><input type="radio" name="information-mode" value="simple" checked><span><strong>Simplified</strong><small>Find equipment, follow the technician and inspect with evidence.</small></span></label>
+      <label><input type="radio" name="information-mode" value="extended"><span><strong>Extended</strong><small>All room tools, object editing, extraction, BIM, Arduino and detailed data.</small></span></label>
+    </fieldset>
+    <label id="simple-context-option"><input id="simple-show-context" type="checkbox"><span>Show nearby equipment frames<small>The selected item stays highlighted.</small></span></label>
+    <p>Saved in this browser. Changing the information level keeps your selected item, route, room edits and inspection records.</p>
+  </dialog>
   <main class="workspace">
     <aside class="sidebar left-sidebar">
-      <div class="sidebar-header"><h1>Explore the room</h1><p id="sidebar-stats-text" class="sidebar-stats">Loading room…</p><p id="dataset-note" class="dataset-note" role="status"></p></div>
+      <div class="sidebar-header"><h1 id="workspace-heading">Inspect equipment</h1><p class="simple-only simple-intro">Choose a device, follow the route, inspect with evidence.</p><p id="sidebar-stats-text" class="sidebar-stats">Loading room…</p><p id="dataset-note" class="dataset-note" role="status"></p></div>
       <div class="mission-box">
         <button class="btn-walk primary" id="btn-safety-demo" disabled aria-pressed="false">Play demo</button>
         <button class="btn-walk" id="btn-room-tour" disabled>Tour the room</button>
         <button class="btn-walk" id="btn-go-target" disabled>Inspect faulty device</button>
+        <p id="inspection-destination" class="simple-only inspection-destination" aria-live="polite">Choose equipment to begin</p>
       </div>
       <div class="filter-group"><label for="asset-search" class="field-label">Find equipment</label><input id="asset-search" class="clean-input" placeholder="Search tag or equipment…" type="search" /></div>
       <select id="select-visual-review" class="clean-select" aria-label="Equipment filter"><option value="all">All extracted regions</option><option value="mapped">Excel-linked equipment</option><option value="alerts">Needs attention</option><option value="baseline">Linards baseline regions</option><option value="new">New candidate regions</option><option value="floor">Floor patches</option></select>
@@ -135,8 +146,8 @@
           <p id="detail-match-note" class="insp-note" hidden></p>
           <button class="btn-primary-full btn-take-apart" id="btn-take-apart" title="Hide the room and show this region alone (T)">Isolate region</button>
         </div>
-        <div class="room-edit-actions"><button id="btn-move-object" class="btn-outline-full" disabled>Move in room</button><span id="room-edit-tooltip"><button id="btn-room-edit" class="btn-outline-full" disabled>Remove from room</button></span></div>
-        <div class="room-edit-actions"><button id="btn-reset-position" class="btn-outline-full" hidden>Reset position</button></div>
+        <div class="room-edit-actions" data-extended><button id="btn-move-object" class="btn-outline-full" disabled>Move in room</button><span id="room-edit-tooltip"><button id="btn-room-edit" class="btn-outline-full" disabled>Remove from room</button></span></div>
+        <div class="room-edit-actions" data-extended><button id="btn-reset-position" class="btn-outline-full" hidden>Reset position</button></div>
         <!-- no visible button: Navigate here replaces it; field-jobs.mjs still clicks it to frame a job's device -->
         <button id="btn-room-location" hidden>View location</button>
         <form id="room-move-form" class="room-move-form" hidden>

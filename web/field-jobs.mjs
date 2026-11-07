@@ -54,7 +54,7 @@ export async function showEquipment(equipment) {
   if (!card()) { search.value = obj; search.dispatchEvent(new Event("input")); }
   if (!card()) {
     restore(); // never leave the list searching for an object that is not there ("No matching regions")
-    throw new Error(`${tag} was removed from this room. Restore it from Room changes to show it.`);
+    throw new Error(`${tag} was removed from this room. ${document.documentElement.dataset.informationMode === "simple" ? "Open Settings → Extended, then Room changes to restore it." : "Restore it from Room changes to show it."}`);
   }
   card().click();
   document.getElementById("btn-room-location").click();

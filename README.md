@@ -29,10 +29,13 @@ python3 -m venv .venv && .venv/bin/python -m pip install -r requirements.txt
 .venv/bin/python server.py 8765          # http://127.0.0.1:8765/  (add --lan for an Arduino on the same network)
 ```
 
-Select **Play demo** for a guided route → hazard illustration → equipment evidence walkthrough.
-Or browse freely, choose **Inspect faulty device**, **Tour the room**, or **Navigate here**.
-**Hazards** toggles potential-energy annotations; Pause, Stop or manual interaction interrupts the demo.
-Playback never completes jobs, changes Arduino readings or certifies safe work.
+The viewer starts in **Simplified** mode: choose equipment, follow its route, then inspect the evidence and checklist.
+**Start inspection** names the selected destination; **Watch demo** runs the separate guided walkthrough.
+Open **Settings → Extended** for extraction, editing, BIM/AR and detailed data. Your information preference is saved
+in this browser; changing it preserves the selection, route and service records. [View guide](docs/features.md#simplified-and-extended-information).
+
+**Hazards** toggles potential-energy annotations. Pause, Stop or manual room interaction interrupts the guided demo;
+watching it never completes jobs, changes Arduino readings or certifies safe work.
 
 The hosted main room enables Ilkka, shared synthetic inspection jobs and the Arduino panel; the board is currently
 not connected. Visitors can start jobs, record checks and notes, and close jobs; their progress is visible to other
@@ -50,6 +53,7 @@ scene changes and exact-source object exports. See
 | Two segmenters | Colour/geometry rules + Gemini labels (default), or SAM 2.1 + SigLIP 2/DINOv2 fully on-site | [Pipeline](docs/pipeline.md#two-segmenters) |
 | Workbook binding | All 30 Excel devices on distinct objects; status, telemetry and citations come from the workbook only | [Technical notes](docs/technical-notes.md) |
 | Navigation | A* with the walking technician’s footprint; follow, first-person and aerial views; original floor data preserved | [Technical notes](docs/technical-notes.md#navigation-and-collision-model) |
+| Information levels | Simplified technician workspace by default; Settings restores the complete Extended toolset | [View guide](docs/features.md#simplified-and-extended-information) |
 | Guided demo and hazards | Rasmus’s walking service technician, interruptible walkthrough and optional energy illustrations | [Integration and reuse](docs/rasmus-integration.md) |
 | Device summary | Canonical condition, one relevant reading/comparison, recorded time and next check; full evidence remains expandable | [Display decisions](docs/rasmus-integration.md#what-belongs-in-the-default-device-view) |
 | Room layers | Scan / Coloured by class / BIM masks of the same view, explode, Show in room filters, floor plan and IFC export | [Features](docs/features.md#room-controls) |

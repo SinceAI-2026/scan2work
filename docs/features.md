@@ -2,7 +2,47 @@
 
 The README lists what Scan2Work does; this page has the detail for the larger features.
 
+## Simplified and Extended information
+
+Open **Settings** to choose the amount of information. **Simplified** is the default for a first visit;
+**Extended** exposes the full room and analysis tools. The preference is saved in this browser. Changing it
+changes presentation only: it does not edit scene objects, start/close jobs, or change device readings.
+
+| Need | Simplified | Extended |
+| --- | --- | --- |
+| Find the next device | Search, inspection queue and explicit filters when browsing all equipment | Same, plus extraction review tools |
+| Reach the device | Selected destination, drawn route and camera/map controls | Same, plus room tour and additional display tools |
+| Understand its condition | Issue, relevant recorded reading, timestamp, next check and expandable evidence | Same, plus specifications, confidence and extraction details |
+| Do the inspection | Source photo, checklist, safety prerequisites, notes and assistant | Same workflow |
+| Show the prototype | Clearly separate guided demo entry; pause/stop/take over | Same walkthrough |
+| Analyse or edit the room | Keep the main room focused | Candidate review, library, BIM/AR, editing and render controls |
+
+The technician flow is **choose equipment → follow the route → inspect the evidence and checklist**.
+The guided demo illustrates the flow without completing work. Recorded/synthetic data labels, unavailable-data
+messages and safety prerequisites remain visible; presentation mode does not grant extra permissions.
+
+The selected item is framed by default in Simplified. **Settings → Show nearby equipment frames** adds nearby
+workbook-linked context without restoring every extraction candidate's label. Extended retains its previous frame
+and layer choices. The level preference uses `scan2work:information-mode:v1`; if storage is unavailable it works for
+the current session. The optional nearby-frame choice is session-only.
+
+Reusable UI policy lives in `web/presentation-mode.mjs` and `web/presentation-mode.css`. The module normalizes and
+stores the information level, derives the selected destination action, and mounts the accessible Settings dialog.
+It receives no scene-write, job or device API. Existing feature controls remain the source of those actions.
+
+### Verification of information levels
+
+The focused viewer suite passed 60 tests, including preference persistence/failure, selected-destination behavior,
+focused frames, Settings focus handling, preservation of unrelated state and actionable removed-item guidance. Run the new module tests with
+`node --test web/presentation-mode.test.mjs`. Both idempotent viewer patch scripts reported zero edits.
+
+Local browser checks covered first-visit Simplified, Extended after reload, a selected M-005 route, switching levels
+without interrupting that route, Escape/focus return, the complete guided demo, and Settings/demo at 500 px width.
+The update retains the newer drag-to-move and scan-remnant removal behavior from the shared repository. When a removed item is requested in Simplified, the message points to Settings → Extended → Room changes. No backend changes, model runs or job/device writes are part of this update.
+
 ## Room controls
+
+The complete toolbar below is available in **Extended** mode. Simplified keeps the camera, map and optional hazard controls.
 
 - **Camera** (round button, top left): **Follow technician**, **First person** (the technician's camera: drag to look,
   WASD/arrows to walk) and **Aerial view**. The technician is driven the same way in every view; the view only moves
@@ -19,14 +59,14 @@ The README lists what Scan2Work does; this page has the detail for the larger fe
 
 ## Technician, hazards and guided demo
 
-**Play demo** walks to the faulty device, illustrates potential energy, then shows its source evidence. The service
+**Watch demo** (**Play demo** in Extended) walks to the faulty device, illustrates potential energy, then shows its source evidence. The service
 technician is adapted from Rasmus's procedural character. Pause/resume, Next, Stop and ordinary room interaction
 keep the walkthrough under the user's control. It does not complete inspection checks or change jobs or sensor state.
 
 **Hazards** is off by default and shows a few nearby workbook-linked devices. The selected demo boundary is an
 illustration, not a measured exclusion distance or isolation approval. Readings are recorded synthetic data.
-Equipment details lead with specifications and a compact condition/reading/time/next-check summary; the original
-photo remains above the job checklist. Full evidence is still available below.
+Simplified equipment details lead with the condition/reading/time/next-check summary; Extended also shows specifications.
+The original photo remains above the job checklist. Full evidence is still available below.
 
 Reusable modules, attribution, data-selection decisions and current route checks are in the
 [Rasmus integration guide](rasmus-integration.md).
