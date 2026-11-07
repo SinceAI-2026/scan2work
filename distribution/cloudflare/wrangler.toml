@@ -8,8 +8,11 @@ routes = [{pattern = "scan2work.app", custom_domain = true}]
 ORIGIN = "http://v2202609409444511285.goodsrv.de:20229"
 # Separate encrypted MCP transport; update if its supervised quick tunnel restarts.
 MCP_ORIGIN = "https://student-leather-designing-recommended.trycloudflare.com"
-# Opt in only with matching baseline/MCP VALMET_PUBLIC_ASSISTANT=1 settings.
-# ASSISTANT = "1"
+# Main demo explicitly enables shared jobs and the Arduino fault panel.
+# Keep these aligned with the baseline/MCP host flags; review remains read-only.
+ASSISTANT = "1"
+ARDUINO = "1"
+ARDUINO_ORIGIN = "https://protect-fill-hanging-important.trycloudflare.com"
 
 [env.review]
 name = "scan2work-review"

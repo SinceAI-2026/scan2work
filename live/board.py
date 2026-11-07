@@ -19,12 +19,13 @@ Self-contained: server.py routes /api/live/* here; nothing else in Scan2Work imp
 from __future__ import annotations
 
 import json
-import os
+import math
 import random
 import threading
 import time
 
 from .stores import snowflake, tiger
+from .security import board_token, require_public_token, token_matches
 
 BOARD_TIMEOUT_S = 5.0   # no heartbeat for this long -> the board is shown offline
 EVENT_TYPE = {"claimed": "FAULT_DETECTED", "acknowledged": "ACKNOWLEDGED", "done": "RESTORED",
@@ -151,8 +152,11 @@ class Board:
                     "signal": worst_signal(a) if status == "fault" else None,
                     "checks_done": sum(bool(c.get("done")) for c in checks), "checks_total": len(checks)}
         nxt = next(iter(self._queue()["needs_inspection"]), None)
+        age = max(0.0, time.time() - self.last_seen) if self.last_seen else None
         return {"status": status, "task": task, "next_fault": nxt and nxt["tag"],
-                "board_online": time.time() - self.last_seen < BOARD_TIMEOUT_S, "touch": self.touch,
+                "board_online": age is not None and age < BOARD_TIMEOUT_S, "touch": self.touch,
+                "last_seen_unix": self.last_seen or None, "heartbeat_age_s": round(age, 2) if age is not None else None,
+                "telemetry_source": "Valmet builder pack (synthetic)", "touch_source": "Arduino A0 input",
                 "stores": {"tiger": tiger.status(), "snowflake": snowflake.status()}}
 
     def heartbeat(self, touch: dict | None) -> dict:
@@ -169,7 +173,7 @@ class Board:
 _BOARD: Board | None = None
 
 
-def handle(method: str, path: str, body: dict | None, field, token: str | None = None) -> tuple[dict, int] | None:
+def handle(method: str, path: str, body: dict | None, field, token: str | None = None, *, public=False) -> tuple[dict, int] | None:
     """Route /api/live/... for server.py. Returns (json, status), or None for a path that is not ours.
 
       GET  /api/live/board              state (the viewer polls it)
@@ -184,30 +188,56 @@ def handle(method: str, path: str, body: dict | None, field, token: str | None =
         return None
     if field is None:
         return {"error": "the twin is not loaded"}, 503
-    if _BOARD is None or _BOARD.field is not field:
-        _BOARD = Board(field)
-    b, sub, body = _BOARD, parts[3] if len(parts) > 3 else "", body or {}
+    sub, body = parts[3] if len(parts) > 3 else "", body or {}
     # The token proves a request comes from the board (claim, heartbeat: "board online" can't be faked). The viewer's
     # actions need none: acknowledging starts a job, which /api/field-jobs allows anyway.
-    secret = os.environ.get("LIVE_TOKEN")
-    if method == "POST" and sub in ("claim", "heartbeat") and secret and token != secret:
+    try:
+        secret = require_public_token() if public else board_token()
+    except (OSError, ValueError):
+        return {"error": "Arduino device credential is unavailable"}, 503
+    if method == "POST" and sub in ("claim", "heartbeat") and secret and not token_matches(secret, token):
         return {"error": "missing or wrong X-Live-Token"}, 401
+    if public:
+        if len(parts) > 4 or not isinstance(body, dict):
+            return {"error": "Invalid board request"}, 400
+        if any(k not in {'touch', 'action', 'by'} for k in body):
+            return {"error": "Unknown board field"}, 400
+        if any(k in body and (not isinstance(body[k], str) or len(body[k]) > 80) for k in ('action', 'by')):
+            return {"error": "Board action and actor must be short text"}, 400
+        touch = body.get('touch')
+        if touch is not None:
+            if not isinstance(touch, dict) or any(k not in {'swing', 'base', 'touched'} for k in touch):
+                return {"error": "Invalid touch reading"}, 400
+            for key in ('swing', 'base'):
+                value = touch.get(key)
+                if value is not None and (type(value) not in (int, float) or not math.isfinite(value) or not 0 <= value <= 65535):
+                    return {"error": "Touch readings must be finite ADC values"}, 400
+            if 'touched' in touch and type(touch['touched']) is not bool:
+                return {"error": "Touched must be a boolean"}, 400
+    if _BOARD is None or _BOARD.field is not field:
+        _BOARD = Board(field)
+    b = _BOARD
+    def response(out):
+        if public and isinstance(out, dict) and 'stores' in out:
+            out['stores'] = {name: {**state, 'error': 'Connection unavailable' if state.get('error') else None}
+                             for name, state in out['stores'].items()}
+        return out, 200
     try:
         if method == "GET" and sub == "":
-            return b.state(), 200
+            return response(b.state())
         if method == "GET" and sub == "events":
             return {"events": list(b.events)}, 200
         if method == "POST" and sub == "claim":
-            return b.claim(str(body.get("by", "board"))), 200
+            return response(b.claim(str(body.get("by", "board"))))
         if method == "POST" and sub == "heartbeat":
             touch = body.get("touch") if isinstance(body.get("touch"), dict) else None
-            return b.heartbeat(touch), 200
+            return response(b.heartbeat(touch))
         if method == "POST" and sub == "action":
             action, by = str(body.get("action", "")), str(body.get("by", "viewer"))
             if action == "ack":
-                return b.acknowledge(by), 200
+                return response(b.acknowledge(by))
             if action == "claim":   # a hold, or the card's Show newest: with nothing left, a simulated emergency
-                return b.claim(by, simulate_if_idle=True), 200
+                return response(b.claim(by, simulate_if_idle=True))
             return {"error": "action must be ack or claim"}, 400
     except ValueError as err:   # e.g. the claimed tag is not in this twin's data
         return {"error": str(err)}, 422

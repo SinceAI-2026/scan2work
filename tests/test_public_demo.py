@@ -66,6 +66,12 @@ class PublicRuntimeTests(unittest.TestCase):
             with self.assertRaises(serve_public_demo.argparse.ArgumentTypeError):
                 serve_public_demo.https_url(value)
 
+    def test_public_arduino_startup_requires_private_credential_before_loading_data(self):
+        with mock.patch.object(server, 'PUBLIC_ARDUINO', True), mock.patch.dict(os.environ, {}, clear=True), \
+             mock.patch.object(server, 'load_data', side_effect=AssertionError('must fail before loading data')):
+            with self.assertRaisesRegex(ValueError, 'private device token'):
+                server.run_server(0)
+
 
 class PublicHTTPTests(unittest.TestCase):
     def setUp(self):
@@ -98,6 +104,7 @@ class PublicHTTPTests(unittest.TestCase):
                    mock.patch.object(server, 'TWIN_DATA', self.twin),
                    mock.patch.object(server, 'PUBLIC_DEMO', True),
                    mock.patch.object(server, 'PUBLIC_ASSISTANT', False),
+                   mock.patch.object(server, 'PUBLIC_ARDUINO', False),
                    mock.patch.object(server, 'ASSETS_BY_ID', {'ASSET-003': self.asset}),
                    mock.patch.object(server, 'ASSETS_BY_OBJ', {'OBJ-206': self.asset}),
                    mock.patch.object(server, 'WORK_ORDER_DRAFTS', [{'notes': 'private draft'}]),
@@ -130,6 +137,7 @@ class PublicHTTPTests(unittest.TestCase):
         self.assertEqual(manifest['runtime'], {'public_demo': True, 'offline': True,
             'external_models_enabled': False, 'shared_writes_enabled': False,
             'voice_assistant': False, 'field_jobs_enabled': False,   # off unless VALMET_PUBLIC_ASSISTANT=1
+            'arduino_enabled': False, 'arduino_actions_enabled': False,
             'install_url': 'https://downloads.example/releases/0.1.0/', 'voice': {
                 'enabled': False, 'provider': 'elevenlabs', 'agent_id': None,
                 'agent_name': 'Ilkka', 'service_mode': 'read_only', 'mcp_url': None}})
@@ -281,6 +289,36 @@ class PublicHTTPTests(unittest.TestCase):
                 {'X-Live-Token': 'fixture-token'})[0], 200)
             live.board.handle.assert_called_with('POST', '/api/live/board/heartbeat',
                 {'touch': {'swing': 3}}, server.FIELD, 'fixture-token')
+
+    def test_public_arduino_opt_in_requires_device_token_and_preserves_other_guards(self):
+        from live import board
+        field = server.field_service.FieldService({'assets': [self.asset]})
+        token_file = self.data / 'device-token'
+        token_file.write_text('fixture-device-' * 4)
+        with mock.patch.object(server, 'PUBLIC_ARDUINO', True), mock.patch.object(server, 'PUBLIC_ASSISTANT', True), \
+             mock.patch.object(server, 'FIELD', field), mock.patch.object(board, '_BOARD', None), \
+             mock.patch.object(board.snowflake, 'write_later'), mock.patch.object(board.tiger, 'insert_heartbeat'), \
+             mock.patch.object(server.field_service, 'LOG_PATH', self.data / 'arduino_test_jobs.json'), \
+             mock.patch.dict(os.environ, {'LIVE_TOKEN_FILE': str(token_file)}):
+            rt = self.request('GET', '/data/digital_twin.json')[1]['runtime']
+            self.assertTrue(rt['arduino_enabled']); self.assertTrue(rt['arduino_actions_enabled'])
+            status, state, _ = self.request('GET', '/api/live/board')
+            self.assertEqual((status, state['status'], state['board_online']), (200, 'waiting', False))
+            for path in ('/api/live/board/claim', '/api/live/board/heartbeat'):
+                self.assertEqual(self.request('POST', path, {})[0], 401)
+            self.assertEqual(self.request('GET', '/api/live/board')[1]['status'], 'waiting')
+            status, state, _ = self.request('POST', '/api/live/board/heartbeat', {'touch': {'swing': 123, 'base': 22, 'touched': True}},
+                {'X-Live-Token': token_file.read_text()})
+            self.assertEqual(status, 200); self.assertTrue(state['board_online'])
+            self.assertEqual(state['touch']['swing'], 123)
+            self.assertEqual(self.request('POST', '/api/live/board/action', {'action': 'ack'})[0], 200)
+            self.assertEqual(self.request('GET', '/api/live/board')[1]['status'], 'in_progress')
+            self.assertEqual(self.request('POST', '/api/live/board/heartbeat/extra', {})[0], 403)
+            for path in ('/api/scene/edits', '/api/library'):
+                self.assertEqual(self.request('POST', path, {})[0], 403)
+            self.assertEqual(self.request('GET', '/data/')[0], 403)
+            token_file.unlink()
+            self.assertEqual(self.request('GET', '/api/live/board')[0], 503)
 
 
 if __name__ == '__main__':

@@ -27,7 +27,7 @@ export function mountDemoBanner(runtime) {
   const banner = document.createElement("div");
   banner.id = "public-demo-banner";
   banner.className = "public-demo-banner";
-  banner.innerHTML = `<span>Live demo · edits stay in this browser</span>${installAction(runtime, "Install")}`;
+  banner.innerHTML = `<span>${runtime?.field_jobs_enabled === true ? "Live demo · jobs are shared; scene edits stay in this browser" : "Live demo · edits stay in this browser"}</span>${installAction(runtime, "Install")}`;
   document.querySelector("header")?.after(banner);
 }
 

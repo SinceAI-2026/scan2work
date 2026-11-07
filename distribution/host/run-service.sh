@@ -5,6 +5,8 @@ service="${1:?Choose baseline, review, mcp or proxy}"
 case "$service" in baseline|review|mcp|proxy) ;; *) echo 'Unknown Scan2Work service' >&2; exit 2 ;; esac
 
 install_dir=/workspace/scan2work/releases/0.1.1
+# A verified source snapshot can update hosted code without modifying a release.
+code_dir="${SCAN2WORK_CODE_DIR:-$install_dir/app}"
 deploy_dir=/workspace/scan2work/deploy
 export PROC_NAME="scan2work-${service}"
 # Use the image's portal logging support, but do not source shared credentials
@@ -22,13 +24,17 @@ elif [[ "$service" == proxy ]]; then
   pty /opt/instance-tools/bin/caddy run --config "$deploy_dir/Caddyfile" --adapter caddyfile
 else
   python_cmd="$install_dir/.venv/bin/python"
-  launcher="$install_dir/app/scripts/serve_public_demo.py"
+  launcher="$code_dir/scripts/serve_public_demo.py"
   install_url=https://assets.scan2work.app/releases/0.1.1/index.html
   cd "$install_dir"
   if [[ "$service" == baseline ]]; then
     assistant_args=()
     if [[ -f "$deploy_dir/assistant.env" ]] && grep -qx 'VALMET_PUBLIC_ASSISTANT=1' "$deploy_dir/assistant.env"; then
       assistant_args=(--assistant)
+    fi
+    if [[ -f "$deploy_dir/assistant.env" ]] && grep -qx 'VALMET_PUBLIC_ARDUINO=1' "$deploy_dir/assistant.env"; then
+      export VALMET_PUBLIC_ARDUINO=1
+      export LIVE_TOKEN_FILE=/workspace/scan2work/private/arduino-token
     fi
     pty "$python_cmd" "$launcher" --data-dir "$install_dir/data/baseline" "${assistant_args[@]}" \
       --install-url "$install_url" --proposal-url https://review.scan2work.app/ --port 9080

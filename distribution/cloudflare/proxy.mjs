@@ -1,5 +1,8 @@
 // Stream the prepared public demo through HTTPS. No arbitrary proxy targets.
 const PUBLIC_POSTS = ['/api/copilot/diagnose', '/api/work-orders/draft'];
+const BOARD_READS = ['/api/live/board', '/api/live/board/events'];
+const BOARD_POSTS = ['/api/live/board/claim', '/api/live/board/heartbeat', '/api/live/board/action'];
+const BOARD_AUTH = ['/api/live/board/claim', '/api/live/board/heartbeat'];
 export default {
   async fetch(request, env) {
     if (!['GET', 'HEAD', 'POST'].includes(request.method)) {
@@ -7,20 +10,28 @@ export default {
     }
     const incoming = new URL(request.url);
     const mcp = incoming.pathname === '/mcp';
+    const board = incoming.pathname.startsWith('/api/live/');
+    if (board) {
+      if (env.ARDUINO !== '1') return Response.json({error: 'public_demo_read_only'}, {status: 403});
+      if (!['GET', 'POST'].includes(request.method)) return new Response('Method not allowed', {status: 405});
+      const allowed = request.method === 'GET' ? BOARD_READS : BOARD_POSTS;
+      if (!allowed.includes(incoming.pathname)) return Response.json({error: 'unknown_live_endpoint'}, {status: 404});
+      if (!env.ARDUINO_ORIGIN) return new Response('Arduino is not configured', {status: 503});
+    }
     if (mcp && !['GET', 'POST'].includes(request.method)) return new Response('Method not allowed', {status: 405});
     if (mcp && !env.MCP_ORIGIN) return new Response('MCP is not configured', {status: 503});
     const posts = env.ASSISTANT === '1' ? [...PUBLIC_POSTS, '/api/field-jobs'] : PUBLIC_POSTS;
-    if (request.method === 'POST' && !mcp && !posts.includes(incoming.pathname)) {
+    if (request.method === 'POST' && !mcp && !board && !posts.includes(incoming.pathname)) {
       return Response.json({error: 'public_demo_read_only'}, {status: 403});
     }
-    const origin = new URL(mcp ? env.MCP_ORIGIN : env.ORIGIN);
+    const origin = new URL(mcp ? env.MCP_ORIGIN : board ? env.ARDUINO_ORIGIN : env.ORIGIN);
     // The ordinary origin contains public scene data. MCP carries a private
     // workspace credential, so it must use its separate encrypted origin.
-    if (mcp && (origin.protocol !== 'https:' || origin.username || origin.password)) {
-      return new Response('MCP requires a secure origin', {status: 503});
+    if ((mcp || board) && (origin.protocol !== 'https:' || origin.username || origin.password)) {
+      return new Response('Credentialed services require a secure origin', {status: 503});
     }
     origin.pathname = incoming.pathname;
-    origin.search = mcp ? '' : incoming.search;
+    origin.search = mcp || board ? '' : incoming.search;
     const headers = new Headers();
     if (mcp) {
       const authorization = request.headers.get('authorization') || '';
@@ -30,6 +41,11 @@ export default {
         if (request.headers.has(name)) headers.set(name, request.headers.get(name));
       }
       headers.set('x-forwarded-for', request.headers.get('cf-connecting-ip') || 'cloudflare');
+    }
+    if (board && request.method === 'POST' && BOARD_AUTH.includes(incoming.pathname)) {
+      const token = request.headers.get('x-live-token') || '';
+      if (!/^[^\s]{1,512}$/.test(token)) return new Response('Unauthorized', {status: 401});
+      headers.set('x-live-token', token);
     }
     for (const key of ['accept', 'content-type', 'range', 'if-range', 'if-none-match', 'if-modified-since']) {
       if (request.headers.has(key)) headers.set(key, request.headers.get(key));

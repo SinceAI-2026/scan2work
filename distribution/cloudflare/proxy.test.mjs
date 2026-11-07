@@ -68,3 +68,48 @@ test('MCP credentials go only to the fixed HTTPS MCP origin; redirects are never
   assert.equal((await worker.fetch(new Request('https://scan2work.app/mcp',{method:'POST',headers:{Authorization:'Bearer private'},body:'x'.repeat(16385)}),{...env,MCP_ORIGIN:'https://mcp.example'})).status,413);
  }finally{globalThis.fetch=original;}
 });
+
+test('Arduino routes require opt-in, an encrypted origin and an exact endpoint',async()=>{
+ const original=globalThis.fetch;let calls=0;
+ globalThis.fetch=async()=>{calls++;return Response.json({});};
+ try {
+  const get=(path,e)=>worker.fetch(new Request('https://scan2work.app'+path),e);
+  assert.equal((await get('/api/live/board',env)).status,403);
+  assert.equal((await get('/api/live/board',{...env,ARDUINO:'1'})).status,503);
+  assert.equal((await get('/api/live/board',{...env,ARDUINO:'1',ARDUINO_ORIGIN:'http://board.example'})).status,503);
+  assert.equal((await get('/api/live/unknown',{...env,ARDUINO:'1',ARDUINO_ORIGIN:'https://board.example'})).status,404);
+  assert.equal(calls,0);
+ }finally{globalThis.fetch=original;}
+});
+
+test('board credentials go only to the dedicated HTTPS claim and heartbeat routes',async()=>{
+ const original=globalThis.fetch;let got;
+ globalThis.fetch=async(url,init)=>{got={url:String(url),init};return Response.json({ok:true});};
+ const enabled={...env,ARDUINO:'1',ARDUINO_ORIGIN:'https://board.example'};
+ const post=(path,headers={})=>worker.fetch(new Request('https://scan2work.app'+path,{method:'POST',headers,body:'{}'}),enabled);
+ try {
+  assert.equal((await post('/api/live/board/heartbeat')).status,401);
+  for(const path of ['/api/live/board/claim','/api/live/board/heartbeat']) {
+   assert.equal((await post(path+'?token=never-forward',{'X-Live-Token':'board-secret',Authorization:'Bearer mcp-secret',Cookie:'visitor'})).status,200);
+   assert.equal(got.url,'https://board.example'+path);
+   assert.equal(got.init.headers.get('x-live-token'),'board-secret');
+   assert.equal(got.init.headers.get('authorization'),null);
+   assert.equal(got.init.headers.get('cookie'),null);
+   assert.equal(got.init.redirect,'manual');
+  }
+  assert.equal((await post('/api/live/board/action',{'X-Live-Token':'board-secret'})).status,200);
+  assert.equal(got.init.headers.get('x-live-token'),null);
+  assert.equal((await post('/api/library')).status,403);
+  const out=await worker.fetch(new Request('https://scan2work.app/data/photo.jpg',{headers:{'X-Live-Token':'board-secret'}}),enabled);
+  assert.equal(out.status,200);assert.equal(got.init.headers.get('x-live-token'),null);
+ }finally{globalThis.fetch=original;}
+});
+
+test('Arduino body limits apply before contacting the board service',async()=>{
+ const original=globalThis.fetch;let calls=0;
+ globalThis.fetch=async()=>{calls++;return new Response('unexpected');};
+ try {
+  const out=await worker.fetch(new Request('https://scan2work.app/api/live/board/heartbeat',{method:'POST',headers:{'X-Live-Token':'secret'},body:'x'.repeat(16385)}),{...env,ARDUINO:'1',ARDUINO_ORIGIN:'https://board.example'});
+  assert.equal(out.status,413);assert.equal(calls,0);
+ }finally{globalThis.fetch=original;}
+});

@@ -77,7 +77,7 @@ def render(st, t):
 
 # --- server -----------------------------------------------------------------------------------------
 def post(path, body):
-    headers = {"content-type": "application/json"}
+    headers = {"content-type": "application/json", "User-Agent": "Scan2WorkArduino/0.1"}
     if LIVE_TOKEN:
         headers["x-live-token"] = LIVE_TOKEN
     req = urllib.request.Request(PLANT_API + path, data=json.dumps(body).encode(), headers=headers, method="POST")

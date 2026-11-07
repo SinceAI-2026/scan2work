@@ -20,6 +20,14 @@ A done task stays done. The board takes the newest fault the next time it starts
 The board only needs to reach the server over HTTP(S). It sends a request once a second, and the server never
 connects to the board, so no port forwarding is needed.
 
+For the hosted demo, use `PLANT_API=https://scan2work.app` and the private board
+connection token supplied by the deployment owner. The token goes in `board.env`
+on the board; it is separate from the ElevenLabs MCP token. It is never included
+in the website, public downloads or repository. The panel can be enabled while
+the board is unplugged: it reports **Board offline** until an authenticated
+heartbeat arrives. The physical inputs are touch/button readings; the plant
+fault and its normal/current signal bars come from the synthetic workbook.
+
 1. Copy `fault-panel/python/board.env.example` to `fault-panel/python/board.env` (git-ignored) and set:
    - `PLANT_API`: the server's address.
      - **Deployed:** the public HTTPS address, e.g. `https://scan2work.example.com`. The board can be on any
@@ -78,3 +86,17 @@ The card's **Acknowledge** and **Show newest** buttons do the same as tap and ho
   and D13 (tap/hold) and tells Python over the Bridge.
 - `fault-panel/python/main.py`: Linux side. Claims the fault, sends heartbeats and button actions, renders the frames.
 - `deploy.sh`: copy and start the app over adb, without App Lab.
+
+## Hosted server settings
+
+The deployment explicitly enables both `VALMET_PUBLIC_ASSISTANT=1` and
+`VALMET_PUBLIC_ARDUINO=1`; the server reads `LIVE_TOKEN_FILE` from a private file.
+The Cloudflare Worker uses matching `ASSISTANT="1"`, `ARDUINO="1"` and a dedicated
+HTTPS `ARDUINO_ORIGIN`. Only the known board endpoints are forwarded, and the
+board's `X-Live-Token` is forwarded only for claim/heartbeat requests. See the
+[host deployment guide](../distribution/host/README.md) for the service and
+rollback setup. The extraction review keeps these capabilities disabled.
+
+The optional Tiger Data and Snowflake integrations are independent. An
+unconfigured store is displayed as such; enabling the panel does not provision
+either service or turn archived workbook values into physical sensor readings.

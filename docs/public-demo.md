@@ -4,6 +4,11 @@ The hosted preview uses a separate prepared release installation. It does not
 expose the author's workstation, editing session, model services or credentials.
 The full installation remains writable; hosted mode is explicit and opt-in.
 
+The current main site runs source snapshot `6840806` with shared inspection jobs,
+Ilkka and the Arduino panel explicitly enabled. The separate extraction review
+keeps those features off. The default invocation below remains read-only; see
+the assistant and Arduino options at the end of this document.
+
 Start the app using the Python environment created by the installer:
 
 ```sh
@@ -65,12 +70,14 @@ from browser interaction QA and deployment connectivity checks.
 
 ## Optional voice connection
 
-The later [voice/MCP integration](voice-mcp.md) allows an explicitly configured
-ElevenLabs widget while backend inference remains offline and shared writes stay
-disabled. No voice configuration means no external widget load. The current
-0.1.1 package has voice disabled; the newer source requires Wael's cloud-agent
-configuration before activation. The separate public MCP service exposes only
-reading tools and requires a bearer credential over its encrypted origin.
+The [voice/MCP integration](voice-mcp.md) separates ElevenLabs from offline
+backend inference. No voice configuration means no external widget load. The
+main hosted site enables Ilkka and shared inspection jobs; the review site and
+immutable 0.1.1 package keep voice disabled. Cloud-agent MCP configuration is
+managed separately in Wael's ElevenLabs workspace. The public MCP service now
+exposes all ten inspection tools and requires a bearer credential over its
+encrypted origin. Widget visibility alone does not prove that its cloud agent
+is connected to this endpoint.
 
 Wael's explicit `--assistant` option is retained in the follow-up source. It
 allows shared field jobs and the original Ilkka widget while scene/library
@@ -78,3 +85,20 @@ writes remain blocked. The matching MCP service can opt into the same shared
 log with `VALMET_PUBLIC_ASSISTANT=1`; Worker `ASSISTANT="1"` allows only the
 additional field-job POST route. Keep all three settings aligned. This opt-in
 is separate from explicit read-only `runtime.voice` configuration.
+
+## Optional Arduino panel
+
+Set `VALMET_PUBLIC_ARDUINO=1` and a private `LIVE_TOKEN_FILE` to enable the board
+API and visible panel. Public startup requires a device token of at least 32
+characters. Browser panel actions require the assistant mode too. The main
+deployment enables both; the review enables neither. Known claim/heartbeat
+requests authenticate before creating or changing board state. Device input is
+bounded and checked, and the state reports heartbeat age so stale connections
+cannot appear online indefinitely.
+
+The board is not connected yet: the live panel correctly reports offline and
+no heartbeat. It displays synthetic workbook plant signals; a connected Arduino
+supplies real touch/button input. Optional Tiger Data and Snowflake stores are
+unconfigured. See [board setup](../arduino/README.md) and the
+[host guide](../distribution/host/README.md#public-arduino-connection) for the
+private device config and dedicated encrypted transport.

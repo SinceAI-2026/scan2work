@@ -33,6 +33,9 @@
 .fault-panel-actions{display:grid;grid-template-columns:1fr 1fr;gap:6px}
 .fault-panel-actions button{min-height:30px;padding:4px 6px;border:1px solid var(--vs-border,#d6dccd);border-radius:7px;background:#fff;color:var(--vs-active,#254c38);font:inherit;font-size:11px;font-weight:600;cursor:pointer}
 .fault-panel-actions button:hover{background:var(--vs-hover,#e7ecdf)}
+.fault-panel-actions button:disabled{opacity:.5;cursor:default}
+#fp-error:empty{display:none}
+#fp-error{color:var(--terracotta,#c64c38)}
 @keyframes fp-blink{to{opacity:.35}}
 @media (prefers-reduced-motion:reduce){.fault-panel,.fault-panel[data-open=false],.fault-panel>*{transition:none}.fault-panel-dot{animation:none!important}}
 @media (max-width:650px){.fault-panel{position:fixed;top:110px;left:auto;right:12px;width:min(280px,calc(100vw - 24px));transform-origin:top right}}

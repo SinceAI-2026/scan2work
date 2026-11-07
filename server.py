@@ -30,6 +30,9 @@ PUBLIC_DEMO = os.environ.get("VALMET_PUBLIC_DEMO") == "1"
 # Opt-in for the hosted demo: show the voice assistant and keep a shared inspection job log (field jobs only;
 # scene edits and library writes stay read-only). mcp_server.py on the same host writes the same log.
 PUBLIC_ASSISTANT = PUBLIC_DEMO and os.environ.get("VALMET_PUBLIC_ASSISTANT") == "1"
+PUBLIC_ARDUINO = PUBLIC_DEMO and os.environ.get("VALMET_PUBLIC_ARDUINO") == "1"
+PUBLIC_BOARD_GETS = {'/api/live/board', '/api/live/board/events'}
+PUBLIC_BOARD_POSTS = {'/api/live/board/claim', '/api/live/board/heartbeat', '/api/live/board/action'}
 PUBLIC_FIELD_TEXT_LIMIT = 1000   # characters per note, step result or summary sent from the public site
 PUBLIC_BODY_LIMIT = 16 * 1024
 _PUBLIC_WORK_SLOTS = threading.BoundedSemaphore(2)
@@ -88,6 +91,7 @@ def served_manifest():
         manifest['runtime'] = {**(manifest.get('runtime') or {}), 'public_demo': True,
             'offline': True, 'external_models_enabled': False, 'shared_writes_enabled': False,
             'voice_assistant': PUBLIC_ASSISTANT, 'field_jobs_enabled': PUBLIC_ASSISTANT,
+            'arduino_enabled': PUBLIC_ARDUINO, 'arduino_actions_enabled': PUBLIC_ARDUINO and PUBLIC_ASSISTANT,
             'install_url': public_install_url()}
     # With --assistant and no explicit agent override, preserve the upstream
     # Ilkka opt-in. An explicit (even empty) agent setting remains authoritative.
@@ -416,15 +420,27 @@ class TwinRequestHandler(SimpleHTTPRequestHandler):
 
     def _live(self, method: str, path: str, body: dict):
         """The Arduino fault panel (with Tiger Data and Snowflake): all of it lives in live/, imported on first use."""
-        if PUBLIC_DEMO:
+        if PUBLIC_DEMO and not PUBLIC_ARDUINO:
             # Even a state GET can log a completed board task. Do not import the
             # optional store module (or discover its credentials) in this mode.
             return self._public_read_only()
+        if PUBLIC_DEMO:
+            allowed = PUBLIC_BOARD_GETS if method == 'GET' else PUBLIC_BOARD_POSTS
+            if path not in allowed:
+                return self._send_json({'error': 'Unknown board endpoint'}, 404)
+            if path == '/api/live/board/action' and not PUBLIC_ASSISTANT:
+                return self._public_read_only()
+            from live.security import require_public_token
+            try:
+                require_public_token()
+            except ValueError as error:
+                return self._send_json({'error': str(error)}, 503)
         try:
             from live import board as live_board
         except Exception as err:  # noqa: BLE001 - the panel is optional; the twin works without it
             return self._send_json({"error": f"fault panel unavailable: {err}"}, 503)
-        out = live_board.handle(method, path, body, FIELD, (self.headers.get("X-Live-Token") or "").strip())
+        out = live_board.handle(method, path, body, FIELD, (self.headers.get("X-Live-Token") or "").strip(),
+                                **({'public': True} if PUBLIC_DEMO else {}))
         return self._send_json(*(out or ({"error": "Unknown endpoint"}, 404)))
 
     def do_GET(self):
@@ -520,6 +536,8 @@ class TwinRequestHandler(SimpleHTTPRequestHandler):
     def do_POST(self):
         parsed = urlparse(self.path)
         public_posts = {'/api/copilot/diagnose', '/api/work-orders/draft'} | ({'/api/field-jobs'} if PUBLIC_ASSISTANT else set())
+        if PUBLIC_ARDUINO:
+            public_posts |= PUBLIC_BOARD_POSTS
         if PUBLIC_DEMO and parsed.path not in public_posts:
             return self._public_read_only()
         try:
@@ -617,6 +635,9 @@ class TwinRequestHandler(SimpleHTTPRequestHandler):
 
 
 def run_server(port: int = 8765, host: str = "127.0.0.1"):
+    if PUBLIC_ARDUINO:
+        from live.security import require_public_token
+        require_public_token()
     mimetypes.add_type("application/octet-stream", ".bin")
     mimetypes.add_type("application/octet-stream", ".gspl")
     mimetypes.add_type("application/octet-stream", ".ply")

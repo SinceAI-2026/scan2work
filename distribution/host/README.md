@@ -5,7 +5,8 @@ do not create DNS, public storage, tunnels or accounts. Read
 `/etc/vast-agents-guide.md` on the actual instance before using them. They require
 its existing supervisor, Caddy binary and portal logging helper, plus Python 3.12.
 
-The application is explicitly public and read-only at the server. It uses its
+The application is explicitly public and read-only by default, with separate
+opt-ins for shared inspection jobs and the Arduino panel. It uses its
 own release installation, logs, supervisor programs and Caddy process. The
 instance's management `caddy`, `instance_portal`, `tunnel_manager`, existing jobs,
 `/etc/portal.yaml` and shared environment must remain untouched.
@@ -66,7 +67,7 @@ three Scan2Work programs; never stop all supervisor services.
 
 This instance reports `workspace_is_volume=false`. Files survive a normal
 stop/start but are lost on recycle/destroy. Keep release archives and deployment
-templates off-host; the public preview has no irreplaceable visitor records.
+templates and any shared inspection job log off-host before retiring the instance.
 Use a new immutable release directory for updates and retain the previous one
 until verification passes. The templates' versioned paths must be changed
 deliberately when deploying another release.
@@ -75,6 +76,46 @@ For an existing deployment, install and verify the new release first, then updat
 only `run-service.sh` and restart `scan2work-baseline` and `scan2work-review`.
 Keep the previous wrapper for rollback. The Caddy process, ports and Workers
 need no change when the upstream listeners stay the same.
+
+### Update hosted code without replacing release data
+
+For a code-only fix, unpack a checksum-verified source archive into a **new**
+directory under `/workspace/scan2work/services/`. The archive's source revision
+and inventory must identify that snapshot. Set `SCAN2WORK_CODE_DIR` to its code
+root in each web program's supervisor `environment` line. The wrapper then uses
+that code with the existing 0.1.1 Python environment and selected data directory;
+the release's `app/`, archives and datasets stay unchanged. Check any new Python
+requirements before using this approach.
+
+For the main site's read-only ElevenLabs widget, add these non-secret settings
+to **only** `scan2work-baseline` (combine them with its existing `PROC_NAME` and
+`SCAN2WORK_CODE_DIR` values):
+
+```ini
+VALMET_VOICE_AGENT_ID="agent_5501m6v02k69e2r8fwc0hznmfda5",VALMET_VOICE_AGENT_NAME="Ilkka",VALMET_VOICE_MCP_URL="https://scan2work.app/mcp"
+```
+
+Set `VALMET_VOICE_AGENT_ID=""` on the extraction review to leave voice off there.
+The MCP bearer token never belongs in these public widget settings. The explicit
+agent ID enables the widget without `--assistant`, shared jobs or backend model
+calls. Configure the cloud agent separately as described below.
+
+Back up the deployed wrapper and supervisor configuration first. Validate the
+wrapper with `bash -n`, then apply only the changed web programs:
+
+```sh
+supervisorctl reread
+supervisorctl update scan2work-baseline scan2work-review
+```
+
+Verify the main manifest's `runtime.voice.enabled=true` and
+`runtime.voice.service_mode=read_only` (or `shared_jobs` when the assistant flag
+is enabled), the review's voice setting remains false,
+and both catalogs retain their expected counts. Reload the public page and check
+the visible widget as well as a text interaction; a manifest flag alone is not
+proof that ElevenLabs loaded. To roll back, restore both backups and apply those
+same two supervisor programs. Do not restart the proxy or MCP tunnel for a web
+code update.
 
 ## Voice assistant (Ilkka) and shared inspection jobs
 
@@ -117,3 +158,42 @@ an existing log while validating the deployment.
 Shared mode deliberately exposes one demonstration job log to every visitor.
 For a fresh scenario use a separate prepared data copy and keep the old log.
 Never enable it accidentally by changing the general scene-write setting.
+
+## Public Arduino connection
+
+The hardware module displays synthetic workbook fault status and accepts the
+board's A0 touch/button input. It does not control plant equipment. To enable it
+on the main hosted app, add this second exact line to `deploy/assistant.env`:
+
+```text
+VALMET_PUBLIC_ASSISTANT=1
+VALMET_PUBLIC_ARDUINO=1
+```
+
+Keep a distinct random device token (at least 32 characters) in
+`/workspace/scan2work/private/arduino-token`, mode 600, parent directory mode 700.
+The baseline wrapper exports its path as `LIVE_TOKEN_FILE`; the secret is never
+embedded in the scene, browser config, public download or repository. The
+server refuses public Arduino startup without this credential. Give the same
+value privately to the board in its `board.env`, with
+`PLANT_API=https://scan2work.app`. It is not the ElevenLabs MCP credential.
+
+Copy `board-tunnel.sh` to the deployment directory, validate it with `bash -n`,
+and install `supervisor-board.conf` as a separate supervisor configuration.
+Register only `scan2work-board-tunnel`. It provides encrypted access to the
+baseline listener, allowing the device token to travel over HTTPS on both
+legs. Set Worker `ARDUINO="1"` and `ARDUINO_ORIGIN` to its returned HTTPS URL.
+Keep the existing MCP tunnel running. If the board tunnel restarts, its URL may
+change and the Worker binding must be updated.
+
+The panel should stay visible with **Board offline** until a real authenticated
+heartbeat arrives. Its latest touch input and heartbeat age describe the board;
+the plant signal bars remain workbook-derived. Optional Tiger Data / Snowflake
+stores show unconfigured until supplied separately. The review process does not
+receive Arduino flags or the private token.
+
+For rollback, restore the backed-up web/MCP supervisor configuration, wrappers
+and `assistant.env`, then apply only the named services that changed. Restore
+the matching Worker bindings and remove only the newly added board tunnel if
+rolling back Arduino. Preserve the shared job log, device token and old source
+snapshots; never reset operator history as part of rollback.

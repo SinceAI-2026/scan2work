@@ -80,9 +80,12 @@ Take apart is ported from Mikael Lehtonen's scan2service (`web/parts.js`) via Si
 
 ## Voice assistant (ElevenLabs agent Ilkka)
 
-The [public MCP and widget setup](voice-mcp.md) describes the current
-branch’s authenticated endpoint, independent voice opt-in, and the settings
-Wael needs to apply in ElevenLabs. The immutable 0.1.1 installer remains offline.
+Ilkka is enabled on the [main hosted demo](https://scan2work.app/) independently
+of the offline backend. The [public MCP and widget setup](voice-mcp.md)
+records the deployment and the separate cloud-agent settings managed in Wael's
+ElevenLabs workspace. The main hosted app enables the shared job workflow below;
+the review site and immutable 0.1.1 installer keep voice off. Public demo jobs
+are shared synthetic records, so another visitor can see their progress.
 
 Select **Call Ilkka for support** at the bottom of the viewer. Ilkka runs on `gemini-3.5-flash`, answers in short radio-style replies, and is told which equipment is selected in the viewer, so "what's wrong with this one?" needs no tag.
 
@@ -107,7 +110,7 @@ ngrok http 8767                                                      # public HT
 .venv/bin/python -m scripts.build_vale_kb                            # the agent's knowledge base, web/data/vale_kb/*.md
 ```
 
-ElevenLabs calls MCP servers from its cloud, so the agent needs a public HTTPS tunnel to port 8767. ngrok works; ElevenLabs could not reach a Cloudflare quick tunnel in testing. Requests through a tunnel must carry `Authorization: Bearer <FIELD_ATLAS_MCP_TOKEN>`. Store the token in ElevenLabs as a workspace secret, with no trailing newline. For this voice integration, point the tunnel at `mcp_server.py` only; the normal writable `server.py` routes have no authentication. The separate [public preview mode](public-demo.md) disables shared writes and uses an isolated prepared dataset. Voice is off by default; the [explicit voice configuration](voice-mcp.md) enables the widget separately after its agent and public MCP connection are verified.
+ElevenLabs calls MCP servers from its cloud, so the agent needs a public HTTPS tunnel to port 8767. ngrok works; ElevenLabs could not reach a Cloudflare quick tunnel in testing. Requests through a tunnel must carry `Authorization: Bearer <FIELD_ATLAS_MCP_TOKEN>`. Store the token in ElevenLabs as a workspace secret, with no trailing newline. For this voice integration, point the tunnel at `mcp_server.py` only; the normal writable `server.py` routes have no authentication. By default, [public preview mode](public-demo.md) disables shared writes and uses an isolated prepared dataset. Voice is off by default; the [explicit voice configuration](voice-mcp.md) enables the widget separately after its agent and public MCP connection are verified.
 
 ## Another dataset
 

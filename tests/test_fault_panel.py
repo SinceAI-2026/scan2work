@@ -90,6 +90,45 @@ class FaultPanelTests(unittest.TestCase):
         self.assertIsNone(panel.handle("GET", "/api/assets", None, self.field))
         self.assertEqual(self.call("POST", "/action", {"action": "explode"})[1], 400)
 
+    def test_public_requires_private_token_before_constructing_board(self):
+        with mock.patch.dict(os.environ, {}, clear=True), mock.patch.object(panel, 'Board') as constructor:
+            self.assertEqual(panel.handle('GET', '/api/live/board', {}, self.field, public=True)[1], 503)
+            constructor.assert_not_called()
+        with mock.patch.dict(os.environ, {'LIVE_TOKEN': 'fixture-device-' * 4}, clear=True), mock.patch.object(panel, 'Board') as constructor:
+            for sub in ('claim', 'heartbeat'):
+                self.assertEqual(panel.handle('POST', '/api/live/board/' + sub, {}, self.field, 'wrong', public=True)[1], 401)
+            constructor.assert_not_called()
+
+    def test_authenticated_fixture_heartbeat_has_freshness_and_expires(self):
+        token = 'fixture-device-' * 4
+        with mock.patch.dict(os.environ, {'LIVE_TOKEN': token}, clear=True), \
+             mock.patch.object(panel.tiger, 'insert_heartbeat'), mock.patch.object(panel.snowflake, 'write_later'), \
+             mock.patch.object(panel.time, 'time', return_value=100):
+            state, _ = panel.handle('GET', '/api/live/board', {}, self.field, public=True)
+            self.assertFalse(state['board_online']); self.assertIsNone(state['heartbeat_age_s'])
+            touch = {'swing': 123, 'base': 30, 'touched': True}
+            state, code = panel.handle('POST', '/api/live/board/heartbeat', {'touch': touch}, self.field, token, public=True)
+            self.assertEqual(code, 200); self.assertTrue(state['board_online'])
+            self.assertEqual((state['last_seen_unix'], state['heartbeat_age_s'], state['touch']), (100, 0, touch))
+            self.assertEqual(state['telemetry_source'], 'Valmet builder pack (synthetic)')
+            with mock.patch.object(panel.time, 'time', return_value=106):
+                stale, _ = panel.handle('GET', '/api/live/board', {}, self.field, public=True)
+                self.assertFalse(stale['board_online']); self.assertEqual(stale['heartbeat_age_s'], 6)
+
+    def test_public_rejects_malformed_touch_before_claiming_or_storing(self):
+        token = 'fixture-device-' * 4
+        with mock.patch.dict(os.environ, {'LIVE_TOKEN': token}, clear=True), mock.patch.object(panel, 'Board') as constructor:
+            for touch in ([], {'swing': float('nan')}, {'swing': -1}, {'base': 65536}, {'touched': 'yes'}, {'secret': 'x'}):
+                self.assertEqual(panel.handle('POST', '/api/live/board/heartbeat', {'touch': touch}, self.field, token, public=True)[1], 400)
+            constructor.assert_not_called()
+
+    def test_public_store_errors_do_not_disclose_connection_details(self):
+        with mock.patch.dict(os.environ, {'LIVE_TOKEN': 'fixture-device-' * 4}, clear=True), \
+             mock.patch.object(panel.tiger, 'status', return_value={'configured': True, 'connected': False, 'error': 'private-connection-details'}):
+            state, code = panel.handle('GET', '/api/live/board', {}, self.field, public=True)
+            self.assertEqual(code, 200)
+            self.assertEqual(state['stores']['tiger']['error'], 'Connection unavailable')
+
 
 if __name__ == "__main__":
     unittest.main()

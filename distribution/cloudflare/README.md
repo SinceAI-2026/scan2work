@@ -37,8 +37,9 @@ indexes. Downloads do not depend on the demo host. See
 [release publication](../../docs/cloudflare-r2.md) for immutable uploads.
 
 Run `node --test distribution/cloudflare/proxy.test.mjs` from the repository root.
-After deploying, verify the manifest, 206 video range response, blocked shared
-writes, actual room rendering, navigation, and the installer download URL.
+After deploying, verify the manifest, 206 video range response, enabled job
+actions, blocked scene/library writes, actual room rendering, navigation, and
+the installer download URL. The review site's job writes remain disabled.
 
 ## Optional public MCP route
 
@@ -55,3 +56,23 @@ checks. This is a demo transport, not a persistent named tunnel. The existing
 management tunnel, Caddy and scene proxy do not need changes.
 
 See [voice/MCP setup](../../docs/voice-mcp.md) for the ElevenLabs handoff.
+
+## Arduino fault panel
+
+Set `ARDUINO="1"` and `ARDUINO_ORIGIN` to the dedicated HTTPS tunnel serving the
+baseline web process. The backend separately requires `VALMET_PUBLIC_ARDUINO=1`
+and a private `LIVE_TOKEN_FILE`. Public board actions also use the shared job
+workflow, so enable `ASSISTANT="1"` with matching viewer/MCP settings.
+
+The Worker accepts only GET `board` / `board/events` and POST `board/claim`,
+`board/heartbeat`, `board/action` under `/api/live/`. The device's `X-Live-Token`
+goes only to the HTTPS claim/heartbeat routes; cookies, bearer credentials and
+query strings are discarded. No secret belongs in Worker plaintext vars or
+browser runtime data. The existing MCP and ordinary scene origins remain
+separate. If the dedicated board tunnel restarts, update `ARDUINO_ORIGIN`.
+
+Verify a device without its token is rejected, public state says offline until
+a real heartbeat arrives, and the panel's job controls work. Exercise successful
+heartbeat handling against an isolated fixture rather than impersonating a
+connected device on the live demo. The board's Python client sets a descriptive
+User-Agent because Cloudflare may reject default automated client headers.
