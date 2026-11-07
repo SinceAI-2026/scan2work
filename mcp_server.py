@@ -20,7 +20,7 @@ from pipeline import field_service, retrieval
 
 TOKEN = os.environ.get("FIELD_ATLAS_MCP_TOKEN", "")
 INFO = {"name": "field-atlas", "version": "1.0"}
-INSTRUCTIONS = ("Field Atlas equipment room. Look equipment up by tag (CV-003, P-001), read its status and procedure, "
+INSTRUCTIONS = ("Scan2Work equipment room. Look equipment up by tag (CV-003, P-001), read its status and procedure, "
                 "and keep the technician's job: start_job, complete_check for each step (safety first), add_note, close_job.")
 SERVICE: field_service.FieldService | None = None
 
@@ -94,7 +94,7 @@ def main(port: int = 8767):
     global SERVICE
     twin = json.loads((C.OUT_DIR / "digital_twin.json").read_text())
     SERVICE = field_service.FieldService(twin, retrieval.load_saved())
-    print(f"Field Atlas MCP on http://127.0.0.1:{port}/mcp ({len(SERVICE.assets)} registered assets; "
+    print(f"Scan2Work MCP on http://127.0.0.1:{port}/mcp ({len(SERVICE.assets)} registered assets; "
           f"{'token set' if TOKEN else 'no FIELD_ATLAS_MCP_TOKEN: local requests only'})", flush=True)
     ThreadingHTTPServer(("127.0.0.1", port), Handler).serve_forever()
 

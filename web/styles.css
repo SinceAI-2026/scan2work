@@ -122,3 +122,6 @@ button.proposal-card .prop-meta span { display: block; overflow-wrap: anywhere; 
 .proposal-review-list button[aria-pressed=true]{border-color:#c87544;background:#f9eadb}.proposal-review-list small{display:block;font-size:10px;color:#657467;margin-top:4px}
 .proposal-review-detail{display:grid;gap:8px;padding-top:10px;border-top:1px solid #bdcaba}.proposal-review-detail h3{font-size:15px}.proposal-overlaps{display:grid;gap:4px}.proposal-review-detail a{text-align:center;text-decoration:none}
 .proposal-review-open .route-map-panel{display:none}.proposal-review-open .navigation-hud{max-width:calc(100% - 375px)}
+
+/* Scan2Work brand: corner-bracket mark and serif wordmark in the top bar. */
+.brand{display:inline-flex;align-items:center;gap:9px}.brand-mark{width:20px;height:20px;color:#f3f1ea;flex-shrink:0}.topbar .brand-name{font-family:Georgia,"Times New Roman",serif;font-weight:400;font-size:19px;letter-spacing:0;color:#f3f1ea}

@@ -55,7 +55,7 @@ export function exportRoomIfc(assets, walls, meta, timestamp = new Date(), deriv
   const model = add("IFCGEOMETRICREPRESENTATIONCONTEXT","$","'Model'",3,"0.00001",origin,"$");
   const body = add("IFCGEOMETRICREPRESENTATIONSUBCONTEXT","'Body'","'Model'","*","*","*","*",model,"$",".MODEL_VIEW.","$");
   const units = add("IFCUNITASSIGNMENT",tuple([add("IFCSIUNIT","*",".LENGTHUNIT.","$",".METRE.")]));
-  const project = add("IFCPROJECT",guid("project"),"$","'Field Atlas'",unverified ? quoted("Approximate envelopes only. Physical scale unverified; IFC metres are an assumed unit convention, not measured dimensions.") : "$","$","$","$",tuple([model]),units);
+  const project = add("IFCPROJECT",guid("project"),"$","'Scan2Work'",unverified ? quoted("Approximate envelopes only. Physical scale unverified; IFC metres are an assumed unit convention, not measured dimensions.") : "$","$","$","$",tuple([model]),units);
   const sitePlace=place("$"), buildingPlace=place(sitePlace), storeyPlace=place(buildingPlace), roomPlace=place(storeyPlace);
   const site=add("IFCSITE",guid("site"),"$","'Valmet'","$","$",sitePlace,"$","$",".ELEMENT.","$","$","$","$","$");
   const building=add("IFCBUILDING",guid("building"),"$","'Equipment room building'","$","$",buildingPlace,"$","$",".ELEMENT.","$","$","$");
@@ -175,7 +175,7 @@ export function exportRoomIfc(assets, walls, meta, timestamp = new Date(), deriv
   if (contextProducts.length) add("IFCRELCONTAINEDINSPATIALSTRUCTURE",guid("derived-context"),"$","'Derived geometry context'","$",tuple(contextProducts),room);
   return [
     "ISO-10303-21;","HEADER;",unverified ? "FILE_DESCRIPTION(('Approximate equipment room; scale unverified'),'2;1');" : "FILE_DESCRIPTION(('Scan-derived equipment room'),'2;1');",
-    `FILE_NAME('field-atlas-equipment-room.ifc','${timestamp.toISOString().slice(0,19)}',('Field Atlas'),('Valmet x Since AI'),'Field Atlas','Field Atlas','');`,
+    `FILE_NAME('scan2work-equipment-room.ifc','${timestamp.toISOString().slice(0,19)}',('Scan2Work'),('Valmet x Since AI'),'Scan2Work','Scan2Work','');`,
     "FILE_SCHEMA(('IFC4'));","ENDSEC;","DATA;",...rows,"ENDSEC;","END-ISO-10303-21;","",
   ].join("\n");
 }

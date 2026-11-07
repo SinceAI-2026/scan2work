@@ -465,7 +465,7 @@ def write_3dgs_ply(packed: np.ndarray, path) -> None:
              "f_dc_0", "f_dc_1", "f_dc_2", "opacity"]
     cols = [*xyz.T, *np.log(np.sqrt(np.clip(vals, 1e-12, None))).T, q[:, 1], q[:, 2], q[:, 3], q[:, 0],
             *((rgb - 0.5) / SH_C0).T, np.log(a / (1 - a))]
-    head = ("ply\nformat binary_little_endian 1.0\ncomment Field Atlas object refined from the walkthrough\n"
+    head = ("ply\nformat binary_little_endian 1.0\ncomment Scan2Work object refined from the walkthrough\n"
             f"element vertex {len(packed)}\n" + "".join(f"property float {k}\n" for k in names) + "end_header\n")
     with open(path, "wb") as f:
         f.write(head.encode())

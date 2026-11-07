@@ -1,6 +1,6 @@
 """Fault panel: the Linux (Python) half of the UNO Q app.
 
-The board shows the first broken thing in the Field Atlas twin until its job is done:
+The board shows the first broken thing in the Scan2Work twin until its job is done:
   - on start it claims the first item of the server's inspection queue (whatever data the server runs on);
   - once a second it sends a heartbeat (with its A0 touch pad level) and gets back what to show:
       fault        red blink, matrix: the worst signal's two bars, normal (dim) vs now (bright)
@@ -8,7 +8,7 @@ The board shows the first broken thing in the Field Atlas twin until its job is 
       done / clear green, matrix: a tick. A done task stays done until the board restarts (or a hold).
   - touch A0 (or bridge D13 to GND) briefly = acknowledge (the job starts), hold = claim the newest fault now.
 
-Settings: PLANT_API (the server's address, e.g. https://field-atlas.example.com or http://<laptop IP>:8765) and
+Settings: PLANT_API (the server's address, e.g. https://scan2work.example.com or http://<laptop IP>:8765) and
 LIVE_TOKEN (if the server sets one), from the environment or from board.env next to this file (see board.env.example).
 """
 import json

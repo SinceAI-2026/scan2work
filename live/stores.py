@@ -1,4 +1,4 @@
-"""The two online stores of the Arduino fault panel. Only live/ uses them; the rest of Field Atlas never imports
+"""The two online stores of the Arduino fault panel. Only live/ uses them; the rest of Scan2Work never imports
 this module and works the same without them.
 
 - Tiger Data (Postgres + TimescaleDB): the board's heartbeats (which fault it shows, its status, its A0 touch

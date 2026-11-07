@@ -1,4 +1,4 @@
-# AGENTS.md: working on Field Atlas
+# AGENTS.md: working on Scan2Work
 
 Instructions for coding agents (and humans) working in this repository. Read this before editing.
 

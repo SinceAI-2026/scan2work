@@ -1,4 +1,4 @@
-# Field Atlas presentation outline
+# Scan2Work presentation outline
 
 Seven slides, one per scoring criterion plus an opening and a close. Pair this outline with the [recording sequence](demo-sequence.md). Read every **[refresh]** value from the final run.
 

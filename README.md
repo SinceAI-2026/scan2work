@@ -1,6 +1,6 @@
-# Field Atlas
+# Scan2Work
 
-Field Atlas is a local industrial inspection demonstrator built from `Equipment Room.ply` and the Valmet synthetic builder workbook. It shows framed equipment proposals, collision-aware robot navigation, operating evidence, and a service report for the destination asset.
+Scan2Work is a local industrial inspection demonstrator built from `Equipment Room.ply` and the Valmet synthetic builder workbook. It shows framed equipment proposals, collision-aware robot navigation, operating evidence, and a service report for the destination asset.
 
 The workbook supplies a synthetic fault scenario. The demonstration does not establish that the real filmed equipment is faulty.
 

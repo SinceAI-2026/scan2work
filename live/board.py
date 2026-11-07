@@ -13,7 +13,7 @@ built from. It then sends a heartbeat every second and gets back what to show:
 A done task stays done; the board claims the newest fault the next time it starts (or on a hold). Tap = start the
 job (technician on site). The job itself is closed in the app as usual, which is what turns the board green.
 
-Self-contained: server.py routes /api/live/* here; nothing else in Field Atlas imports live/.
+Self-contained: server.py routes /api/live/* here; nothing else in Scan2Work imports live/.
 """
 from __future__ import annotations
 
