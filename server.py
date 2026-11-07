@@ -8,7 +8,6 @@ from __future__ import annotations
 import io
 import json
 import mimetypes
-import os
 import threading
 import time
 import zipfile
@@ -16,13 +15,14 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-# Serving a prepared demo must never silently spend API credits or load secrets.
-# Explicit VALMET_OFFLINE=0 is required to opt into the legacy API-enabled mode.
-os.environ.setdefault("VALMET_OFFLINE", "1")
+ROOT = Path(__file__).resolve().parent
+# Keep upstream defaults for normal Wael scenes. Imported/offline manifests must
+# be recognized before config imports, which may otherwise load credentials.
+from pipeline.runtime_policy import configure_server_runtime
+configure_server_runtime(ROOT)
 from pipeline import asset_export, decisions_client, field_service, retrieval, config as C
 from pipeline.asset_records import asset_for_api, route_for_api, UNMAPPED_NOTICE
 
-ROOT = Path(__file__).resolve().parent
 WEB_DIR = ROOT / "web"
 DATA_PATH = C.OUT_DIR / "digital_twin.json"
 EDITS_PATH = C.OUT_DIR / "scene_edits.json"   # isolated by the active dataset directory
@@ -99,7 +99,7 @@ FIELD_ACTIONS = {"start_job", "complete_check", "add_note", "close_job"}
 
 def load_data():
     global TWIN_DATA, ASSETS_BY_ID, ASSETS_BY_OBJ, RETRIEVER, FIELD
-    RETRIEVER = retrieval.load_saved(try_gemma=False)
+    RETRIEVER = retrieval.load_saved(try_gemma=not C.OFFLINE)
     with open(DATA_PATH, "r", encoding="utf-8") as f:
         TWIN_DATA = json.load(f)
     ASSETS_BY_ID = {a["asset_id"]: a for a in TWIN_DATA["assets"]}
