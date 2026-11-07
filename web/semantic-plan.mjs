@@ -121,6 +121,15 @@ export function bindSemanticPlan({snapshot, inspect, navigate, viewModel}) {
 
   function draw() {
     const meta=current.navigation.grid_meta;
+    const imported=current.assets.some(asset=>asset.source_region_id);
+    const floorAvailable=Boolean(current.derived_context?.observed_floor?.cells_xz?.length || current.assets.some(floorRegion));
+    const contextAvailable=Boolean(current.derived_context?.pipe_segments?.length);
+    showFloor.parentElement.hidden=!floorAvailable;
+    showPipes.parentElement.hidden=!contextAvailable;
+    for(const el of dialog.querySelectorAll("[data-floor-legend]"))el.hidden=!floorAvailable;
+    for(const el of dialog.querySelectorAll("[data-unreviewed-legend]"))el.hidden=!imported;
+    showAll.parentElement.lastChild.textContent=imported ? " Include small regions" : " Show all floor objects";
+    showOverhead.parentElement.lastChild.textContent=imported ? " Include overhead regions" : " Show overhead objects";
     const width=900, height=width*meta.nz/meta.nx, frame=mapFrame(width,height);
     project=(x,z)=>mapPoint(meta,width,height,x,z);
     svg.setAttribute("viewBox",`0 0 ${width} ${height}`);
@@ -145,9 +154,18 @@ export function bindSemanticPlan({snapshot, inspect, navigate, viewModel}) {
 
     const options={all:showAll.checked,raised:showOverhead.checked,floors:showFloor.checked,selectedId:selected?.id};
     const assets=current.assets.filter(asset=>regionVisible(asset,options)).map(visualGeometry);
-    counts.textContent=layerSummaryText(layerSummary(current.assets,options));
+    counts.textContent=layerSummaryText(layerSummary(current.assets,options),imported ? "regions" : "objects",imported ? "small" : "other");
     const pipes=current.derived_context?.pipe_segments || [];
-    document.getElementById("semantic-plan-context").textContent=`${walls.length} assumed wall guides · ${showPipes.checked ? pipes.length : 0} / ${pipes.length} fitted pipe segments · context is not additional extracted objects`;
+    const fittedTotal=current.assets.filter(asset=>bimCylinder(asset)).length,fittedVisible=assets.filter(asset=>bimCylinder(asset)).length;
+    document.getElementById("semantic-plan-context").textContent=imported
+      ? `${walls.length} assumed wall guides · ${showPipes.checked ? pipes.length : 0} / ${pipes.length} fitted pipe segments · context is not additional extracted objects`
+      : `${fittedVisible} / ${fittedTotal} fitted object cylinders shown · ${walls.length} wall guides`;
+    document.getElementById("semantic-plan-evidence-note").textContent=imported
+      ? "Observed floor is scan evidence, not a claim that every floor point is walkable. Grey envelopes have unverified labels and boundaries."
+      : "Original Wael object geometry and walkable simulation grid. Dimensions remain unverified.";
+    document.getElementById("semantic-plan-export-note").textContent=contextAvailable
+      ? "Approximate IFC includes region envelopes, unreviewed pipe fits, and assumed walls/slab. Floor sample counts are included as evidence, not a reconstructed surface."
+      : "Approximate IFC includes fitted object cylinders, equipment envelopes, and assumed walls/slab.";
     if (showPipes.checked) for(const pipe of pipes) {
       if(!pipe.start || !pipe.end) continue;
       const [x1,y1]=project(pipe.start[0],pipe.start[2]),[x2,y2]=project(pipe.end[0],pipe.end[2]);
@@ -196,7 +214,7 @@ export function bindSemanticPlan({snapshot, inspect, navigate, viewModel}) {
     svg.append(robot);
     const y=frame.y+frame.height+22;
     svg.append(svgNode("line",{x1:frame.x,y1:y,x2:frame.x+scale,y2:y,stroke:"#23383e","stroke-width":2}),
-      svgNode("text",{x:frame.x+scale+8,y:y+4,"font-size":13},current.navigation.scale_verified === false ? "1 scan unit (unverified)" : "1 m"),
+      svgNode("text",{x:frame.x+scale+8,y:y+4,"font-size":13},current.scaleUnverified || current.navigation.scale_verified === false ? "1 scan unit (unverified)" : "1 m"),
       svgNode("text",{x:frame.x+frame.width,y:y+4,"text-anchor":"end","font-size":13},"+Z ↑"));
     lastRoute=null;
     update(current.robot,current.journey);
@@ -234,7 +252,8 @@ export function bindSemanticPlan({snapshot, inspect, navigate, viewModel}) {
   go.addEventListener("click",()=>{dialog.close();navigate(selected);});
   document.getElementById("semantic-plan-export").addEventListener("click",()=>{
     const room=snapshot();
-    const data=exportRoomIfc(room.assets,room.walls,room.navigation.grid_meta,new Date(),room.derived_context);
+    const meta=room.scaleUnverified ? {...room.navigation.grid_meta,units:"unverified source units"} : room.navigation.grid_meta;
+    const data=exportRoomIfc(room.assets,room.walls,meta,new Date(),room.derived_context);
     const url=URL.createObjectURL(new Blob([data],{type:"application/step"}));
     const link=document.createElement("a");
     link.href=url;

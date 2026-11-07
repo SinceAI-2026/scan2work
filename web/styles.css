@@ -113,3 +113,12 @@ button.proposal-card .prop-meta span { display: block; overflow-wrap: anywhere; 
 /* Map in the top-right corner, under the view controls; the voice assistant widget has the bottom-right corner. */
 .route-map-panel{top:56px;bottom:auto;max-height:calc(100% - 140px);overflow-y:auto}
 @media(max-width:650px){.route-map-panel{top:140px;max-height:calc(100% - 230px)}}
+.proposal-review-panel{position:absolute;top:58px;right:16px;bottom:18px;z-index:29;width:min(330px,calc(100% - 32px));overflow:auto;background:#f6f7f0;color:#24372e;padding:14px;border:1px solid #bdcaba;border-radius:8px;box-shadow:0 8px 30px #0004;display:flex;flex-direction:column;gap:10px;font-size:12px}
+.proposal-review-heading{display:flex;justify-content:space-between;align-items:center}.proposal-review-heading button{border:0;background:none;font-size:24px;color:inherit}
+.proposal-review-note,.proposal-review-status{font-size:11px;line-height:1.45;color:#657467}
+.proposal-review-panel label{display:grid;gap:5px}.proposal-review-panel input{width:100%;padding:7px;border:1px solid #bdcaba;border-radius:4px}
+.proposal-review-list{display:grid;gap:4px;max-height:200px;min-height:90px;overflow:auto;flex-shrink:0}
+.proposal-review-list button,.proposal-overlaps button{padding:8px;text-align:left;border:1px solid #d5decf;border-radius:5px;background:white;color:inherit}
+.proposal-review-list button[aria-pressed=true]{border-color:#c87544;background:#f9eadb}.proposal-review-list small{display:block;font-size:10px;color:#657467;margin-top:4px}
+.proposal-review-detail{display:grid;gap:8px;padding-top:10px;border-top:1px solid #bdcaba}.proposal-review-detail h3{font-size:15px}.proposal-overlaps{display:grid;gap:4px}.proposal-review-detail a{text-align:center;text-decoration:none}
+.proposal-review-open .route-map-panel{display:none}.proposal-review-open .navigation-hud{max-width:calc(100% - 375px)}

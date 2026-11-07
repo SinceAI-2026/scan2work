@@ -31,9 +31,9 @@ export function layerSummary(assets,options) {
   return {visible:visible.length,total:assets.length,hiddenSmall:hidden.filter(a=>!floorRegion(a)&&!overhead(a)).length,
     hiddenOverhead:hidden.filter(overhead).length,hiddenFloor:hidden.filter(floorRegion).length};
 }
-export function layerSummaryText(summary) {
-  const parts=[`${summary.visible.toLocaleString()} / ${summary.total.toLocaleString()} regions shown`];
-  if(summary.hiddenSmall) parts.push(`${summary.hiddenSmall.toLocaleString()} small hidden`);
+export function layerSummaryText(summary,noun="regions",hiddenName="small") {
+  const parts=[`${summary.visible.toLocaleString()} / ${summary.total.toLocaleString()} ${noun} shown`];
+  if(summary.hiddenSmall) parts.push(`${summary.hiddenSmall.toLocaleString()} ${hiddenName} hidden`);
   if(summary.hiddenOverhead) parts.push(`${summary.hiddenOverhead.toLocaleString()} overhead hidden`);
   if(summary.hiddenFloor) parts.push(`${summary.hiddenFloor} floor patches hidden`);
   return parts.join(" · ");

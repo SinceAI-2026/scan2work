@@ -7,6 +7,7 @@ from pathlib import Path
 import numpy as np
 os.environ['VALMET_OFFLINE']='1'
 from pipeline import derived_context as D
+from pipeline import config as C
 
 
 class ContextUnitTests(unittest.TestCase):
@@ -35,7 +36,7 @@ class ContextUnitTests(unittest.TestCase):
         self.assertTrue(all(abs(p[0]-.5)>.2 for p in floor['cells_xz']))
 
 
-DATA=Path(__file__).resolve().parents[1]/'web/data'
+DATA=C.OUT_DIR
 @unittest.skipUnless((DATA/'derived_context.json').exists(),'run the imported scene context derivation')
 class ContextArtifactTests(unittest.TestCase):
     @classmethod

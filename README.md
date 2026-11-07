@@ -1,12 +1,14 @@
-# Field Atlas — expanded asset integration
+# Field Atlas — original scene and candidate review
 
-This fork combines Wael’s room viewer, navigation and service workflow with the expanded Field Atlas extraction bundle. It starts from [SinceAI-2026/Wael at ab777d3](https://github.com/SinceAI-2026/Wael/tree/ab777d3c94182780cc3528fe1373e5b79e3fd110).
+This fork includes [Wael’s upstream changes through 4286b4e](https://github.com/SinceAI-2026/Wael/tree/4286b4e47d7aa16be047558ba74ee357fc33d0f2). The main demo uses his supplied **504-object scene**, original photos, fitted equipment geometry, 30 procedural Excel bindings and walkthrough navigation. It preserves the original render buffers byte for byte.
 
-The imported scene contains **1,933 candidate regions**, including all **415 Linards regions**. Regions retain exact membership in the original Gaussian-splat file. This makes selecting, isolating and exporting an object consistent across the viewer and the asset library.
+The expanded extraction contains **1,933 candidate regions**, including all **415 Linards regions**. It is a separate review layer, not a replacement for the original catalog. Exact source-row correspondence connects proposals to original objects without changing their identities, device bindings or navigation. The full imported scene remains available separately for isolation and export.
 
-The 30 equipment records and fault scenarios come from Valmet’s **synthetic** Excel pack. Region boundaries and inherited labels remain unreviewed; more assigned points do not establish better recognition accuracy. The source scan’s physical scale is unverified.
+Equipment records and fault scenarios come from Valmet’s **synthetic** Excel pack. The original archive also contains borrowed telemetry profiles for auxiliary objects; these remain demonstration data. Model labels and candidate boundaries need review; more assigned points do not establish better recognition accuracy. Physical scale is unverified.
 
 ## Get the data
+
+Obtain Wael’s `field-atlas-data.zip` and extract it into its own directory. Its `web/data` folder supplies the original generated scene. Do not unpack it over the imported dataset.
 
 Download and extract `Field-Atlas-assets-2026-11-07.zip` from the [team’s shared asset folder](https://drive.google.com/drive/u/0/folders/14MMXTD37DJAzgkPp4029zU8tqayBF7OP). Keep the extracted directory structure intact. The bundle contains the room scan, exact object ownership, individual object files and available native video evidence. It does not contain the Excel workbook; use the supplied Valmet builder pack.
 
@@ -16,7 +18,7 @@ Generated scene data is excluded from Git. The importer creates this fork’s ow
 
 ## Run locally
 
-Python 3.10+ and a modern WebGL 2 browser are sufficient for the imported scene. No CUDA, AI credentials or model downloads are required for this path.
+Python 3.10+ and a modern WebGL 2 browser are sufficient for these prepared-data paths. No CUDA, AI credentials or model downloads are required.
 
 ```sh
 python3 -m venv .venv
@@ -27,16 +29,30 @@ python3 -m venv .venv
   --workbook /absolute/path/Valmet_Builder_Pack.xlsx \
   --target-region linards-BOX-0173
 
-VALMET_OFFLINE=1 .venv/bin/python server.py 8766
+.venv/bin/python -m pipeline.build_baseline_demo \
+  --original-data /absolute/path/original/web/data \
+  --proposal-data web/data \
+  --poses web/data/walk_poses.json \
+  --output /absolute/path/wael-baseline-data \
+  --full-view-url http://127.0.0.1:8768/
+
+VALMET_OFFLINE=1 VALMET_DATA_DIR=/absolute/path/wael-baseline-data \
+  .venv/bin/python server.py 8766
 ```
 
-Open [the local demo](http://127.0.0.1:8766/).
+Open [the main demo](http://127.0.0.1:8766/). In another terminal, serve the complete imported scene for candidate review:
+
+```sh
+VALMET_OFFLINE=1 .venv/bin/python server.py 8768
+```
+
+`VALMET_DATA_DIR` selects the dataset for both static files and APIs, including edits, service logs and library saves. Without it, the server uses `web/data`, which contains the imported scene. The baseline builder refuses an existing output directory and never replaces either input. Keep the chosen data-directory setting in your launch command.
 
 The importer validates the source PLY hash and the ownership array before generating the scene. Use `--source "/absolute/path/Equipment Room.ply"` when the original PLY is stored separately.
 
-`VALMET_OFFLINE=1` skips credential loading and prevents AI calls. In this mode, service explanations use deterministic logic and retrieval over the workbook. The optional upstream voice assistant and AI rebuilding workflow are separate integrations.
+`VALMET_OFFLINE=1` skips credential loading and prevents backend AI calls. Service explanations use archived outputs and deterministic retrieval over the workbook. New baseline object exports preserve the original GSID ownership, including its historical box filling, without rerunning refinement. The optional upstream voice assistant and AI rebuilding workflow are separate integrations.
 
-## What the import preserves
+## What the separate import preserves
 
 | Data | Imported behavior |
 | --- | --- |
@@ -55,6 +71,7 @@ CV-003 keeps Wael’s physical demo location. Native video evidence shows the or
 
 | Module | Responsibility |
 | --- | --- |
+| `pipeline/build_baseline_demo.py` | Preserve the original scene, recover native source-row exports and project candidate correspondence into a separate review catalog |
 | `pipeline/import_field_atlas.py` | Bundle adapter, source validation, coordinate conversion and exact ownership export |
 | `pipeline/derived_context.py` | Offline pipe fitting, observed floor, assumed wall guides and display geometry, without changing object membership |
 | `pipeline/knowledge.py` | Read equipment, telemetry, alarms, maintenance and documents from Excel |
@@ -63,16 +80,17 @@ CV-003 keeps Wael’s physical demo location. Native video evidence shows the or
 | `pipeline/asset_export.py` | Export individual objects to the reusable asset library |
 | `server.py` | Scene, service, library and editing endpoints |
 | `web/imported-assets.mjs` | Imported-region presentation and evidence helpers |
+| `web/proposal-review.mjs`, `web/proposal-review-data.mjs` | Optional candidate overlay, original-object correspondence, evidence and complete-review links |
 | `web/scene-layers.mjs` | Shared floor-plan/BIM visibility and display-proxy rules for class-free candidates |
 | `web/explode.mjs`, `web/take-apart.mjs` | Exact-membership separation and object inspection |
 
 The viewer uses Wael’s levelled Y-up coordinates. Native PLY exports retain the original coordinate frame and Gaussian properties. Integration metadata records the conversion; do not align objects by filenames or array order alone.
 
-The floor plan and geometry preview show large candidate regions even when their class is unknown. Visible/hidden counts and the small-region/overhead controls expose the full catalog. Preserved Linards names are normalized for display, with their unverified status retained. Oriented envelopes and fitted pipes are derived geometry, not new confirmed assets.
+In the separate imported view, the floor plan and geometry preview show large candidate regions even when their class is unknown. Visible/hidden counts and the small-region/overhead controls expose the full catalog. Preserved Linards names are normalized for display, with their unverified status retained. Oriented envelopes and fitted pipes are derived geometry, not new confirmed assets. The main baseline uses the original equipment geometry instead.
 
 Observed floor is a separate context layer from the green navigation mask. The four wall guides retain Wael’s configured room-boundary assumptions. Adding these visual layers does not enlarge the walkable grid or change object ownership.
 
-Wael’s original generated data was subsequently supplied as `field-atlas-data.zip` and inspected separately. It contains 504 assets across 24 classes, 471 linked source photos and 83 asset-attached cylinder geometries. The imported scene is a different segmentation, not a superset of those original objects: preserving the raw scan and Linards membership does not preserve Wael’s labels, grouping or evidence associations. Original and imported datasets must remain separate until an explicit correspondence and conflict policy is applied; object counts alone do not measure improvement.
+Wael’s original generated data contains 504 assets across 24 classes, 471 linked source photos and 83 asset-attached cylinder geometries. The imported scene is a different segmentation, not a superset: preserving the raw scan and Linards membership does not preserve Wael’s grouping or evidence associations. The baseline adapter therefore keeps both inventories separate, with review-only correspondence links. Object counts alone do not measure improvement.
 
 See the [original-data audit](docs/original-data-audit.md) for source-row correspondence, grouping changes, synthetic mapping differences and the original browser's walkthrough-based floor expansion. To repeat the read-only comparison, extract the archive into a separate directory, then run:
 
@@ -105,6 +123,8 @@ node tests/test_journey.mjs
 node tests/test_render_quality.mjs
 ```
 
+To test a staged baseline instead of the default imported data, set `VALMET_DATA_DIR=/absolute/path/wael-baseline-data` on the Python test command. Artifact checks apply to their dataset; the preserved imported scene can still be tested independently. The browser walkthrough verifies the original CV-003 route, candidate-overlay isolation, reversible object removal, background native export and IFC validation; see [technical notes](docs/technical-notes.md).
+
 Imported-scene validation is documented in [technical notes](docs/technical-notes.md). The upstream hand-labelled sample, 85% label score, 29/29 requirement score and refinement benchmarks were measured on a different generated scene. They must not be reported as results for these 1,933 imported regions.
 
 The imported artifact retains all **711,568 owned source rows** in the rendered scene, including **103,378 baseline rows**. It provides grid-validated routes to **28 of 30** mapped devices, including CV-003; CV-011 and P-006 have no supported destination in the reachable floor component and remain unavailable. Distances are uncalibrated scan units.
@@ -114,7 +134,7 @@ Current limits:
 - Candidate extraction is incomplete. Objects can be fragmented, merged or partially captured, and most additional regions have no native-video identity yet.
 - Exact membership means reproducible extraction, not correct segmentation or complete geometry.
 - The viewer is a scan-based demonstrator. Importing more regions does not reconstruct missing surfaces or produce a measured BIM.
-- Navigation checks the derived occupancy grid. Unknown floor remains unavailable; the model does not prove real-world clearance or autonomous robot safety.
-- Only the imported mode is guaranteed to avoid paid AI calls. The original `pipeline.run` and `scripts/check.sh` can invoke configured services and replace data; run those only deliberately.
+- The main demo restores Wael’s walkthrough-expanded navigation policy; the separate import keeps its conservative observed-floor grid. Neither policy proves real-world clearance or robot safety, and their assumed robot dimensions differ.
+- These prepared-data workflows run offline. The original `pipeline.run` and `scripts/check.sh` can invoke configured services and replace data; only the user runs them deliberately.
 
-Wael’s original setup and optional voice/refinement workflows remain available in the [upstream README](https://github.com/SinceAI-2026/Wael/blob/ab777d3c94182780cc3528fe1373e5b79e3fd110/README.md). Use the import instructions above for this expanded dataset.
+Wael’s original setup and optional voice/refinement workflows remain available in the [upstream README](https://github.com/SinceAI-2026/Wael/blob/4286b4e47d7aa16be047558ba74ee357fc33d0f2/README.md). Use the explicit dataset launch commands above for this integration.

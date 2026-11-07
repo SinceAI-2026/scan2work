@@ -105,9 +105,9 @@ export function createTakeApart(ctx) {
     const busy = Boolean(job);
     const files = entry?.files || {};
     const tag = asset.tag ? `${esc(asset.tag)} · ${esc(asset.asset_id)} · ${esc(asset.condition_state)}` : "Not in the Excel pack";
-    const exact = Boolean(asset.source_region_id || asset.membership_mode === "exact-source-rows");
+    const exact = Boolean(ctx.state.exactMembership || asset.source_region_id || asset.membership_mode === "exact-source-rows");
     const facts = entry ? describe(entry)
-      : exact ? `<p class="apart-facts">${busy ? `Exporting ${esc(asset.id)}${job?.seconds ? ` (${job.seconds} s so far)` : ""}. You can close this card; the save carries on.` : `${plural(asset.n_gaussians || 0, "source Gaussian")} · ${esc(asset.review_status || "unreviewed")}. Save exports this exact region for your team.`} Original membership is retained; missing geometry is not rebuilt.</p>`
+      : exact ? `<p class="apart-facts">${busy ? `Exporting ${esc(asset.id)}${job?.seconds ? ` (${job.seconds} s so far)` : ""}. You can close this card; the save carries on.` : `${plural(asset.exact_owned_gaussians ?? asset.n_gaussians ?? 0, "source Gaussian")} · ${esc(asset.review_status || (ctx.state.baseline ? "original room membership" : "unreviewed"))}. Save exports this exact region for your team.`} Original membership is retained; missing geometry is not rebuilt.</p>`
       : busy ? `<p class="apart-facts">Cutting ${esc(asset.id)} out of the scan and fitting it to the walkthrough photos. This takes 1 to 3 minutes${job?.seconds ? ` (${job.seconds} s so far)` : ""}. You can close this card; the save carries on.</p>`
       : `<p class="apart-facts">Showing the scan. Save to library cuts this object out and refines it against the walkthrough photos (1 to 3 minutes).</p>`;
     card.innerHTML = `

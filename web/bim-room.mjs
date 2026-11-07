@@ -53,6 +53,12 @@ export function createBimRoom({camera, controls, container, onSelect = () => {}}
     displayedAssets = items;
     imported = items.some(a => a.source_region_id);
     context = derived || {};
+    settings.floor.parentElement.hidden=!(context.observed_floor?.cells_xz?.length || items.some(floorRegion));
+    settings.contextPipes.parentElement.hidden=!context.pipe_segments?.length;
+    for(const el of container.querySelectorAll("[data-floor-legend]"))el.hidden=settings.floor.parentElement.hidden;
+    for(const el of container.querySelectorAll("[data-unreviewed-legend]"))el.hidden=!imported;
+    settings.pipes.parentElement.lastChild.textContent=imported ? " Include overhead regions" : " All pipes and overhead";
+    settings.all.parentElement.lastChild.textContent=imported ? " Include small regions" : " All equipment";
     disposeGroup(contextPipes); disposeGroup(observedFloor);
     disposeGroup(room);
     disposeGroup(equipment);
@@ -170,8 +176,14 @@ export function createBimRoom({camera, controls, container, onSelect = () => {}}
     }
     const count=[...assets.values()].filter(a=>a.mesh.visible).length;
     const summary=layerSummary(displayedAssets || [],options);
-    document.getElementById("bim-counts").textContent=layerSummaryText({...summary,visible:count});
-    document.getElementById("bim-context-counts").textContent=`${settings.walls.checked ? walls.length : 0} wall guides · ${settings.contextPipes.checked ? contextPipes.children.length : 0} / ${contextPipes.children.length} pipe fits. Context is separate from extracted regions.`;
+    const hidden=[...assets.values()].filter(a=>!a.mesh.visible).map(a=>a.asset);
+    document.getElementById("bim-counts").textContent=layerSummaryText({...summary,visible:count,
+      hiddenSmall:hidden.filter(a=>!floorRegion(a)&&!overhead(a)).length,
+      hiddenOverhead:hidden.filter(overhead).length,hiddenFloor:hidden.filter(floorRegion).length},imported ? "regions" : "objects",imported ? "small" : "other");
+    const fitted=[...assets.values()].filter(({asset})=>bimCylinder(asset));
+    document.getElementById("bim-context-counts").textContent=imported
+      ? `${settings.walls.checked ? walls.length : 0} wall guides · ${settings.contextPipes.checked ? contextPipes.children.length : 0} / ${contextPipes.children.length} pipe fits. Context is separate from extracted regions.`
+      : `${fitted.filter(({mesh})=>mesh.visible).length} / ${fitted.length} fitted object cylinders shown · ${settings.walls.checked ? walls.length : 0} wall guides`;
   }
 
   function resetCamera() {

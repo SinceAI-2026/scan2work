@@ -84,7 +84,7 @@ function filter() {
 
 function status(e) {
   if (e.movable) return "movable object · no telemetry";
-  if (e.membership_mode === "exact-source-rows" || e.condition_state === "unknown") return "unreviewed region · scale unverified";
+  if (e.source_region_id || e.condition_state === "unknown") return "unreviewed region · scale unverified";
   if (!e.tag) return "facility item · no device record";
   return `health ${e.health_score ?? "–"} · ${words(e.condition_state)}${e.issue_code && e.issue_code !== "NORMAL" ? ` · ${words(e.issue_code)}` : ""}`;
 }

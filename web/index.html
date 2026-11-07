@@ -20,7 +20,7 @@
   <div id="arrival-announcement" class="visually-hidden" role="status" aria-live="polite"></div>
   <header class="topbar">
     <div class="topbar-left"><span class="diamond-logo">◆</span><strong class="brand-name">Field Atlas</strong><span class="room-name">Equipment Room</span><span id="room-object-count" class="room-object-count"></span></div>
-    <div class="topbar-right"><a class="btn-export topbar-link" href="library.html">Asset library</a><button id="btn-inspector" class="btn-export" aria-expanded="false">Equipment details</button></div>
+    <div class="topbar-right"><button id="btn-review-proposals" class="btn-export" aria-expanded="false" hidden>Review candidates</button><a class="btn-export topbar-link" href="library.html">Asset library</a><button id="btn-inspector" class="btn-export" aria-expanded="false">Equipment details</button></div>
   </header>
   <main class="workspace">
     <aside class="sidebar left-sidebar">
@@ -83,8 +83,8 @@
             <span><i style="background:#e7a05a"></i>Vessels</span>
             <span><i style="background:#aa7bd1"></i>Movables</span>
             <span><i style="background:#ee705e"></i>Target</span>
-            <span><i style="background:#78909b"></i>Unreviewed envelopes</span>
-            <span><i style="background:#a89e6a"></i>Observed floor samples</span>
+            <span data-unreviewed-legend><i style="background:#78909b"></i>Unreviewed envelopes</span>
+            <span data-floor-legend><i style="background:#a89e6a"></i>Observed floor samples</span>
           </div>
         </div>
         <div id="hud-overlay" class="hud-overlay"></div>
@@ -243,11 +243,11 @@
           <li><i style="background:#b9d6f4"></i>Valves</li><li><i style="background:#a7ded2"></i>Pumps and motors</li>
           <li><i style="background:#f3ce9d"></i>Tanks and vessels</li><li><i style="background:#d7c8ef"></i>Instruments</li>
           <li><i style="background:#d2dbdf"></i>Fixtures and structure</li><li><i style="background:#eee5f4"></i>Movable objects</li>
-          <li><i style="background:#d9e2e4"></i>Unreviewed envelopes</li><li><i style="background:#e2dfca"></i>Observed floor samples</li>
+          <li data-unreviewed-legend><i style="background:#d9e2e4"></i>Unreviewed envelopes</li><li data-floor-legend><i style="background:#e2dfca"></i>Observed floor samples</li>
           <li><i style="background:#dcebe5"></i>Walkable simulation grid</li><li><i style="background:#247384"></i>Robot and route</li>
         </ul>
-        <p>Observed floor is scan evidence, not a claim that every floor point is walkable. Grey envelopes have unverified labels and boundaries.</p>
-        <p>Approximate IFC includes region envelopes, unreviewed pipe fits, and assumed walls/slab. Floor sample counts are included as evidence, not a reconstructed surface.</p>
+        <p id="semantic-plan-evidence-note">Observed floor is scan evidence, not a claim that every floor point is walkable. Grey envelopes have unverified labels and boundaries.</p>
+        <p id="semantic-plan-export-note">Approximate IFC includes region envelopes, unreviewed pipe fits, and assumed walls/slab. Floor sample counts are included as evidence, not a reconstructed surface.</p>
       </aside>
     </div>
   </dialog>

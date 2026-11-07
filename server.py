@@ -19,12 +19,12 @@ from urllib.parse import parse_qs, urlparse
 # Serving a prepared demo must never silently spend API credits or load secrets.
 # Explicit VALMET_OFFLINE=0 is required to opt into the legacy API-enabled mode.
 os.environ.setdefault("VALMET_OFFLINE", "1")
-from pipeline import asset_export, decisions_client, field_service, retrieval
+from pipeline import asset_export, decisions_client, field_service, retrieval, config as C
 
 ROOT = Path(__file__).resolve().parent
 WEB_DIR = ROOT / "web"
-DATA_PATH = WEB_DIR / "data" / "digital_twin.json"
-EDITS_PATH = WEB_DIR / "data" / "scene_edits.json"   # room changes made in the viewer (objects removed / restored)
+DATA_PATH = C.OUT_DIR / "digital_twin.json"
+EDITS_PATH = C.OUT_DIR / "scene_edits.json"   # isolated by the active dataset directory
 _EDITS_LOCK = threading.Lock()
 
 TWIN_DATA: dict = {}
@@ -255,6 +255,16 @@ def library_zip(saved: list[dict]) -> bytes:
 class TwinRequestHandler(SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=str(WEB_DIR), **kwargs)
+
+    def translate_path(self, path):
+        # Let the standard handler normalize URL traversal first. Only the /data
+        # subtree is redirected; code and UI still come from this checkout.
+        translated = Path(super().translate_path(path))
+        try:
+            relative = translated.relative_to(WEB_DIR / 'data')
+        except ValueError:
+            return str(translated)
+        return str(C.OUT_DIR / relative)
 
     def log_message(self, fmt, *args):
         pass

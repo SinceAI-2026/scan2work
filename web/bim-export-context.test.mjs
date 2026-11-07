@@ -32,8 +32,8 @@ test("generated scene exports every extracted region and every context pipe fit"
   const twin=JSON.parse(fs.readFileSync(path,"utf8"));
   const text=exportRoomIfc(twin.assets,twin.scene.walls,twin.navigation.grid_meta,stamp,twin.scene.derived_context);
   assert.equal(count(text,/'FieldAtlas_Asset'/g),twin.assets.length);
-  assert.equal(count(text,/'DerivedContextPipeFit'/g),twin.scene.derived_context.pipe_segments.length);
+  assert.equal(count(text,/'DerivedContextPipeFit'/g),twin.scene.derived_context?.pipe_segments?.length || 0);
   assert.equal(count(text,/=IFCWALL\(/g),twin.scene.walls.length);
-  assert.equal(count(text,/'FieldAtlas_DerivedContext'/g),twin.scene.derived_context.pipe_segments.length);
+  assert.equal(count(text,/'FieldAtlas_DerivedContext'/g),twin.scene.derived_context?.pipe_segments?.length || 0);
   assert.doesNotMatch(text,/NaN|Infinity/);
 });

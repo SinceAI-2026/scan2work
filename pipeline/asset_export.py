@@ -278,7 +278,7 @@ class SceneCutter:
         i = self.by_id[oid]
         if self.exact:
             idx = np.sort(self.order[self.bounds[i]:self.bounds[i + 1]])
-            if len(idx) != self.assets[i]['n_gaussians']:
+            if len(idx) != self.assets[i].get('exact_owned_gaussians', self.assets[i]['n_gaussians']):
                 raise ValueError("Exact imported object ownership is incomplete")
             return i, idx, 0, 0
         idx, n_floor, n_float = own_splats(self.packed["xyz"], np.sort(self.order[self.bounds[i]:self.bounds[i + 1]]))
@@ -369,6 +369,9 @@ def _write_library(saved: list[dict]) -> None:
            "saved": saved}
     if any(s.get('membership_mode') == 'exact-source-rows' for s in saved):
         doc.update(source='source_scan.ply', membership='Exact imported original source rows. No floor removal, expansion, filling or refinement.')
+        if any(s.get('membership_mode') != 'exact-source-rows' for s in saved):
+            doc['membership'] = ('Mixed provenance: entries marked exact-source-rows preserve their dataset ownership without refinement; '
+                                 'archived entries retain their original extraction/refinement provenance. Check each entry.')
         doc['frame']['gspl_glb_bounds'] = 'Levelled frame; source units and physical scale unverified. Native PLY preserves original frame and attributes.'
     tmp = LIBRARY_JSON.with_name(LIBRARY_JSON.name + ".tmp")
     tmp.write_text(json.dumps(doc, indent=1))

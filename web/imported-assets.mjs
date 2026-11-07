@@ -1,5 +1,11 @@
 // Portable helpers for imported region data. No rendering or API dependency.
 export const isImportedScene = twin => Boolean(twin?.assets?.some(a => a.source_region_id));
+export function scenePolicy(twin) {
+  const baseline=twin?.scene?.dataset_kind === "wael-original-baseline" || twin?.dataset_kind === "wael-original-baseline";
+  return {imported:isImportedScene(twin),exactMembership:twin?.scene?.membership_mode === "exact-source-rows",
+    baseline,
+    scaleUnverified:baseline || twin?.scene?.coordinate_frame?.scale_verified === false || twin?.navigation?.scale_verified === false};
+}
 export const escapeHtml = value => String(value ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 
 export function decodeInstanceIds(buffer, count, assetCount) {

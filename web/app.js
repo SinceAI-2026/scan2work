@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { isImportedScene, firstNavigationPoint, regionSummary, escapeHtml as esc } from "./imported-assets.mjs";
+import { scenePolicy, firstNavigationPoint, regionSummary, escapeHtml as esc } from "./imported-assets.mjs";
 import { inspectionCameraPose } from "./inspection-camera.mjs";
 import { assetPresentation } from "./asset-presentation.mjs";
 import { renderAssetPhoto } from "./asset-photo.mjs";
@@ -19,6 +19,7 @@ import { fitBimVessels } from "./bim-geometry.mjs";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { explodeState, explodeOffset, loadInstanceUniforms, applyExplode, mountExplodeControls, SHADER_DECL, SHADER_OFFSET, SHADER_COLOR } from "./explode.mjs";
 import { createTakeApart } from "./take-apart.mjs";
+import { mountProposalReview } from "./proposal-review.mjs";
 import { sampleRoute, nearbyAssets, planFromPosition, reachableFloor, floorDestination, assetDestination, planRoomTour, advanceAlongRoute, segmentIsFree } from "./navigation-view.mjs";
 
 const state = {
@@ -38,6 +39,9 @@ const state = {
   visualReviewFilter: "all",
   listLimit: 100,
   imported: false,
+  exactMembership: false,
+  baseline: false,
+  scaleUnverified: false,
   navigationAvailable: true,
   classFilter: "all",
   searchQuery: "",
@@ -65,6 +69,7 @@ const attract = {enabled:new URLSearchParams(location.search).get("attract") ===
 const walkKeys = new Set();
 const movementKeys = ["w", "a", "s", "d", "arrowup", "arrowdown", "arrowleft", "arrowright"];
 let equipmentObstacles;
+let proposalReview = null;
 let takeApart = null; // one object alone, the room faded (take-apart.mjs)
 let updateFillSort;
 let sourceScan, indexedScan, originalNavigation, initialNavigation, walkPoses;
@@ -81,7 +86,21 @@ async function init() {
     fetch("./data/walk_poses.json").then(res => res.ok ? res.json() : null).catch(() => null),
   ]);
   state.twin = twin;
-  state.imported = isImportedScene(twin);
+  state.datasetId = twin.scene?.dataset_id || twin.runtime?.dataset_id || "";
+  Object.assign(state,scenePolicy(twin));
+  state.visualReviewFilter = state.imported ? "all" : "mapped";
+  document.getElementById("select-visual-review").value = state.visualReviewFilter;
+  for (const option of document.querySelectorAll("#select-visual-review option")) {
+    if (["baseline","new","floor"].includes(option.value)) option.hidden = !state.imported;
+    if (option.value === "all" && !state.imported) option.textContent = "All room objects";
+    if (option.value === "mapped" && !state.imported) option.textContent = "Registered equipment";
+  }
+  if (state.baseline) document.getElementById("dataset-note").textContent = "Wael room model · synthetic service data · scale unverified";
+  document.getElementById("btn-room-fill-label").hidden = state.exactMembership;
+  if (state.scaleUnverified) {
+    document.querySelector("#bim-plane").parentNode.lastChild.textContent = " 1.1-unit section plane";
+    document.querySelectorAll(".room-move-fields label").forEach(el => {el.firstChild.textContent=el.firstChild.textContent.replace("(m)","(units)");});
+  }
   if (state.imported) {
     state.boxesMode = "selected";
     document.querySelectorAll("[data-bmode]").forEach(b => b.classList.toggle("active", b.dataset.bmode === "selected"));
@@ -126,14 +145,21 @@ async function init() {
     container: document.getElementById("canvas-container"), scene, renderer,
   });
   buildRobotAvatar();
-  editStore = roomEditStore(id => canRemove(state.assetsByObj.get(id)));
-  roomPlacements = loadRoomPlacements(state.assetsByObj, canRemove);
+  editStore = roomEditStore(id => canRemove(state.assetsByObj.get(id)),state.datasetId);
+  roomPlacements = loadRoomPlacements(state.assetsByObj, canRemove,state.datasetId);
   const savedEdits = await editStore.load();
   applyRoomEdits(savedEdits, true);
   buildRouteMap();
   rebuildRouteGeometry();
 
   bindUIEvents();
+  proposalReview = mountProposalReview({
+    config:twin.proposal_review, container:document.getElementById("canvas-container"), scene,camera,controls,
+    button:document.getElementById("btn-review-proposals"), uniforms:()=>splatMaterial.uniforms,
+    count:sourceScan[4], texSize:splatMaterial.uniforms.uTexSize.value,
+    onOpen:()=>{ takeApart.close(); setInspectorOpen(false); if(state.journey.phase==="moving")applyJourneyEvent({type:"pause"}); applyCameraPreset("overview"); },
+    onOriginal:id=>{ const asset=state.assetsByObj.get(id); if(asset){selectAsset(asset,true);viewRoomLocation(asset);} },
+  });
   renderProposalList();
   selectAsset(targetAsset, false);
   applyCameraPreset("overview");
@@ -151,6 +177,7 @@ async function init() {
     updateAttractMode(now);
     stepSimulation(dt, now * 0.001);
     takeApart.frame(boxMeshes);
+    if (proposalReview?.isOpen) for (const entry of boxMeshes.values()) entry.group.visible=false;
     if (bimView.active) {
       bimView.update(currentNavigation,state.journey,state.selectedAsset);
       renderer.render(bimView.scene,camera);
@@ -626,6 +653,7 @@ function maybeTriggerDepthSort() {
 
 function applyCameraPreset(preset) {
   if (preset === "bim" && takeApart?.isOpen) takeApart.close();
+  if (preset === "bim") proposalReview?.close();
   state.cameraPreset = preset;
   controls.enabled = preset !== "first" && !(state.manualWalk && preset === "walk");
   document.querySelectorAll("[data-cam]").forEach((b) => {
@@ -865,7 +893,7 @@ function drawRouteMap(nav) {
   // One source unit; the imported scan has no verified physical scale.
   const length=frame.width/(m.nx*m.res),x=frame.x+frame.width-length,y=canvas.height-12;
   ctx.strokeStyle="#b0c8ce";ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(x,y-5);ctx.lineTo(x,y);ctx.lineTo(x+length,y);ctx.lineTo(x+length,y-5);ctx.stroke();
-  ctx.font="15px sans-serif";ctx.fillStyle="#b0c8ce";ctx.textAlign="center";ctx.fillText(state.imported || state.twin.navigation.scale_verified === false ? "1 unit" : "1 m",x+length/2,y-9);
+  ctx.font="15px sans-serif";ctx.fillStyle="#b0c8ce";ctx.textAlign="center";ctx.fillText(state.scaleUnverified || state.imported ? "1 unit" : "1 m",x+length/2,y-9);
 }
 
 function rebuildRouteGeometry() {
@@ -1063,7 +1091,7 @@ function updateHudLabels() {
       continue;
     }
 
-    el.textContent = `${a.tag || a.label} · ${dist.toFixed(1)} ${state.imported ? "units" : "m"} · ${a.source_region_id ? a.review_status : a.condition_state.replaceAll("_", " ")}`;
+    el.textContent = `${a.tag || a.label} · ${dist.toFixed(1)} ${state.scaleUnverified || state.imported ? "units" : "m"} · ${a.source_region_id ? a.review_status : a.condition_state.replaceAll("_", " ")}`;
     if (state.imported) el.title = `${a.label} · ${regionSummary(a)}${a.mapped ? " · Synthetic Excel mapping" : " · No assigned device data"}`;
     else el.title = `${a.label} · ${a.mapped ? "Excel registry" : `Excel profile from ${a.excel_profile_tag || "registry"}`} · ${a.health_score == null ? "Movable object" : `Health ${a.health_score}%`}`;
     if (assetPresentation(a).notice) el.title = `${a.label} · ${assetPresentation(a).notice}`;
@@ -1122,7 +1150,7 @@ function renderProximityStream(mappedNearby) {
       return `
         <div class="prox-row ${cls}" data-obj="${n.id}">
           <span>${n.tag} · ${a ? a.label : ""}</span>
-          <span>${n.distance_m.toFixed(1)} ${state.imported ? "units" : "m"} · ${status}</span>
+          <span>${n.distance_m.toFixed(1)} ${state.scaleUnverified || state.imported ? "units" : "m"} · ${status}</span>
         </div>
       `;
     })
@@ -1154,11 +1182,11 @@ function renderProposalList() {
   document.getElementById("asset-result-count").textContent = `${shown.length.toLocaleString()} of ${filtered.length.toLocaleString()} ${state.imported ? "regions" : "objects"}`;
   listEl.innerHTML = shown.map(a => {
     const selected = state.selectedAsset?.id === a.id;
-    const status = a.source_region_id ? regionSummary(a) : assetPresentation(a).notice || a.condition_state;
+    const status = a.source_region_id ? regionSummary(a) : assetPresentation(a).notice || `${Number.isFinite(a.health_score) ? `Health ${a.health_score}% · ` : ""}${String(a.condition_state || "").replaceAll("_", " ")}`;
     return `<button class="proposal-card ${selected ? "selected" : ""}" data-obj="${esc(a.id)}" aria-pressed="${selected}">
       <span class="prop-class">${esc(a.label || a.id)}</span>
       <span class="prop-meta"><span>${esc(a.tag ? a.tag + " · " + a.id : a.id)}</span>
-      <span>${esc(status)}</span>${a.mapped ? '<span class="prop-mapping">Synthetic Excel mapping</span>' : ""}</span></button>`;
+      <span>${esc(status)}</span>${a.mapped && state.imported ? '<span class="prop-mapping">Synthetic Excel mapping</span>' : ""}</span></button>`;
   }).join("") || '<p class="list-empty">No matching regions. Try a name or source ID.</p>';
   if (filtered.length > shown.length) listEl.insertAdjacentHTML("beforeend", '<button id="show-more-regions" class="btn-outline-full">Show next 100 regions</button>');
   listEl.querySelector("#show-more-regions")?.addEventListener("click", () => { state.listLimit += 100; renderProposalList(); });
@@ -1232,6 +1260,7 @@ function fmtComma(num) {
 }
 
 function selectAsset(asset, openInspector = false) {
+  proposalReview?.close();
   if (movePreview && movePreview.asset.id !== asset.id) closeMovePreview();
   asset = roomAsset(asset);
   if (removedIds.has(asset.id) && takeApart?.isOpen) takeApart.close();
@@ -1454,8 +1483,8 @@ function renderJourneyControls(nav) {
   document.getElementById("btn-manual-walk").hidden = !manual;
   document.getElementById("btn-drop-obstacle").disabled = manual || !!state.demoObstacle || !["moving","paused"].includes(journey.phase) || journey.route.total_distance_m-nav.distance < 2;
   const remaining=Math.max(0,journey.route.total_distance_m-nav.distance);
-  document.getElementById("nav-hud-metrics").textContent=manual ? "WASD to walk · ← → to turn · F to inspect nearby" : idle ? "Choose a map point, equipment, or room tour." : `${remaining.toFixed(1)} ${state.imported ? "scan units" : "m"} remaining · ${view.remainingSeconds} s`;
-  document.getElementById("sim-dist-label").textContent=idle?"":`${nav.distance.toFixed(1)} / ${journey.route.total_distance_m.toFixed(1)} ${state.imported ? "units" : "m"}`;
+  document.getElementById("nav-hud-metrics").textContent=manual ? "WASD to walk · ← → to turn · F to inspect nearby" : idle ? "Choose a map point, equipment, or room tour." : `${remaining.toFixed(1)} ${state.scaleUnverified || state.imported ? "scan units" : "m"} remaining · ${view.remainingSeconds} s`;
+  document.getElementById("sim-dist-label").textContent=idle?"":`${nav.distance.toFixed(1)} / ${journey.route.total_distance_m.toFixed(1)} ${state.scaleUnverified || state.imported ? "units" : "m"}`;
   document.getElementById("navigation-message").textContent=view.error || (!state.navigationAvailable ? "No supported floor route is available. Inspect with Free view." : "");
   document.getElementById("map-feedback").textContent=view.error;
 }
@@ -1535,7 +1564,7 @@ function cellAtPosition({x,z}, navigation=state.twin.navigation) {
 }
 
 function prepareRoomEdits(edits, placements=roomPlacements) {
-  if (state.imported) return prepareImportedRoomEdits(edits, placements);
+  if (state.exactMembership) return prepareExactRoomEdits(edits, placements);
   const ids = new Set(edits.map(edit=>edit.id));
   const affected = new Set([...ids,...placements.keys()].sort());
   const reviews = new Map(), parts = new Map();
@@ -1589,8 +1618,8 @@ function prepareRoomEdits(edits, placements=roomPlacements) {
   return {ids,parts,instances,assets,navigation,fills,placed,owners};
 }
 
-// Imported regions retain exact source membership. No box filling, fragment recovery, or invented walls.
-function prepareImportedRoomEdits(edits, placements) {
+// Exact-membership datasets retain their original ownership. Semantic classes and navigation are independent.
+function prepareExactRoomEdits(edits, placements) {
   const ids = new Set(edits.map(edit => edit.id));
   const affected = new Set([...ids, ...placements.keys()]);
   const instances = new Set([...affected].map(id => instancesById.get(id)));
@@ -1736,7 +1765,7 @@ function renderRoomEditControls() {
   reset.disabled=editBusy;
   const notice=document.getElementById('room-edit-notice');
   notice.textContent=removed ? (asset.mapped ? `${asset.tag} removed: its Excel record is no longer located in this room` : 'Removed from this room.') :
-    roomPlacements.has(asset.id) ? `Moved to X ${asset.center[0].toFixed(2)}, Z ${asset.center[2].toFixed(2)} ${state.imported ? "scan units (unverified)" : "m"}. The photo shows the original location.` : '';
+    roomPlacements.has(asset.id) ? `Moved to X ${asset.center[0].toFixed(2)}, Z ${asset.center[2].toFixed(2)} ${state.scaleUnverified || state.imported ? "scan units (unverified)" : "m"}. The photo shows the original location.` : '';
   notice.hidden=!notice.textContent;
   const list=document.getElementById('room-edit-list');
   list.replaceChildren();
@@ -1790,7 +1819,7 @@ async function changeRoom(action,asset) {
     if (action==='restore') {
       const position=roomPlacements.get(asset.id);
       const source=state.assetsByObj.get(asset.id);
-      const review=state.imported ? null : reviewedTrolleyParts(source,state.assetsByObj);
+      const review=state.exactMembership ? null : reviewedTrolleyParts(source,state.assetsByObj);
       const restored=position ? placedRoomAsset(source,position,review?.baseY) : asset;
       if (state.roomAssets.some(other=>other.transform && roomBoundsOverlap(restored,other))) {
         throw new Error('Move the other object away from this location first.');
@@ -1851,7 +1880,7 @@ function beginMovePreview(asset) {
   walkKeys.clear();
   viewRoomLocation(asset);
   const source=state.assetsByObj.get(asset.id);
-  const review=state.imported ? null : reviewedTrolleyParts(source,state.assetsByObj);
+  const review=state.exactMembership ? null : reviewedTrolleyParts(source,state.assetsByObj);
   const [sx,sy,sz]=source.size;
   const baseY=review?.baseY ?? source.center[1]-sy/2;
   const box = new THREE.BoxGeometry(sx,source.center[1]+sy/2-baseY,sz);
@@ -1927,7 +1956,7 @@ function changePlacement(asset, placement) {
     if (!prepared.navigation || !cellAtPosition(robotPosition(),prepared.navigation)) {
       throw new Error('Move the robot clear of this location before placing the object.');
     }
-    saveRoomPlacements(next);
+    saveRoomPlacements(next,state.datasetId);
     roomPlacements=next;
     closeMovePreview();
     applyRoomEdits({removed:activeEdits,offline:editsOffline},false,prepared);
@@ -2089,7 +2118,7 @@ function bindUIEvents() {
   bindRoomEdits();
   bimView=createBimRoom({camera,controls,container:document.getElementById("canvas-container"),onSelect:asset=>selectAsset(asset,true)});
   semanticPlan=bindSemanticPlan({
-    snapshot:()=>({assets:state.roomAssets,walls:state.twin.scene.walls,derived_context:state.twin.scene.derived_context,navigation:state.twin.navigation,
+    snapshot:()=>({assets:state.roomAssets,walls:state.twin.scene.walls,derived_context:state.twin.scene.derived_context,navigation:state.twin.navigation,scaleUnverified:state.scaleUnverified,
       robot:robotPosition(),journey:state.journey,selected:state.selectedAsset}),
     inspect:asset=>selectAsset(asset,true),
     navigate:dispatchRobotToAsset,

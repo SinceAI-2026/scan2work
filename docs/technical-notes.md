@@ -321,3 +321,96 @@ schema validation errors. Schema validity does not validate geometry, scale,
 wall placement or the catalog labels. Moved assets use their placed canonical
 envelopes so an original scan proxy cannot remain at a stale location; independent
 scan-context pipe fits do not follow an arbitrary moved region.
+
+## Original baseline with an optional proposal review layer
+
+The active demonstration can now use the supplied Wael archive as its canonical
+baseline. `pipeline/build_baseline_demo.py` stages a **new directory** and refuses
+to replace an existing directory, input tree or parent of either input. It never
+activates the staged data automatically. Every original field of all 504 objects,
+their 30 canonical bindings, 471 photo references, 83 attached cylinders and the
+complete stored navigation object is checked for equality. Original GSPL and GSID
+files are copied byte-for-byte, preserving the original 1,046,910-row rendering.
+The four archived asset-library entries remain available with their original
+refinement provenance.
+
+The staged dataset also contains the full source PLY, an audited original source-row
+map and a compact exact ownership file for the 598,437 rows assigned by the archived
+GSID. Original detector `n_gaussians` values are preserved. A separate
+`exact_owned_gaussians` field controls new native PLY exports: CV-003 / OBJ-206 retains
+its original detector count of 346, while native export contains its actual 1,231
+GSID-owned source rows. No additional box filling, floor deletion or refinement runs.
+A library containing both archived refinements and new exact exports explicitly
+reports mixed provenance, with individual entry metadata authoritative.
+
+The 1,933 expanded regions are kept **outside** the canonical asset list:
+
+- `proposal-review/catalog.json` contains their original IDs, geometry, unreviewed
+  labels, evidence, full/visible member counts and source-row links to original
+  objects. It does not assign synthetic telemetry or duplicate canonical device IDs.
+- `proposal-review/projected_instance.bin` uses the same GSID format and row ordering
+  as the unchanged baseline renderer, but indexes the separate proposal catalog.
+- 627,926 proposal-owned rows are visible in the original renderer; 83,642 additional
+  owned rows remain available in the complete extraction review at port 8768.
+- `proposal-review/full_source_members.npz` preserves all 711,568 proposal members.
+  All 3,716 referenced proposal evidence files are copied locally for review.
+- `digital_twin.json.proposal_review` advertises the catalog, projected ownership,
+  full-view URL and counts. It defaults to hidden. Neither proposal visibility nor
+  selection changes original identities, equipment bindings or navigation.
+
+The original baseline has `scene.dataset_kind="wael-original-baseline"` and a
+manifest-derived dataset ID. Its assets deliberately do not have `source_region_id`,
+so original semantic rendering and walkthrough-passage behavior remain available.
+Exact ownership is a separate capability (`scene.membership_mode="exact-source-rows"`)
+and must not be confused with the expanded-import visual mode.
+
+### Explicit data-directory selection
+
+`VALMET_DATA_DIR` selects the served data **and** all dataset writes. It governs
+`/data/...` static files, the API manifest, retrieval index, technician log, scene
+edits and asset library. UI/code still come from the current checkout. This keeps
+baseline operations separate from the complete extraction-review application's
+files and browser origin. Running `server.py` without this variable still serves
+this checkout's `web/data` directory; it does not silently switch datasets.
+
+Current baseline launch:
+
+```sh
+VALMET_OFFLINE=1 \
+VALMET_DATA_DIR=/Users/perttu/Downloads/SinceAI-2026/Wael-baseline-stage-2026-11-07 \
+.venv/bin/python server.py 8766
+```
+
+The complete extraction application is preserved independently under
+`/Users/perttu/Downloads/SinceAI-2026/Wael-extraction-review` at port 8768.
+
+Baseline tests use the selected staged directory and assert unchanged original
+fields, images, cylinders, bindings, navigation and renderer hashes; exact proposal
+projection; byte-exact native target export; isolated static routing; and upstream's
+asynchronous library-save HTTP 202 contract. Imported-region and derived-context
+artifact checks remain strict but run only against their applicable dataset. They
+can be run independently against the preserved extraction data:
+
+```sh
+VALMET_OFFLINE=1 \
+VALMET_DATA_DIR=/Users/perttu/Downloads/SinceAI-2026/Wael-extraction-review/web/data \
+.venv/bin/python -m unittest discover -s tests -p test_field_atlas_import.py -v
+```
+
+### Browser verification of the restored baseline
+
+The baseline was activated on port 8766 using the staged data directory; the
+checkout's expanded `web/data` and the complete review on port 8768 remain intact.
+Browser verification confirmed:
+
+- Navigation reached **ARRIVED** at CV-003 / OBJ-206 and displayed grounded service
+  guidance.
+- Saving the target continued in the background after its card was closed. The
+  HTTP 202 job produced a native PLY containing exactly 1,231 owned source rows.
+- Removing and restoring OBJ-004 returned the scene to zero removed objects.
+- Selecting the 171-row proposal linked it to OBJ-206 through 170 shared rows;
+  proposal review did not change the canonical catalog or equipment bindings.
+- The actual browser IFC export contained 504 assets, 87 cylinder geometries
+  (83 archived cylinders plus four legacy runtime vessel fits), and four walls.
+  IfcOpenShell reported zero schema validation errors. This checks IFC structure,
+  not measured scale, segmentation correctness or construction readiness.

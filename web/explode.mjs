@@ -64,6 +64,8 @@ export async function loadInstanceUniforms(url, count, texW, texH, assets) {
     uApart: { value: 0 },      // take-apart view (take-apart.mjs): instance id + 1 of the isolated object, 0 = off
     uApartRoom: { value: 0 },  // opacity left to every other splat while one object is taken apart
     uApartSelf: { value: 1 },  // opacity of the isolated object's scan splats (0 while its saved model stands in)
+    uProposalTex: { value: floatTex(new Float32Array(1),1,1,THREE.RedFormat) },
+    uProposalId: { value: 0 }, // optional review overlay, independent of canonical object ownership
   };
 }
 
@@ -76,6 +78,8 @@ export const SHADER_DECL = `
       uniform float uApart;
       uniform float uApartRoom;
       uniform float uApartSelf;
+      uniform sampler2D uProposalTex;
+      uniform float uProposalId;
 `;
 export const SHADER_OFFSET = `
         float instId = synthetic ? floor(max(0.0, -fillCovB.w)) : texture2D(uInstTex, uv).x;
@@ -98,6 +102,9 @@ export const SHADER_COLOR = `
         }
         if (uApart > 0.5) vColor.a *= abs(instId - uApart) > 0.5 ? uApartRoom : uApartSelf;
         else if (instId < 0.5) vColor.a *= 1.0 - 0.85 * max(uExplode, uSegment * 0.6);
+        if (uProposalId > 0.5 && !synthetic && abs(texture2D(uProposalTex, uv).x - uProposalId) < 0.5) {
+          vColor.rgb = mix(vColor.rgb, vec3(1.0, 0.38, 0.13), 0.75);
+        }
 `;
 
 // Called once per frame after app.js has styled the boxes.

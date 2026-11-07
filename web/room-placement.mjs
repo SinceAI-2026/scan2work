@@ -1,8 +1,9 @@
 const STORAGE_KEY = "field-atlas:equipment-room:placements";
 
-export function loadRoomPlacements(assets, canMove) {
+export function loadRoomPlacements(assets, canMove, datasetId = "") {
   try {
-    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+    const key = datasetId ? `${STORAGE_KEY}:${encodeURIComponent(datasetId)}` : STORAGE_KEY;
+    const saved = JSON.parse(localStorage.getItem(key)) || [];
     return new Map(saved.filter(([id, placement]) => {
       const asset = assets.get(id);
       return canMove(asset) && placement.center?.length === 3 &&
@@ -14,8 +15,9 @@ export function loadRoomPlacements(assets, canMove) {
   }
 }
 
-export function saveRoomPlacements(placements) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify([...placements]));
+export function saveRoomPlacements(placements, datasetId = "") {
+  const key = datasetId ? `${STORAGE_KEY}:${encodeURIComponent(datasetId)}` : STORAGE_KEY;
+  localStorage.setItem(key, JSON.stringify([...placements]));
 }
 
 export function roomTransform(asset, placement) {
