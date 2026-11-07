@@ -18,7 +18,7 @@ The video is scored on five criteria, so time is spent in proportion to them: ex
    ```
 
 3. Rehearse **Inspect faulty device**. Arrival must open CV-003 (`ASSET-003`) with its diagnosis, evidence and inspection steps.
-4. Keep the scorecard output (`python -m tests.scorecard`) and `docs/technical-notes.md` open for the numbers. Read every **[refresh]** value from the final run, not from this file.
+4. Keep the scorecard output (`python -m tests.scorecard`) and `docs/technical-notes.md` open for the numbers. Check the numbers against the final scorecard run before recording.
 5. Close terminals and settings that contain credentials.
 
 ## Follow the sequence
@@ -26,11 +26,11 @@ The video is scored on five criteria, so time is spent in proportion to them: ex
 | Time | Criterion | Action | Narration |
 | --- | --- | --- | --- |
 | 0:00–0:20 | Clarity | Open **Floor plan** from the room overview, search for CV-003, and show **Download IFC4**. | "Before entering the room, a service engineer can locate equipment on a clean plan from the scan. The same layout is available as an IFC4 room model." |
-| 0:20–1:10 | Extraction | Turn on all frames, then run the **exploded view** so objects separate. Hover a pump, a valve, a pipe cylinder, a movable cart and the washing machine. | "From 1.7 million Gaussians we extract **[refresh] objects**. Each object is labelled by AI from its real photo in the walkthrough video: on hand-labelled ground truth that was 85% correct from renders, **[refresh]** from photos. Pipes are fitted as true cylinders. Movable objects such as carts and ladders are flagged so a robot knows they can move." |
+| 0:20–1:10 | Extraction | Turn on all frames, then run the **exploded view** so objects separate. Hover a pump, a valve, a pipe cylinder, a movable cart and the washing machine. | "From 1.7 million Gaussians we extract **504 objects**. Each object is labelled by AI from its real photo in the walkthrough video: on hand-labelled ground truth that was 85% correct from renders and 85% from photos. Pipes are fitted as true cylinders. Movable objects such as carts and ladders are flagged so a robot knows they can move." |
 | 1:10–1:45 | Extraction / innovation | Play 25 s of `overlay_walk.mp4`, ending as the faulty valve comes into view. | "Because the twin is aligned to the real camera, we can draw it over the real video. This is Valmet's tablet use case: the engineer's camera view, with every device, its tag and its status. The red frame is the faulty valve." |
 | 1:45–2:50 | Navigation | Select **Inspect faulty device**. Show the route bending around equipment. Pause once on the nearby-assets panel (statuses). Resume to the stand-off point. | "The robot plans the shortest collision-free route on a 5 cm occupancy grid built from the scan, with its own radius plus a safety margin. As it walks, every asset within 2.5 m is framed with its status from the Excel pack. We checked the map against the real walkthrough: only 1.8% of the path a person walked is marked as obstacle." |
 | 2:50–3:55 | AI diagnosis | Arrival opens the CV-003 panel. Show observations with evidence IDs, the root cause, severity, lock-out/tag-out (LOTO) steps, then **Draft work order**. | "On arrival the AI diagnoses CV-003. Every statement cites telemetry, alarms or service cases from the pack, retrieved with EmbeddingGemma. In a blind test, with the answer hidden and telemetry only, it named the right root cause first for 9 of 13 faulty assets, against 2 for a baseline. Steps include LOTO before any hands-on check." |
-| 3:55–4:30 | Backend | One slide: pipeline diagram, then the scorecard output. | "Everything is one automated Python pipeline: ingest, extraction, AI labelling, detection lifted to 3D, pipe fitting, Excel binding, navigation and diagnostics, checked by a scorecard against the brief on every run." |
+| 3:55–4:30 | Backend | Slide 2 of [the deck](slides/scan2work-slides.pdf) (two routes), then the scorecard output. | "Everything is one automated Python pipeline: ingest, extraction, AI labelling, detection lifted to 3D, pipe fitting, Excel binding, navigation and diagnostics, checked by a scorecard against the brief on every run." |
 
 Navigation note: Briefly take over with WASD or the arrow keys, use **F** to inspect a nearby device, then press **M** to replan to CV-003 from the robot’s current position.
 
