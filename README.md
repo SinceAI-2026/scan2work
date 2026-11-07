@@ -52,7 +52,7 @@ scene changes and exact-source object exports. See
 | Extraction | 504 framed objects in 24 classes in the release room; labels from real walkthrough photos, checked against a hand-labelled sample | [Pipeline](docs/pipeline.md) |
 | Two segmenters | Colour/geometry rules + Gemini labels (default), or SAM 2.1 + SigLIP 2/DINOv2 fully on-site | [Pipeline](docs/pipeline.md#two-segmenters) |
 | Workbook binding | All 30 Excel devices on distinct objects; status, telemetry and citations come from the workbook only | [Technical notes](docs/technical-notes.md) |
-| Navigation | A* with the walking technician’s footprint; follow, first-person and aerial views; original floor data preserved | [Technical notes](docs/technical-notes.md#navigation-and-collision-model) |
+| Navigation | A* with the original room clearances and a compact walking technician; follow, first-person and aerial views | [Technical notes](docs/technical-notes.md#navigation-and-collision-model) |
 | Information levels | Simplified technician workspace by default; Settings restores the complete Extended toolset | [View guide](docs/features.md#simplified-and-extended-information) |
 | Guided demo and hazards | Rasmus’s walking service technician, interruptible walkthrough and optional energy illustrations | [Integration and reuse](docs/rasmus-integration.md) |
 | Device summary | Canonical condition, one relevant reading/comparison, recorded time and next check; full evidence remains expandable | [Display decisions](docs/rasmus-integration.md#what-belongs-in-the-default-device-view) |
@@ -91,7 +91,7 @@ synthetic.
 | Refinement | Colour error / SSIM vs a held-out photo, 6 objects | 0.162 → 0.123 / 0.340 → 0.399 | `tests.eval_refine` |
 | Voice | Full CV-003 job by voice | 5/5 simulated runs | ElevenLabs tests |
 
-The original robot-route result predates the wider technician profile; current route checks are recorded in the
+The robot-route result describes the archived route; current passage and technician checks are recorded in the
 [integration verification](docs/rasmus-integration.md#verification). Physical scale remains unverified.
 
 Limits: navigation checks are kinematic and grid-based; with alarms included the diagnosis is near trivial (alarm

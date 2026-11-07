@@ -5,17 +5,17 @@ import {makeTechnician,advanceGait,technicianCameraOffset} from './technician-av
 import {summaryFor} from './device-summary.mjs';
 import {visibleEnergy,energyDescription} from './hazard-layer.mjs';
 import {createSafetyStory} from './safety-demo.mjs';
-import {withTechnicianClearance,TECHNICIAN_RADIUS} from './technician-navigation.mjs';
+import {withTechnicianProfile,TECHNICIAN_HEIGHT} from './technician-navigation.mjs';
 
-test('technician faces +Z, rests on the floor and preserves recognizable uniform proportions',()=>{
- const avatar=makeTechnician(THREE,{height:1.4});
+test('compact technician faces +Z, rests on the floor and fits the original capsule while walking',()=>{
+ const avatar=makeTechnician(THREE,{height:TECHNICIAN_HEIGHT,footprintRadius:.10});
  avatar.root.updateMatrixWorld(true);const bounds=new THREE.Box3().setFromObject(avatar.root);
- assert.ok(Math.abs(bounds.min.y)<1e-5);assert.ok(Math.abs(bounds.max.y-1.4)<1e-5);
+ assert.ok(Math.abs(bounds.min.y)<1e-5);assert.ok(Math.abs(bounds.max.y-TECHNICIAN_HEIGHT)<1e-5);
  for(let i=0;i<180;i++){
   avatar.animate(.016,.016);avatar.root.updateMatrixWorld(true);
-  avatar.root.traverse(mesh=>{if(!mesh.geometry)return;const pos=mesh.geometry.getAttribute('position');for(let p=0;p<pos.count;p++){const v=new THREE.Vector3().fromBufferAttribute(pos,p).applyMatrix4(mesh.matrixWorld);assert.ok(Math.hypot(v.x,v.z)<=TECHNICIAN_RADIUS,`footprint ${v.x},${v.z}`);}});
+  avatar.root.traverse(mesh=>{if(!mesh.geometry)return;const pos=mesh.geometry.getAttribute('position');for(let p=0;p<pos.count;p++){const v=new THREE.Vector3().fromBufferAttribute(pos,p).applyMatrix4(mesh.matrixWorld);assert.ok(Math.hypot(v.x,v.z)<=avatar.footprintRadius+1e-8,`footprint ${v.x},${v.z}`);}});
  }
- const glasses=avatar.root.children.find(x=>x.position.z===.125);assert.ok(glasses,'safety glasses face +Z');
+ const glasses=avatar.root.children.find(x=>x.position.y===1.61);assert.ok(glasses?.position.z>0,'safety glasses face +Z');
  const phase=avatar.gait.phase;for(let i=0;i<120;i++)avatar.animate(0,.016);
  assert.equal(avatar.gait.phase,phase);assert.equal(avatar.gait.amplitude,0);
 });
@@ -63,22 +63,27 @@ test('follow camera tries a clear side view before using a compact overhead fall
  const overhead=technicianCameraOffset(nav,0,()=>false);assert.equal(overhead.y,2.1);
 });
 
-test('technician navigation only restricts cells and preserves original floor evidence and source metadata',()=>{
+test('visual technician preserves the source navigation mask, clearance values and profile',()=>{
  const input={grid_meta:{nx:3,nz:2,res:.05,robot_radius_m:.1},walkable_grid:[[1,1],[1,0],[1,1]],clearance_grid_m:[[.1,.5],[.2,1],[null,.6]]};
- const before=JSON.stringify(input),out=withTechnicianClearance(input);
- assert.equal(JSON.stringify(input),before);assert.deepEqual(out.walkable_grid,[[0,1],[0,0],[0,1]]);
- assert.equal(out.source_floor_grid,input.walkable_grid);assert.equal(out.grid_meta.robot_radius_m,TECHNICIAN_RADIUS);
- assert.deepEqual(withTechnicianClearance(out).walkable_grid,out.walkable_grid);
+ const before=JSON.stringify(input),out=withTechnicianProfile(input);
+ assert.equal(JSON.stringify(input),before);assert.strictEqual(out.walkable_grid,input.walkable_grid);
+ assert.strictEqual(out.grid_meta,input.grid_meta);assert.strictEqual(out.clearance_grid_m,input.clearance_grid_m);
+ assert.equal(out.source_floor_grid,input.walkable_grid);assert.equal(out.technician_profile.radius,.1);
+ assert.equal(out.technician_profile.height,1.1);assert.ok(out.technician_profile.footprintRadius<=.1);
+ assert.strictEqual(withTechnicianProfile(out).walkable_grid,out.walkable_grid);
 });
 
 test('reported technician footprint contains the animated model across height variants',()=>{
- for(const height of [.7,1.4,1.65]){
-  const avatar=makeTechnician(THREE,{height});
+ for(const height of [.7,1.1,1.4])for(const radius of [.1,.15]){
+  const avatar=makeTechnician(THREE,{height,footprintRadius:radius});
   for(let i=0;i<180;i++){
    avatar.animate(.03,.016);avatar.root.updateMatrixWorld(true);
-   avatar.root.traverse(mesh=>{if(!mesh.geometry)return;const pos=mesh.geometry.getAttribute('position');for(let p=0;p<pos.count;p++){const v=new THREE.Vector3().fromBufferAttribute(pos,p).applyMatrix4(mesh.matrixWorld);assert.ok(Math.hypot(v.x,v.z)<=avatar.footprintRadius);}});
+   avatar.root.traverse(mesh=>{if(!mesh.geometry)return;const pos=mesh.geometry.getAttribute('position');for(let p=0;p<pos.count;p++){const v=new THREE.Vector3().fromBufferAttribute(pos,p).applyMatrix4(mesh.matrixWorld);assert.ok(Math.hypot(v.x,v.z)<=avatar.footprintRadius+1e-8);}});
   }
-  assert.equal(withTechnicianClearance({grid_meta:{res:.05},walkable_grid:[[1]],clearance_grid_m:[[1]]},{height}).grid_meta.robot_radius_m,avatar.footprintRadius);
+  const profile=withTechnicianProfile({grid_meta:{res:.05,robot_radius_m:radius},walkable_grid:[[1]],clearance_grid_m:[[1]]},{height});
+  assert.equal(profile.technician_profile.footprintRadius,avatar.footprintRadius);
+  assert.equal(profile.technician_profile.eyeHeight,avatar.eyeHeight);
+  assert.equal(profile.grid_meta.robot_radius_m,radius);
  }
 });
 

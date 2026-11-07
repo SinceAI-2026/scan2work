@@ -601,3 +601,37 @@ tests also pass. Browser QA separately checked front/side removal and restoratio
 front/back isolation, and manual-mask precedence over removing OBJ-348's mixed
 canonical control-panel fragment. These checks do not establish pixel-perfect
 segmentation or unseen geometry.
+
+## Restoring the original navigation footprint
+
+The source baseline stores a 0.15-unit robot radius. Its existing browser
+`withWalkthroughPassages` profile uses a 0.10-unit radius and 0.01-unit margin,
+checking the recorded walkthrough neighbourhoods against occupied-cell squares
+and equipment envelopes. That runtime grid has 7,225 reachable cells from the
+original start at `[-0.275, 2.875]`.
+
+The larger technician introduced a second erosion with a 0.301-unit radius and
+0.382211-unit raw-clearance threshold. It left 3,894 free cells, of which only
+3,254 remained connected to the start. The lower map (`Z < -0.8`) fell from 1,746
+reachable cells to 39, and the central band (`|Z| < 0.8`, `|X| < 1.4`) fell from
+970 to 582. This was a runtime profile regression, not missing source floor data.
+Of 279 recorded camera poses admitted by the original runtime grid, 121 became
+blocked; another 47 remained free but disconnected. Camera poses are evidence
+for this demo's existing passage policy, not a calibrated human-clearance survey.
+
+The technician now fits the room's existing profile. Attaching its visual metadata
+does not erode, open or replace any navigation cell or alter the source radius.
+The imported extraction view retains its separate occupancy grid and profile;
+temporary and moved-object blocks remain closed when the profile is reapplied.
+
+`node --test tests/test_runtime_navigation_compat.mjs` independently checks the
+prepared original baseline and expanded dataset (paths can be supplied through
+`VALMET_BASELINE_DATA_DIR` / `VALMET_REVIEW_DATA_DIR`). All five tests passed on the
+available data, with no skips. Routes to the central passage `(0.025, -0.025)`,
+lower room `(-3.275, -1.875)`, CV-003 and the room tour pass 51 complete continuous
+grid-segment checks and 5,830 manual-walking increments with the original
+equipment collision checks still enabled. Their minimum continuous distances to
+raw occupied-cell squares are respectively 0.259128, 0.157270, 0.215054 and
+0.144461 scene units, all above the source capsule plus margin (0.11). These
+simulation checks do not establish real-world walking clearances or physical
+scale. No source assets or stored navigation were rewritten.

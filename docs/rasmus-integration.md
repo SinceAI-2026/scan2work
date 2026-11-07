@@ -8,7 +8,7 @@ Ilkka, shared inspection jobs and Arduino panel.
 
 | Feature | Source | Scan2Work adaptation |
 | --- | --- | --- |
-| Walking service technician | `demo/web/src/meshes.ts`, `makeTechnician` | The same procedural hard hat, high-visibility vest, coveralls and walking limbs, adapted to our up/forward axes. A wider runtime navigation profile accommodates the uniformly scaled model. No external character asset is required. |
+| Walking service technician | `demo/web/src/meshes.ts`, `makeTechnician` | The same procedural hard hat, high-visibility vest, coveralls and walking limbs, adapted to our up/forward axes. A compact character fits the room's existing navigation capsule. No external character asset is required. |
 | Hazard views | `hazards/rules.json`, `demo/web/src/hazardFx.ts` | Focused energy annotations, amber rings and a selected illustrative danger boundary at our equipment positions. Optional while browsing. |
 | Guided demo | `maintenance/web/demo.ts`, `demo/web/src/stage.ts`, `camera.ts` | One interruptible walkthrough with a short explanation at each stage. Demonstration state stays separate from shared jobs and Arduino. |
 | Device summary | `backend/status.py`, `demo/web/src/devices.ts`, `xr/hub.ts` | One canonical status, the reason, one relevant reading, its recorded source/time and the next check. Existing detailed evidence remains available. |
@@ -49,12 +49,14 @@ estimated `mpu=1.082` are not imported. Scan2Work's physical scale remains
 unverified. Character dimensions and hazard boundaries are visual geometry in
 the current scene frame, not a new physical survey or certified clearance.
 
-The original narrow robot route does not accommodate a proportionally scaled
-technician. A runtime copy of the walkable grid is restricted using the source
-clearance field and the animated avatar's footprint. The existing planner then
-finds a new service stopping position. The original scan, floor geometry and
-dataset remain unchanged. Manual walking and later route planning use the same
-profile, so the guided demo does not get a special collision exemption.
+The technician is fitted to the existing navigation profile. Its illustrative
+height is 1.1 scene units; its horizontal scale fits the room's recorded capsule,
+including the animated limbs. The baseline walkthrough profile uses a 0.10-unit
+radius and 0.01-unit margin; the archived grid starts at radius 0.15. Map clicks,
+manual walking and route planning retain that room's prepared walkable grid.
+Character appearance adds no further clearance pass or coarse-box expansion.
+The original scan, floor geometry and dataset remain unchanged. Temporary and
+moved-object obstacles still block routes, with no special demo exemption.
 
 ## Hazard interpretation
 
@@ -75,7 +77,7 @@ Those existing workflows remain available for deliberate user interaction.
 ## Reusable interfaces
 
 - `pipeline.scene_context.build_scene_context(twin)` returns JSON-ready context without side effects. The server exposes it at `GET /api/scene-context`.
-- `makeTechnician(THREE, {height})` returns the avatar root, footprint and displacement-driven animation; `withTechnicianClearance(navigation, {height, assets})` copies/restricts the runtime grid to match it.
+- `makeTechnician(THREE, {height, footprintRadius})` returns the avatar root, fitted footprint and displacement-driven animation. `withTechnicianProfile(navigation, {height})` derives the visual profile without changing either walkable grid or the source clearance metadata. The earlier `withTechnicianClearance` name remains an alias.
 - `summaryFor(asset, context)` produces the compact device view; `renderDeviceSummary(...)` renders it. `createContextRefresh(...)` follows existing fault-panel notifications, drops stale responses and clears unavailable readings without adding a polling loop.
 - `createHazardLayer(THREE, host)` uses callbacks for the current objects, selection and position. Moving/removing an object updates its annotation.
 - `createSafetyStory(host)` needs only navigation and presentation callbacks. `mountSafetyDemo(...)` adds the interruptible controls and captions. Neither receives a job, sensor or persistence API.
@@ -89,29 +91,40 @@ The local baseline demo reached CV-003 and completed all three stages without cr
 state. Pause/resume, manual takeover, free-view browsing, hazard toggle and the compact evidence card were checked
 at desktop and narrow widths. Upstream's latest Take apart/specifications/photo-before-checklist layout is retained.
 
-The animated footprint is 0.301 scene units. Independent dense sampling of the newly planned target routes found:
+On 8 November, the full-room audit found that the first integration's 0.301-unit footprint and extra clearance
+pass disconnected passages even though its target-route checks passed. The corrected profile preserves every
+cell of the original runtime grid:
 
-| Dataset | Route length (scene units) | Minimum obstacle clearance | Dense samples |
-| --- | --- | --- | --- |
-| Baseline, 504 objects | 4.682 | 0.414 | 4,684 |
-| Extraction review, 1,933 regions | 4.163 | 0.364 | 4,165 |
+| Reachable area | Original robot | Enlarged profile regression | Corrected technician |
+| --- | ---: | ---: | ---: |
+| Whole room | 7,225 cells | 3,254 cells | 7,225 cells |
+| Lower map (`Z < -0.8`) | 1,746 cells | 39 cells | 1,746 cells |
+| Central band (`abs(Z) < 0.8`, `abs(X) < 1.4`) | 970 cells | 582 cells | 970 cells |
 
-All 470 manual movement samples on the baseline route passed. The runtime profile only restricts walkable cells;
-it does not open source obstacles or replace original floor evidence. These are checks of the target routes,
-not proof of reachability for every device or measured real-world human clearance.
+Five independent prepared-data tests passed without skips: central/lower destinations, CV-003, room tour,
+the complete reachable mask, manual movement and dynamic obstacles. The routes passed 51 continuous segment
+checks and 5,830 manual increments. Their closest approach to an occupied-cell square was 0.144461 scene units,
+above the original 0.10 radius plus 0.01 margin. See the [technical audit](technical-notes.md#restoring-the-original-navigation-footprint)
+and `tests/test_runtime_navigation_compat.mjs`. These checks establish consistency of the simulation with the
+prepared room data, not measured human clearance.
+
+The corrected viewer and prepared-data suite passed 72 tests. The animated vertex checks cover multiple heights
+and source radii; the head, helmet and vest retain legible proportions within the compact capsule. Both viewer
+patch scripts report zero edits. Browser verification accepted the previously disconnected lower-left map point
+and drew the route around the right and bottom corridors.
 
 Automated checks cover gait/footprint, route restrictions and edits, moved/removed hazard anchors, demo interruption,
 canonical status, missing/non-finite readings, hot bearings, zero-current interpretation and scripted fault provenance.
 No paid pipeline rebuild was run. Deployment and final regression counts are recorded below.
 
-Backend regression: 74 focused tests passed across scene context, public access, MCP, Arduino, media ranges, runtime compatibility and shared inspection jobs.
+Initial integration backend regression: 74 focused tests passed across scene context, public access, MCP, Arduino, media ranges, runtime compatibility and shared inspection jobs.
 
-Frontend regression: 54 focused tests passed; both idempotent viewer patch scripts reported 0 edits. Browser Tour the room produced a 14.2-unit route with working Pause/Continue on the technician profile. Runtime context refresh was checked for out-of-order responses and unavailable readings.
+Initial integration frontend regression: 54 focused tests passed; both idempotent viewer patch scripts reported 0 edits. That earlier room tour covered only the narrower reachable component. Runtime context refresh was checked for out-of-order responses and unavailable readings.
 
 ## Hosted deployment
 
-The main room and extraction review run source `458d749056fc1b70d0c370badc90f5f17f50ed18` from an isolated code
-snapshot. The original 0.1.1 release archives and generated scene data were not rebuilt.
+The initial integration was deployed as source `458d749056fc1b70d0c370badc90f5f17f50ed18`. The hosted apps receive
+later source updates in isolated snapshots; the original 0.1.1 archives and generated scene data are preserved.
 
 | Public site | Scene objects/regions | Mapped summaries | Potential-energy annotations | Hosted integrations |
 | --- | --- | --- | --- | --- |

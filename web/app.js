@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { makeTechnician, technicianCameraOffset } from "./technician-avatar.mjs";
-import { withTechnicianClearance, TECHNICIAN_HEIGHT } from "./technician-navigation.mjs";
+import { withTechnicianProfile, TECHNICIAN_HEIGHT } from "./technician-navigation.mjs";
 import { createHazardLayer, energyDescription } from "./hazard-layer.mjs";
 import { renderDeviceSummary } from "./device-summary.mjs";
 import { mountSafetyDemo } from "./safety-demo.mjs";
@@ -80,7 +80,7 @@ const VIEW_NAMES = {walk:"Follow technician", first:"First person", aerial:"Aeri
 const VIEW_ICONS = {walk:"follow", first:"first", aerial:"aerial"};
 const firstLook = {yaw:0, pitch:0, at:-1e9};   // first person: drag-to-look offsets from the walking direction
 const CEILING_CUT_M = 1.7;   // above the tallest pump or valve top, below the overhead pipe runs
-const ROBOT_EYE_M = 1.25;     // robot head and first-person camera height
+const ROBOT_EYE_M = TECHNICIAN_HEIGHT * 1.61 / 1.8; // compact technician eye height, scene units
 // Free view frames every object; Aerial view frames what its "Show in room" boxes pick (view-filter.mjs).
 let bimView;
 
@@ -162,7 +162,7 @@ async function init() {
   originalNavigation = twin.navigation;
   walkPoses = !state.imported && Array.isArray(poses) ? poses : [];
   if (walkPoses.length) twin.navigation = withWalkthroughPassages(twin.navigation, twin.assets, walkPoses);
-  twin.navigation=withTechnicianClearance(twin.navigation,{assets:twin.assets});
+  twin.navigation=withTechnicianProfile(twin.navigation);
   initialNavigation = twin.navigation;
   equipmentObstacles = manualObstacles(state.twin.assets, state.twin.navigation.grid_meta.robot_radius_m);
 
@@ -1065,7 +1065,7 @@ function buildAssetBoundingBoxes() {
 }
 
 function buildRobotAvatar() {
-  technician = makeTechnician(THREE,{height:TECHNICIAN_HEIGHT});
+  technician = makeTechnician(THREE,{height:TECHNICIAN_HEIGHT,footprintRadius:state.twin.navigation.technician_profile.footprintRadius});
   robotGroup = new THREE.Group();
   robotGroup.add(technician.root);
   robotGroup.traverse(object=>{object.renderOrder=6;});
@@ -1967,7 +1967,7 @@ function prepareRoomEdits(edits, placements=roomPlacements) {
       const indices=[...indexedScan.owned.get(owner).filter(index=>owners[index]===owner),...(added.get(owner)||[])];
       return copyPlacedSplats(scan,indices,asset,owner);
     });
-    navigation = withTechnicianClearance(navigationAfterRoomEdits(originalNavigation,assets,scan,instances,fills,walkPoses,initialNavigation.grid_meta,placed),{assets});
+    navigation = withTechnicianProfile(navigationAfterRoomEdits(originalNavigation,assets,scan,instances,fills,walkPoses,initialNavigation.grid_meta,placed));
   }
   if (navigation && state.demoObstacle) navigation = blockBox(navigation,state.demoObstacle);
   return {ids,parts,instances,assets,navigation,fills,placed,owners};
@@ -2564,8 +2564,8 @@ function beginInspectionView(asset) {
 
 function updateWalkCamera(nav, dt = 0, route = null) {
   const yaw = firstPersonYaw(nav, dt, route), pitch = firstLook.pitch;
-  // The robot's own camera: the front of its head, at a standing person's eye height.
-  const eyeX = nav.x + Math.sin(yaw) * 0.1, eyeZ = nav.z + Math.cos(yaw) * 0.1, eyeY = ROBOT_EYE_M;
+  // The illustrative technician's camera, positioned near the front of its head.
+  const eyeX = nav.x + Math.sin(yaw) * technician.footprintRadius*.5, eyeZ = nav.z + Math.cos(yaw) * technician.footprintRadius*.5, eyeY = ROBOT_EYE_M;
   camera.position.set(eyeX, eyeY, eyeZ);
   controls.target.set(eyeX + Math.sin(yaw) * Math.cos(pitch), eyeY + Math.sin(pitch), eyeZ + Math.cos(yaw) * Math.cos(pitch));
   camera.lookAt(controls.target);
@@ -2582,7 +2582,7 @@ function updateFollowCamera(nav, dt, route) {
   if (followRig.yaw === undefined || followRig.snap) followRig.yaw = goalYaw;
   else followRig.yaw += Math.atan2(Math.sin(goalYaw - followRig.yaw), Math.cos(goalYaw - followRig.yaw)) * ease(3);
   const dx = Math.sin(followRig.yaw), dz = Math.cos(followRig.yaw);
-  const rig=technicianCameraOffset(nav,followRig.yaw,(start,end)=>segmentIsFree(state.twin.navigation,start,end));
+  const rig=technicianCameraOffset(nav,followRig.yaw,(start,end)=>segmentIsFree(state.twin.navigation,start,end),{height:TECHNICIAN_HEIGHT});
   const goalPos = new THREE.Vector3(rig.x,rig.y,rig.z);
   const arrivedAt = state.journey.phase === "arrived" && route?.asset_id ? roomAsset(state.assetsById.get(route.asset_id)) : null;
   const goalTarget = arrivedAt ? new THREE.Vector3().fromArray(arrivedAt.center)

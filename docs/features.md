@@ -59,6 +59,11 @@ The complete toolbar below is available in **Extended** mode. Simplified keeps t
 
 ## Technician, hazards and guided demo
 
+The technician is sized to the room's original navigation profile. The map, planned routes and manual walking
+use the same walkable floor, including the previously observed lower and central passages. Changing the character's
+appearance does not add another obstacle margin. Walls and temporary/moved obstacles still block travel; physical
+scale remains unverified.
+
 **Watch demo** (**Play demo** in Extended) walks to the faulty device, illustrates potential energy, then shows its source evidence. The service
 technician is adapted from Rasmus's procedural character. Pause/resume, Next, Stop and ordinary room interaction
 keep the walkthrough under the user's control. It does not complete inspection checks or change jobs or sensor state.
