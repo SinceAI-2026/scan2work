@@ -102,6 +102,7 @@ let sourceScan, indexedScan, originalNavigation, initialNavigation, walkPoses;
 let editStore, activeEdits = [], removedIds = new Set(), editsOffline = false, editBusy = false;
 let roomPlacements = new Map(), liveRoomAssets = new Map(), movePreview = null;
 let foldedRoomParts = new Map();
+const MAX_ROOM_CUTS = 32, CUT_PAD = 0.03, CUT_TO_FLOOR = 0.3; // updateRoomCuts
 const tracedFragments = new Map();
 const instancesById = new Map();
 const instanceSizes = new Map();
@@ -128,7 +129,6 @@ async function init() {
   if (state.baseline) document.getElementById("dataset-note").textContent = "Wael room model · synthetic service data · scale unverified";
   document.getElementById("btn-room-fill-label").hidden = state.exactMembership;
   if (state.scaleUnverified) {
-    document.querySelectorAll(".room-move-fields label").forEach(el => {el.firstChild.textContent=el.firstChild.textContent.replace("(m)","(units)");});
     document.querySelectorAll(".technical-details .field-label").forEach(el => {el.textContent=el.textContent.replace("scan units (m)","scan units (unverified)");});
   }
   if (state.imported) {
@@ -141,7 +141,6 @@ async function init() {
     document.getElementById("semantic-plan-export").textContent = "Approximate IFC";
     document.querySelectorAll(".technical-details .field-label").forEach(el => { el.textContent = el.textContent.replace("scan units (m)", "scan units (unverified)"); });
     document.querySelector("#arrival-evidence .field-label").textContent = "Synthetic workbook telemetry";
-    document.querySelectorAll(".room-move-fields label").forEach(el => { el.firstChild.textContent = el.firstChild.textContent.replace("(m)", "(scan units)"); });
   }
   state.roomAssets = twin.assets;
   originalNavigation = twin.navigation;
@@ -242,6 +241,7 @@ async function init() {
     if (proposalReview?.isOpen) for (const entry of boxMeshes.values()) entry.group.visible=false;
     roomParts.frame(dt);
     ai3d.frame();
+    updateRoomCuts();
     bimView.update(state.selectedAsset);
     updateMotionResolution(now);
     maybeTriggerDepthSort();
@@ -493,6 +493,9 @@ async function loadEwaGaussianSplats(url) {
       uCovered: {value:makeRoomTexture(new Float32Array(256 * explodeUniforms.uInstTableSize.value.y),256,   // ai3d.mjs: objects under an AI 3D model
         explodeUniforms.uInstTableSize.value.y,THREE.RedFormat)},
       uHasCovered: {value:0},
+      uCutCount: {value:0},   // updateRoomCuts: unowned scan splats left in a removed / moved object's box
+      uCutMin: {value:Array.from({length:MAX_ROOM_CUTS},()=>new THREE.Vector3())},
+      uCutMax: {value:Array.from({length:MAX_ROOM_CUTS},()=>new THREE.Vector3())},
     },
     vertexShader: `
       attribute float splatIndex;
@@ -509,6 +512,8 @@ ${SHADER_DECL}      uniform float uSplatAxisLimit;
       uniform float uHasCovered;
       uniform sampler2D uCovered;
       uniform float uBaseCount, uFillCount, uHasRemoved, uFillDebug;
+      uniform int uCutCount;
+      uniform vec3 uCutMin[${MAX_ROOM_CUTS}], uCutMax[${MAX_ROOM_CUTS}];
       uniform sampler2D uRoomFill, uRemoved;
       uniform vec2 uRoomFillSize;
 
@@ -535,6 +540,15 @@ ${SHADER_DECL}      uniform float uSplatAxisLimit;
 ${SHADER_OFFSET}        if (uHasCovered > 0.5 && instId > 0.5 && texture2D(uCovered, (vec2(mod(instId, uInstTableSize.x), floor(instId / uInstTableSize.x)) + 0.5) / uInstTableSize).x > 0.5) {
           gl_Position = vec4(0.0, 0.0, 2.0, 1.0);   // under its AI 3D model (ai3d.mjs)
           return;
+        }
+        if (!synthetic && instId < 0.5 && uCutCount > 0) {   // unowned scan left where an object was (updateRoomCuts)
+          for (int i = 0; i < ${MAX_ROOM_CUTS}; i++) {
+            if (i >= uCutCount) break;
+            if (all(greaterThanEqual(centerRgba.xyz, uCutMin[i])) && all(lessThanEqual(centerRgba.xyz, uCutMax[i]))) {
+              gl_Position = vec4(0.0, 0.0, 2.0, 1.0);
+              return;
+            }
+          }
         }
         vec4 cam = modelViewMatrix * vec4(center, 1.0);
 
@@ -1412,6 +1426,14 @@ function renderProximityStream(mappedNearby) {
   }
 }
 
+// An empty list usually means the object was removed from the room (removed objects leave the list); say so.
+function emptyListMessage(q) {
+  const removed = q ? state.twin.assets.filter(a => removedIds.has(a.id) &&
+    [a.tag,a.asset_id,a.id,a.label,a.class_label].some(v => String(v || "").toLowerCase().includes(q))) : [];
+  if (removed.length) return `<p class="list-empty">${removed.slice(0, 3).map(a => esc(displayAssetTag(a))).join(", ")}${removed.length > 3 ? ` and ${removed.length - 3} more` : ""} ${removed.length === 1 ? "was" : "were"} removed from this room. Restore from Room changes below.</p>`;
+  return `<p class="list-empty">No matching ${state.imported ? "regions" : "objects"}. Try a tag, name or ID.</p>`;
+}
+
 function renderProposalList() {
   const listEl = document.getElementById("asset-list");
   const q = state.searchQuery.trim().toLowerCase();
@@ -1435,7 +1457,7 @@ function renderProposalList() {
       <span class="prop-class">${esc(a.label || a.id)}</span>
       <span class="prop-meta"><span>${esc(a.mapped && a.tag ? a.tag + " · " + a.id : a.id)}</span>
       <span>${esc(status)}</span>${a.mapped && state.imported ? '<span class="prop-mapping">Synthetic Excel mapping</span>' : ""}</span></button>`;
-  }).join("") || '<p class="list-empty">No matching regions. Try a name or source ID.</p>';
+  }).join("") || emptyListMessage(q);
   if (filtered.length > shown.length) listEl.insertAdjacentHTML("beforeend", '<button id="show-more-regions" class="btn-outline-full">Show next 100 regions</button>');
   listEl.querySelector("#show-more-regions")?.addEventListener("click", () => { state.listLimit += 100; renderProposalList(); });
   for (const card of listEl.querySelectorAll(".proposal-card")) card.addEventListener("click", () => {
@@ -1932,6 +1954,30 @@ function uploadRoomFill(instances, layers, owners) {
   updateFillSort(positions);
 }
 
+// A removed or moved object's own splats go with it, but the scan often keeps unowned splats inside its box
+// (a red ghost of a bucket, the body of a motor behind its AI 3D model). Those are cut here, by box: the
+// object's detection box, and the box of any AI 3D model it owned (ai3d.mjs). Other objects' splats and the
+// floor stay; the hole is filled by the room fill as before.
+function updateRoomCuts() {
+  const u = splatMaterial?.uniforms;
+  if (!u?.uCutMin) return;
+  const boxes = ai3d?.cutBoxes() ?? [];
+  for (const id of new Set([...removedIds, ...roomPlacements.keys()])) {
+    const a = state.assetsByObj.get(id), min = a?.aabb_min ?? a?.bbox_min, max = a?.aabb_max ?? a?.bbox_max;
+    if (!min || !max) continue;
+    const box = {min: min.map(v => v - CUT_PAD), max: max.map(v => v + CUT_PAD)};
+    if (min[1] < CUT_TO_FLOOR) box.min[1] = -0.1; // a box that stops just above the floor: its base (and its red smear on the floor) goes too; the room fill covers the floor
+    boxes.push(box);
+  }
+  const n = Math.min(boxes.length, MAX_ROOM_CUTS);
+  for (let i = 0; i < n; i++) {
+    const {min, max} = boxes[i];
+    u.uCutMin.value[i].set(...min);
+    u.uCutMax.value[i].set(...max);
+  }
+  u.uCutCount.value = n;
+}
+
 function applyRoomEdits(snapshot, initial=false, prepared) {
   const prior = state.journey;
   const {ids,parts,instances,assets,navigation,fills,placed,owners} = prepared ?? prepareRoomEdits(snapshot.removed);
@@ -2134,10 +2180,6 @@ function viewRoomLocation(asset,{avoid=null}={}) {
   }
 }
 
-function moveField(name) {
-  return document.getElementById(`room-move-${name}`);
-}
-
 function beginMovePreview(asset) {
   if (editBusy || removedIds.has(asset.id) || !canRemove(asset)) return;
   closeMovePreview();
@@ -2153,14 +2195,12 @@ function beginMovePreview(asset) {
   const outline = new THREE.LineSegments(edges,new THREE.LineBasicMaterial({color:0x79e2ef,depthTest:false}));
   outline.renderOrder=10;
   scene.add(outline);
-  movePreview={asset:source,outline,review};
+  const [x,y,z]=asset.center;
+  // the pending placement lives here; the mouse (drag, floor or map click) and Q / E change it
+  movePreview={asset:source,outline,review,x,z,
+    height:Math.max(0,asset.transform ? y-asset.size[1]/2 : baseY),yaw:Math.round(asset.yaw*180/Math.PI)};
   document.body.classList.add('placing-object');
   document.getElementById('room-move-form').hidden=false;
-  const [x,y,z]=asset.center;
-  moveField('x').value=x.toFixed(2);
-  moveField('z').value=z.toFixed(2);
-  moveField('height').value=Math.max(0,asset.transform ? y-asset.size[1]/2 : baseY).toFixed(2);
-  moveField('yaw').value=String(Math.round(asset.yaw*180/Math.PI));
   updateMovePreview();
 }
 
@@ -2170,40 +2210,93 @@ function closeMovePreview() {
   movePreview.outline.geometry.dispose();
   movePreview.outline.material.dispose();
   movePreview=null;
-  document.body.classList.remove('placing-object');
+  document.body.classList.remove('placing-object','dragging-object');
+  renderer.domElement.classList.remove('over-object');
   document.getElementById('room-move-form').hidden=true;
 }
 
 function setMovePoint(point) {
-  moveField('x').value=point.x.toFixed(2);
-  moveField('z').value=point.z.toFixed(2);
+  if (!movePreview) return;
+  movePreview.x=point.x;
+  movePreview.z=point.z;
+  updateMovePreview();
+}
+
+function turnMovePreview(degrees) {
+  if (!movePreview) return;
+  movePreview.yaw=Math.round(movePreview.yaw+degrees);
   updateMovePreview();
 }
 
 function updateMovePreview() {
   if (!movePreview) return;
-  const {asset,outline,review}=movePreview;
-  const [x,z,height,degrees]=['x','z','height','yaw'].map(name=>moveField(name).valueAsNumber);
-  const valid=[x,z,height,degrees].every(Number.isFinite);
-  const placement=valid ? {center:[x,height+asset.size[1]/2,z],yaw:degrees*Math.PI/180,source:[...asset.center,asset.yaw]} : null;
-  let error='Enter a position, height, and rotation.';
-  outline.visible=valid;
-  if (placement) {
-    indexedScan ??= indexRoomScan(...sourceScan);
-    const omitted=new Set([...removedIds,...roomPlacements.keys(),asset.id].map(id=>instancesById.get(id)));
-    const rail=review?.rail;
-    const includeRail=rail && !removedIds.has(rail.id) && !roomPlacements.has(rail.id);
-    if (includeRail) omitted.add(instancesById.get(rail.id));
-    const collisionAssets=includeRail ? state.roomAssets.filter(other=>other.id!==rail.id) : state.roomAssets;
-    const placedAsset=placedRoomAsset(asset,placement,review?.baseY);
-    error=roomPlacementError(placedAsset,collisionAssets,indexedScan,omitted,initialNavigation.grid_meta);
-    outline.position.fromArray(placedAsset.center);
-    outline.rotation.y=-placement.yaw;
-    outline.material.color.setHex(error ? 0xff9b85 : 0x79e2ef);
-  }
+  const {asset,outline,review,x,z,height,yaw}=movePreview;
+  const placement={center:[x,height+asset.size[1]/2,z],yaw:yaw*Math.PI/180,source:[...asset.center,asset.yaw]};
+  indexedScan ??= indexRoomScan(...sourceScan);
+  const omitted=new Set([...removedIds,...roomPlacements.keys(),asset.id].map(id=>instancesById.get(id)));
+  const rail=review?.rail;
+  const includeRail=rail && !removedIds.has(rail.id) && !roomPlacements.has(rail.id);
+  if (includeRail) omitted.add(instancesById.get(rail.id));
+  const collisionAssets=includeRail ? state.roomAssets.filter(other=>other.id!==rail.id) : state.roomAssets;
+  const placedAsset=placedRoomAsset(asset,placement,review?.baseY);
+  const error=roomPlacementError(placedAsset,collisionAssets,indexedScan,omitted,initialNavigation.grid_meta);
+  outline.visible=true;
+  outline.position.fromArray(placedAsset.center);
+  outline.rotation.y=-placement.yaw;
+  outline.material.color.setHex(error ? 0xff9b85 : 0x79e2ef);
   Object.assign(movePreview,{placement,error});
   document.getElementById('room-move-error').textContent=error;
   document.getElementById('btn-place-object').disabled=!!error;
+}
+
+// Move in room: press on the outline and drag it over the floor (the camera stays put while dragging);
+// pressing anywhere else still orbits, and a plain click on the floor drops the object there.
+function bindMoveDrag() {
+  const canvas=renderer.domElement, ray=new THREE.Raycaster(), ndc=new THREE.Vector2(), box=new THREE.Box3();
+  let drag=null, frame=0;
+  const cast=e=>{
+    const r=canvas.getBoundingClientRect();
+    ndc.set((e.clientX-r.left)/r.width*2-1,-(e.clientY-r.top)/r.height*2+1);
+    ray.setFromCamera(ndc,camera);
+    return ray.ray;
+  };
+  const floorAt=(e,y)=>cast(e).intersectPlane(new THREE.Plane(new THREE.Vector3(0,1,0),-y),new THREE.Vector3());
+  const onObject=e=>{
+    const outline=movePreview.outline;
+    outline.updateMatrixWorld();
+    box.setFromObject(outline).expandByScalar(.06);
+    return !!cast(e).intersectBox(box,new THREE.Vector3());
+  };
+  canvas.addEventListener('pointerdown',e=>{
+    if (!movePreview || e.button!==0 || !onObject(e)) return;
+    const p=floorAt(e,movePreview.height);
+    if (!p) return;
+    drag={dx:movePreview.x-p.x,dz:movePreview.z-p.z};
+    controls.enabled=false;
+    canvas.setPointerCapture(e.pointerId);
+    document.body.classList.add('dragging-object');
+    e.preventDefault();
+    e.stopImmediatePropagation(); // before OrbitControls and the click-to-select handler
+  },{capture:true});
+  canvas.addEventListener('pointermove',e=>{
+    if (!movePreview) return;
+    if (!drag) { canvas.classList.toggle('over-object',onObject(e)); return; }
+    const p=floorAt(e,movePreview.height);
+    if (!p) return;
+    movePreview.x=p.x+drag.dx;
+    movePreview.z=p.z+drag.dz;
+    frame ||= requestAnimationFrame(()=>{ frame=0; updateMovePreview(); });
+  });
+  const end=e=>{
+    if (!drag) return;
+    drag=null;
+    controls.enabled=true;
+    if (canvas.hasPointerCapture(e.pointerId)) canvas.releasePointerCapture(e.pointerId);
+    document.body.classList.remove('dragging-object');
+    e.stopImmediatePropagation(); // a drag is not a floor click
+  };
+  canvas.addEventListener('pointerup',end,{capture:true});
+  canvas.addEventListener('pointercancel',end,{capture:true});
 }
 
 function changePlacement(asset, placement) {
@@ -2255,8 +2348,10 @@ function bindRoomEdits() {
   document.getElementById('btn-move-object').addEventListener('click',()=>beginMovePreview(state.selectedAsset));
   document.getElementById('btn-reset-position').addEventListener('click',()=>changePlacement(state.selectedAsset,null));
   document.getElementById('btn-cancel-move').addEventListener('click',closeMovePreview);
+  document.getElementById('btn-rotate-left').addEventListener('click',()=>turnMovePreview(-15));
+  document.getElementById('btn-rotate-right').addEventListener('click',()=>turnMovePreview(15));
+  bindMoveDrag();
   const form=document.getElementById('room-move-form');
-  form.addEventListener('input',updateMovePreview);
   form.addEventListener('submit',event=>{
     event.preventDefault();
     if (movePreview?.placement && !movePreview.error) changePlacement(movePreview.asset,movePreview.placement);
@@ -2510,7 +2605,10 @@ function bindUIEvents() {
   document.getElementById("btn-manual-walk").addEventListener("click", resumeMission);
   window.addEventListener("keydown", event => {
     if (movePreview) {
+      const key=event.key.toLowerCase();
       if (event.key === 'Escape') closeMovePreview();
+      else if (key === 'q' || key === 'e') { event.preventDefault(); turnMovePreview(key === 'q' ? -15 : 15); }
+      else if (event.key === 'Enter') { event.preventDefault(); if (!movePreview.error) changePlacement(movePreview.asset,movePreview.placement); }
       return;
     }
     if (event.defaultPrevented || event.isComposing || event.altKey || event.ctrlKey || event.metaKey ||

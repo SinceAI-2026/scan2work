@@ -45,14 +45,20 @@ export async function showEquipment(equipment) {
   const filter = document.getElementById("select-visual-review");
   const card = () => document.querySelector(`#asset-list .proposal-card[data-obj="${CSS.escape(obj)}"]`);
   const keep = { q: search.value, f: filter.value };
+  const restore = () => {
+    if (search.value !== keep.q) { search.value = keep.q; search.dispatchEvent(new Event("input")); }
+    if (filter.value !== keep.f) { filter.value = keep.f; filter.dispatchEvent(new Event("change")); }
+  };
   if (!card()) { search.value = ""; search.dispatchEvent(new Event("input")); }
   if (!card()) { filter.value = "all"; filter.dispatchEvent(new Event("change")); }
   if (!card()) { search.value = obj; search.dispatchEvent(new Event("input")); }
-  if (!card()) throw new Error(`${tag} is not in the room list (removed from the room?)`);
+  if (!card()) {
+    restore(); // never leave the list searching for an object that is not there ("No matching regions")
+    throw new Error(`${tag} was removed from this room. Restore it from Room changes to show it.`);
+  }
   card().click();
   document.getElementById("btn-room-location").click();
-  if (search.value !== keep.q) { search.value = keep.q; search.dispatchEvent(new Event("input")); }
-  if (filter.value !== keep.f) { filter.value = keep.f; filter.dispatchEvent(new Event("change")); }
+  restore();
   flash(`Showing ${tag}`);
   return { tag, label, area };
 }

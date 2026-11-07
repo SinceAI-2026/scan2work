@@ -140,13 +140,8 @@
         <!-- no visible button: Navigate here replaces it; field-jobs.mjs still clicks it to frame a job's device -->
         <button id="btn-room-location" hidden>View location</button>
         <form id="room-move-form" class="room-move-form" hidden>
-          <p>Click the floor or map to place the outline. Adjust height and angle here.</p>
-          <div class="room-move-fields">
-            <label>X (m)<input id="room-move-x" type="number" step="0.01" required></label>
-            <label>Z (m)<input id="room-move-z" type="number" step="0.01" required></label>
-            <label>Base height (m)<input id="room-move-height" type="number" step="0.01" min="0" required></label>
-            <label>Rotation (°)<input id="room-move-yaw" type="number" step="1" required></label>
-          </div>
+          <p>Drag the object across the floor, or click the floor or map to drop it there. Q / E turn it.</p>
+          <div class="room-edit-actions"><button id="btn-rotate-left" type="button" class="btn-outline-full" title="Turn 15° left (Q)">↺ Turn</button><button id="btn-rotate-right" type="button" class="btn-outline-full" title="Turn 15° right (E)">Turn ↻</button></div>
           <p id="room-move-error" role="status"></p>
           <div class="room-edit-actions"><button id="btn-cancel-move" type="button" class="btn-outline-full">Cancel move</button><button id="btn-place-object" class="btn-outline-full" type="submit">Place object</button></div>
         </form>
