@@ -122,6 +122,40 @@ The [asset library](http://127.0.0.1:8765/library.html) lists the saved objects 
 
 On 6 objects (7 Nov 2026), `tests.eval_refine` held out each object's best frame and its neighbours. Against that photo, mean colour error fell from 0.162 to 0.123, and SSIM rose from 0.340 to 0.399. Objects the walkthrough saw from few angles gain least: pump P-001 (OBJ-008) went from 0.128 to 0.124 error, and its SSIM fell from 0.275 to 0.262.
 
+## Take a pump apart in the room
+
+Select a pump or motor that stands inside one of the five split units and choose **Take apart** in Equipment details (or press **T**). For these objects the button takes the unit apart in the room. For every other object it keeps the take-apart described above.
+
+| Unit (scan2service) | This viewer's objects inside it |
+| --- | --- |
+| Inline pump 2, `B019p+A069_r2` | M-005 and the pump casing below it (OBJ-034) |
+| Inline pump 1, `B013+B013m` | M-004 |
+| Red circulator, `B156+B156m_r2` | M-006 |
+| Grundfos circulator, `B149+B149m` | P-001 |
+| Red circulator, `A101+G071` | P-005 and OBJ-434 |
+
+Away from the pump, the robot walks there first. The view glides into first person at the robot and turns to the unit, and the unit's parts ease apart where it stands. The room stays in view behind them, dimmed and blurred (3 px), and the objects' own scan splats are hidden under the model. Other frames, labels and the navigation panels are hidden until **Done** or **Esc**.
+
+- Each part has a callout with its name and size in mm. It also shows the tag of the object that the part holds, with that object's synthetic fault.
+- The dock on the right has **Explode**, **Reassemble**, **Reset** and **Done**, a slider, the fault list, a button per part and the selected part's detail.
+- Click a part (or its callout or button) to select it. The eye eases about 30 % toward it.
+- The fault part is tinted and outlined in red. Another object's fault in the same unit is shown in amber.
+
+The models are AI-generated (Higgsfield) units, split into parts by geometry rules. scan2service fitted them in raw PLY coordinates of the same `Equipment Room.ply`. The viewer only levels them, `(x, 1.185 − y, −z)` as in `pipeline/ingest.py`, so each unit stands exactly where it was fitted. Objects are matched to a unit by **position**: an object belongs to the unit when its box centre lies inside the unit's box. Tags are never used for this, because the two repos tagged the Excel devices onto the scan independently. The faults come from the matched objects' own Excel records, on the part whose fault codes hold the issue, preferring the part the object stands in. For example, M-005's current imbalance is shown on the motor and P-005's fouling on the pump housing. An issue that no part of the model carries is still listed in the dock, such as P-001's misalignment on a circulator with no coupling.
+
+### AI 3D models in the room
+
+Every Higgsfield unit that scan2service shows in its room is drawn where it was fitted, unshifted: 15 models from its own index (`equip_v1/assets_export/hf3d/index.json`), including the big vessel, cabinet and trolley, plus 3 newer ones from the MVP's `index_new.json`: the Grundfos twin pump unit (on P-002 here) and the valves A257 (on CV-007) and A352 (on M-002). The `_r2` redo is used where there is one. Units that scan2service hides, or whose silhouette fit against the photos is below 0.5, are skipped, and the import lists them with the reason. Each model sits on this viewer's objects whose box centres lie inside it. A small model with none sits on the smallest box that holds its centre. A model with no object of this viewer under it is skipped, so the scan never shows through a model (B165 and B169 here; `window.__ai3d.skipped()` lists them). The room models carry 1024 px copies of their textures, written by the import, while the split units for Take apart keep the full 2048 px. That is about 70 MB of video memory for the 13 room models instead of about 290 MB. Their scan splats are hidden under the model, and their room labels get an **AI 3D** badge. A pump and motor unit is one model, drawn once. The models load one by one after the splat. They follow the explode slider and room moves of their main object, and leave with it. They are hidden in the BIM layer and while an object is taken apart with Wael's take-apart. `?ai3d=0` turns them off. The code is in `web/ai3d.mjs`.
+
+The assets ship in the repo under `web/data/take_apart/`, so no import step is needed: `index.json`, the split units in `parts/` (2048 px textures) and the room models in `ai3d/` (1024 px copies), about 44 MB in 24 files. The rest of `web/data/` stays git-ignored. `scripts/import_take_apart.py` only regenerates them, from the MVP's s2s parts index, scan2service's hf3d index and the MVP's `index_new.json`:
+
+```sh
+.venv/bin/python -m scripts.import_take_apart    # regenerates web/data/take_apart/{index.json,parts/,ai3d/}
+node tests/test_parts_data.mjs                    # matching by position, faults from the objects' own records
+```
+
+Take apart is ported from Mikael Lehtonen's scan2service (`web/parts.js`) via SinceAI-2026/mvp, with the UX after Rasmus Mäkinen's pump explode. The code is in `web/room-parts.mjs`, `web/parts-data.mjs`, `web/ai3d.mjs` and `web/room-parts.css`. `web/vendor/three/addons/loaders/GLTFLoader.js` is three.js r170's loader, matching the vendored three.
+
 ## Voice assistant (ElevenLabs agent Ilkka)
 
 Select **Call Ilkka for support** at the bottom of the viewer. Ilkka runs on `gemini-3.5-flash`, answers in short radio-style replies, and is told which equipment is selected in the viewer, so "what's wrong with this one?" needs no tag.

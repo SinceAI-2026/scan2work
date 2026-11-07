@@ -17,13 +17,15 @@ import { createBimRoom } from "./bim-room.mjs";
 import { fitBimVessels } from "./bim-geometry.mjs";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { explodeState, explodeOffset, loadInstanceUniforms, applyExplode, mountExplodeControls, SHADER_DECL, SHADER_OFFSET, SHADER_COLOR } from "./explode.mjs";
-import { classColour, setTintMask } from "./explode.mjs";
+import { classColour, setTintMask, setAlertMask, setAlertPulse } from "./explode.mjs";
 import { classCss } from "./asset-presentation.mjs";
 import { filterShows, onFilterChange } from "./view-filter.mjs";
 import { ICONS } from "./view-icons.mjs";
 import { createTakeApart } from "./take-apart.mjs";
 import { mountProposalReview } from "./proposal-review.mjs";
 import { bindRoomControls } from "./room-controls.mjs";
+import { createRoomParts } from "./room-parts.mjs";
+import { createAi3d } from "./ai3d.mjs";
 import { sampleRoute, nearbyAssets, planFromPosition, reachableFloor, floorDestination, assetDestination, planRoomTour, advanceAlongRoute, segmentIsFree } from "./navigation-view.mjs";
 
 const state = {
@@ -85,6 +87,8 @@ const movementKeys = ["w", "a", "s", "d", "arrowup", "arrowdown", "arrowleft", "
 let equipmentObstacles;
 let proposalReview = null;
 let takeApart = null; // one object alone, the room faded (take-apart.mjs)
+let roomParts = null; // a pump unit apart where it stands, in first person (room-parts.mjs)
+let ai3d = null; // Higgsfield models drawn in place of their devices (ai3d.mjs)
 let updateFillSort;
 let sourceScan, indexedScan, originalNavigation, initialNavigation, walkPoses;
 let editStore, activeEdits = [], removedIds = new Set(), editsOffline = false, editBusy = false;
@@ -157,6 +161,16 @@ async function init() {
     setLayer:setViewLayer, setCeilingCut, beforeOpen:()=>proposalReview?.close(),
     container: document.getElementById("canvas-container"), scene, renderer,
   });
+  roomParts = createRoomParts({
+    scene, camera, renderer, container: document.getElementById("canvas-container"), state, boxMeshes,
+    uniforms: () => splatMaterial?.uniforms, look: firstLook, eye: ROBOT_EYE_M, setPreset: applyCameraPreset,
+    robot: robotPosition, walkTo: dispatchRobotToAsset, closeOther: () => takeApart?.close(), setInspector: setInspectorOpen,
+    onStage: (asset, on) => ai3d?.hold(asset, on),
+  });
+  ai3d = createAi3d({
+    scene, renderer, state, hudElements, uniforms: () => splatMaterial?.uniforms, ready: roomParts.ready,
+    roomAsset, removed: id => removedIds.has(id), otherOpen: () => !!takeApart?.isOpen,
+  });
   buildRobotAvatar();
   editStore = roomEditStore(id => canRemove(state.assetsByObj.get(id)),state.datasetId);
   roomPlacements = loadRoomPlacements(state.assetsByObj, canRemove,state.datasetId);
@@ -208,10 +222,13 @@ async function init() {
     stepSimulation(dt, now * 0.001);
     takeApart.frame(boxMeshes);
     if (proposalReview?.isOpen) for (const entry of boxMeshes.values()) entry.group.visible=false;
+    roomParts.frame(dt);
+    ai3d.frame();
     bimView.update(state.selectedAsset);
     updateMotionResolution(now);
     maybeTriggerDepthSort();
     renderer.render(scene, camera);
+    roomParts.draw();
     updateHudLabels();
   }
   requestAnimationFrame(animate);
@@ -455,6 +472,9 @@ async function loadEwaGaussianSplats(url) {
       uHasRemoved: {value:0},
       uFillDebug: {value:0},
       uSplatAxisLimit: { value: 180 },
+      uCovered: {value:makeRoomTexture(new Float32Array(256 * explodeUniforms.uInstTableSize.value.y),256,   // ai3d.mjs: objects under an AI 3D model
+        explodeUniforms.uInstTableSize.value.y,THREE.RedFormat)},
+      uHasCovered: {value:0},
     },
     vertexShader: `
       attribute float splatIndex;
@@ -468,6 +488,8 @@ async function loadEwaGaussianSplats(url) {
       uniform vec2 uViewport;
       uniform vec2 uFocal;
 ${SHADER_DECL}      uniform float uSplatAxisLimit;
+      uniform float uHasCovered;
+      uniform sampler2D uCovered;
       uniform float uBaseCount, uFillCount, uHasRemoved, uFillDebug;
       uniform sampler2D uRoomFill, uRemoved;
       uniform vec2 uRoomFillSize;
@@ -492,7 +514,11 @@ ${SHADER_DECL}      uniform float uSplatAxisLimit;
           return;
         }
         vec3 center = centerRgba.xyz;
-${SHADER_OFFSET}        vec4 cam = modelViewMatrix * vec4(center, 1.0);
+${SHADER_OFFSET}        if (uHasCovered > 0.5 && instId > 0.5 && texture2D(uCovered, (vec2(mod(instId, uInstTableSize.x), floor(instId / uInstTableSize.x)) + 0.5) / uInstTableSize).x > 0.5) {
+          gl_Position = vec4(0.0, 0.0, 2.0, 1.0);   // under its AI 3D model (ai3d.mjs)
+          return;
+        }
+        vec4 cam = modelViewMatrix * vec4(center, 1.0);
 
         if (cam.z > -0.08) {
           gl_Position = vec4(0.0, 0.0, 2.0, 1.0);
@@ -822,17 +848,34 @@ function setCeilingCut(on) {
 // After applyExplode: class colours in the Detected layer, and no frames above a hidden ceiling.
 function applyLayerFrames() {
   for (const entry of boxMeshes.values()) {
-    if (entry.removed) continue;
+    if (entry.removed || entry.outlineOnly) continue;
     const a = entry.asset;
     const isSel = state.selectedAsset?.id === a.id;
-    if (isAerial() && !isSel && !a.is_target && !filterShows(a)) { entry.group.visible = false; continue; }
-    if (state.ceilingCut && !isSel && a.center[1] - a.size[1] / 2 > CEILING_CUT_M - 0.15) { entry.group.visible = false; continue; }
-    if (state.viewLayer === "bim") { entry.lineMat.opacity = 0; entry.fillMat.opacity = 0; continue; }
+    const broken = isBrokenEquipment(a);
+    if (isAerial() && !isSel && !a.is_target && !filterShows(a)) { if (broken) showBrokenOutline(entry); else entry.group.visible = false; continue; }
+    if (state.ceilingCut && !isSel && a.center[1] - a.size[1] / 2 > CEILING_CUT_M - 0.15) { if (broken) showBrokenOutline(entry); else entry.group.visible = false; continue; }
+    if (state.viewLayer === "bim") { if (broken) showBrokenOutline(entry); else { entry.lineMat.opacity = 0; entry.fillMat.opacity = 0; } continue; }
     if (state.viewLayer !== "detected" || a.is_target) continue;
     const c = classColour(a);
     entry.lineMat.color.copy(c);
     entry.fillMat.color.copy(c);
   }
+}
+
+// Broken equipment (degraded or attention required in the Excel pack, and the faulty target) keeps a thin red
+// outline wherever frames are hidden: frames Off, the inspection view, a filter or the BIM layer. No fill and no
+// label, so it marks the part without covering it.
+const BROKEN_RED = 0xd94838;
+function isBrokenEquipment(asset) {
+  return !asset.movable && (asset.is_target || (asset.mapped && ["degraded", "attention_required"].includes(asset.condition_state)));
+}
+setAlertMask(isBrokenEquipment);   // their splats flash red when frames are off (explode.mjs applies it on load)
+function showBrokenOutline(entry) {
+  entry.group.visible = true;
+  entry.lineMat.color.setHex(BROKEN_RED);
+  entry.lineMat.opacity = 0.85;
+  entry.fillMat.opacity = 0;
+  entry.outlineOnly = true;
 }
 
 function getAssetBoxColor(asset) {
@@ -1145,6 +1188,8 @@ function stepSimulation(dt, elapsedSec) {
       vis = isSel || a.is_target || (isNear && (!state.imported || a.mapped));
     }
 
+    entry.outlineOnly = false;
+    if (!vis && isBrokenEquipment(a) && state.boxesMode !== "off") { showBrokenOutline(entry); continue; }
     entry.group.visible = vis;
     if (!vis) continue;
 
@@ -1169,6 +1214,9 @@ function stepSimulation(dt, elapsedSec) {
 
 
   explodeState.segment = state.viewLayer === "detected";
+  // Frames off: broken equipment flashes red in the scan itself, from its own colour to bright red about once a second.
+  setAlertPulse(splatMaterial, state.boxesMode === "off" && state.viewLayer !== "bim"
+    ? 0.85 * (0.5 + 0.5 * Math.sin(performance.now() * 0.0063)) : 0);
   applyExplode(boxMeshes, splatMaterial);
   renderJourneyControls(nav);
   if (state.boxesMode !== "off") applyLayerFrames();
@@ -1224,7 +1272,7 @@ function updateHudLabels() {
   const candidates = [];
   for (const [objId, el] of hudElements.entries()) {
     const entry = boxMeshes.get(objId);
-    if (state.boxesMode === "off" || !entry.group.visible) { showLabel(el, false); continue; }
+    if (state.boxesMode === "off" || !entry.group.visible || entry.outlineOnly) { showLabel(el, false); continue; }
     const a = entry.asset;
     const isSel = state.selectedAsset && state.selectedAsset.id === objId;
     const dist = Math.hypot(a.center[0] - rx, a.center[2] - rz);
@@ -1613,6 +1661,7 @@ function showArrivalReport(assetId) {
   const asset=roomAsset(state.assetsById.get(assetId));
   if(!asset)return;
   selectAsset(asset,true);
+  beginInspectionView(asset);
   document.getElementById("canvas-container").classList.remove("map-expanded");
   document.getElementById("btn-map-expand").textContent="Expand map";
   document.getElementById("btn-map-expand").setAttribute("aria-expanded","false");
@@ -1652,6 +1701,7 @@ function renderJourneyControls(nav) {
 }
 
 function activateRoute(route, {preserveWalk=false, preserveHistory=false, keepView=false} = {}) {
+  endInspectionView();
   const result=transitionJourney(state.journey,{type:"start",route,position:robotPosition()});
   state.manualWalk = null;
   walkKeys.clear();
@@ -2174,7 +2224,7 @@ function bindViewSwitch() {
   };
   fab.addEventListener("click", () => setOpen(menu.hidden));
   for (const btn of menu.querySelectorAll("[data-cam]")) {
-    btn.addEventListener("click", () => { proposalReview?.close(); applyCameraPreset(btn.dataset.cam); setOpen(false); fab.focus(); });
+    btn.addEventListener("click", () => { proposalReview?.close(); endInspectionView(); applyCameraPreset(btn.dataset.cam); setOpen(false); fab.focus(); });
   }
   document.addEventListener("pointerdown", e => { if (!menu.hidden && !e.target.closest("#view-switch")) setOpen(false); });
   document.addEventListener("keydown", e => {
@@ -2261,6 +2311,34 @@ function firstPersonYaw(nav, dt, route) {
   return firstLook.body + firstLook.yaw;
 }
 
+// Inspecting a part: going to equipment switches to the robot's own eyes (first person). On arrival the frames
+// are switched off so they do not cover the part, and the view turns to face it. The frames come back as they
+// were when the robot sets off again or the user picks another view; picking a frames mode keeps that choice.
+const inspection = { framesBefore: null };
+
+function setBoxesMode(mode) {
+  state.boxesMode = mode;
+  document.querySelectorAll("[data-bmode]").forEach(b => b.classList.toggle("active", b.dataset.bmode === mode));
+  updateLayerCount();
+}
+
+function endInspectionView() {
+  if (inspection.framesBefore === null) return;
+  setBoxesMode(inspection.framesBefore);
+  inspection.framesBefore = null;
+}
+
+function beginInspectionView(asset) {
+  if (state.cameraPreset !== "first" || !asset?.center) return;
+  if (inspection.framesBefore === null) inspection.framesBefore = state.boxesMode;
+  setBoxesMode("off");
+  const {x, z} = robotPosition(), [ax, ay, az] = asset.center;
+  firstLook.body = Math.atan2(ax - x, az - z);   // face the part
+  firstLook.yaw = 0;
+  firstLook.pitch = Math.max(-0.9, Math.min(0.6, Math.atan2(ay - ROBOT_EYE_M, Math.hypot(ax - x, az - z))));
+  firstLook.at = performance.now();
+}
+
 function updateWalkCamera(nav, dt = 0, route = null) {
   const yaw = firstPersonYaw(nav, dt, route), pitch = firstLook.pitch;
   // The robot's own camera: the front of its head, at a standing person's eye height.
@@ -2301,10 +2379,11 @@ function navigationError(error) {
   applyJourneyEvent({type:"block",message:error.message});
 }
 
-function dispatchRobotToAsset(asset) {
+function dispatchRobotToAsset(asset, {firstPerson = true} = {}) {
   asset=roomAsset(asset);
   if (!asset || removedIds.has(asset.id)) return;
   if (!state.navigationAvailable) { navigationError(new Error("No supported floor route is available; use Free view to inspect.")); return; }
+  if (firstPerson && state.cameraPreset !== "first" && !bimView?.active) applyCameraPreset("first");
   takeApart?.close();
   try {
     const start=robotPosition();
@@ -2343,11 +2422,11 @@ function registerActivity() {
 function updateAttractMode(now) {
   if (bimView?.active) return;
   if (movePreview) return;
-  if (takeApart?.isOpen || state.manualWalk || !attract.enabled || attract.active || document.hidden || now-attract.lastActivity < 20000) return;
+  if (takeApart?.isOpen || roomParts?.isOpen || state.manualWalk || !attract.enabled || attract.active || document.hidden || now-attract.lastActivity < 20000) return;
   if (!["idle","arrived"].includes(state.journey.phase)) return;
   const target=state.assetsById.get(state.twin.target_asset_id);
   if (!target) return;
-  dispatchRobotToAsset(target);
+  dispatchRobotToAsset(target, {firstPerson: false});   // the idle demo does not take over the camera
   attract.lastActivity=now;
   if (["moving","arrived"].includes(state.journey.phase)) {
     attract.active=true;
@@ -2487,6 +2566,7 @@ function bindUIEvents() {
       btn.classList.add("active");
       state.boxesMode = btn.dataset.bmode;
       updateLayerCount();
+      inspection.framesBefore = null;   // the user's own choice stays
     });
   }
 

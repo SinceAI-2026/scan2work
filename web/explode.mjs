@@ -8,6 +8,8 @@ import { decodeInstanceIds } from "./imported-assets.mjs";
 export const explodeState = { amount: 0, segment: false };
 const offsets = new Map();
 let tintTable = null;   // {data, texture, assets, colours}: per-object class colour, -1 = not tinted
+let alertTable = null;  // {data, texture, assets}: 1 for objects whose splats flash red (broken equipment)
+let alertPredicate = null;
 
 export function objectColor(id) {
   let h = 0;
@@ -62,6 +64,9 @@ export async function loadInstanceUniforms(url, count, texW, texH, assets) {
   });
   const tableTexture = floatTex(table, tableW, tableH, THREE.RGBAFormat);
   tintTable = { data: table, texture: tableTexture, assets, colours: assets.map((a, i) => table[(i + 1) * 4 + 3]) };
+  const alertData = new Float32Array(tableW * tableH);
+  alertTable = { data: alertData, texture: floatTex(alertData, tableW, tableH, THREE.RedFormat), assets };
+  if (alertPredicate) setAlertMask(alertPredicate);
   const instanceTexture = floatTex(instData, texW, texH, THREE.RedFormat);
   instanceTexture.userData.complete = complete;
   return {
@@ -76,6 +81,8 @@ export async function loadInstanceUniforms(url, count, texW, texH, assets) {
     uApartSelf: { value: 1 },  // opacity of the isolated object's scan splats (0 while its saved model stands in)
     uProposalTex: { value: floatTex(new Float32Array(1),1,1,THREE.RedFormat) },
     uProposalId: { value: 0 }, // optional review overlay, independent of canonical object ownership
+    uAlertTex: { value: alertTable.texture },  // per object: 1 = flash red (setAlertMask)
+    uAlertPulse: { value: 0 },  // 0 = off; 0..1 = how red the flagged objects are this frame (setAlertPulse)
   };
 }
 
@@ -91,6 +98,8 @@ export const SHADER_DECL = `
       uniform float uApartSelf;
       uniform sampler2D uProposalTex;
       uniform float uProposalId;
+      uniform sampler2D uAlertTex;
+      uniform float uAlertPulse;
 `;
 export const SHADER_OFFSET = `
         float instId = synthetic ? floor(max(0.0, -fillCovB.w)) : texture2D(uInstTex, uv).x;
@@ -111,6 +120,11 @@ export const SHADER_COLOR = `
           vec3 ic = vec3(mod(p, 256.0), mod(floor(p / 256.0), 256.0), floor(p / 65536.0)) / 255.0;
           vColor.rgb = mix(vColor.rgb, ic, 0.85);
         }
+        if (instId > 0.5 && uAlertPulse > 0.0 && uApart < 0.5) {
+          vec2 auv = (vec2(mod(instId, uInstTableSize.x), floor(instId / uInstTableSize.x)) + 0.5) / uInstTableSize;
+          // Toward a bright red and a little lighter at the peak, so even red-painted equipment visibly blinks.
+          if (texture2D(uAlertTex, auv).x > 0.5) vColor.rgb = min(mix(vColor.rgb, vec3(1.0, 0.1, 0.06), uAlertPulse) + 0.22 * uAlertPulse, 1.0);
+        }
         if (uApart > 0.5) vColor.a *= abs(instId - uApart) > 0.5 ? uApartRoom : uApartSelf;
         else if (instId < 0.5) vColor.a *= 1.0 - 0.85 * max(uExplode, uSegment * 0.6);
         if (uProposalId > 0.5 && !synthetic && abs(texture2D(uProposalTex, uv).x - uProposalId) < 0.5) {
@@ -124,6 +138,20 @@ export function setTintMask(predicate) {
   const { data, texture, assets, colours } = tintTable;
   assets.forEach((a, i) => { data[(i + 1) * 4 + 3] = predicate(a) ? colours[i] : -1; });
   texture.needsUpdate = true;
+}
+
+// Broken equipment flashes red when frames are off: which objects (once), and how red this frame (every frame).
+export function setAlertMask(predicate) {
+  alertPredicate = predicate;   // kept, so a call before the splats load still applies
+  if (!alertTable) return;
+  const { data, texture, assets } = alertTable;
+  assets.forEach((a, i) => { data[i + 1] = predicate(a) ? 1 : 0; });
+  texture.needsUpdate = true;
+}
+
+export function setAlertPulse(splatMaterial, value) {
+  const u = splatMaterial?.uniforms?.uAlertPulse;
+  if (u) u.value = value;
 }
 
 // Called once per frame after app.js has styled the boxes.
