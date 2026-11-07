@@ -8,12 +8,13 @@ from __future__ import annotations
 import io
 import json
 import mimetypes
+import re
 import threading
 import time
 import zipfile
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs, unquote, urlparse
 
 from pipeline import asset_export, decisions_client, field_service, retrieval
 
@@ -254,6 +255,44 @@ class TwinRequestHandler(SimpleHTTPRequestHandler):
         self.send_header("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
         super().end_headers()
 
+    def _send_media(self, file_path: Path):
+        """Serve a video with HTTP byte ranges (206), which browsers need to stream and seek it. Safari will not
+        play a large MP4 without them, and the AR walkthrough is 64 MB."""
+        size = file_path.stat().st_size
+        start, end, status = 0, size - 1, 200
+        m = re.fullmatch(r"bytes=(\d*)-(\d*)", self.headers.get("Range", "").strip())
+        if m and (m[1] or m[2]):
+            if m[1]:
+                start, end = int(m[1]), min(int(m[2]) if m[2] else size - 1, size - 1)
+            else:  # suffix range: the last N bytes
+                start = max(0, size - int(m[2]))
+            if start > end:
+                self.send_response(416)
+                self.send_header("Content-Range", f"bytes */{size}")
+                self.send_header("Content-Length", "0")
+                self.end_headers()
+                return
+            status = 206
+        self.send_response(status)
+        self.send_header("Content-Type", mimetypes.guess_type(file_path.name)[0] or "application/octet-stream")
+        self.send_header("Accept-Ranges", "bytes")
+        self.send_header("Content-Length", str(end - start + 1))
+        if status == 206:
+            self.send_header("Content-Range", f"bytes {start}-{end}/{size}")
+        self.end_headers()
+        try:
+            with file_path.open("rb") as f:
+                f.seek(start)
+                left = end - start + 1
+                while left > 0:
+                    chunk = f.read(min(1 << 20, left))
+                    if not chunk:
+                        break
+                    self.wfile.write(chunk)
+                    left -= len(chunk)
+        except (BrokenPipeError, ConnectionResetError):  # the browser stopped this range to ask for another
+            pass
+
     def _send_json(self, obj, status=200):
         raw = json.dumps(obj).encode("utf-8")
         self.send_response(status)
@@ -270,6 +309,11 @@ class TwinRequestHandler(SimpleHTTPRequestHandler):
 
         if path == "/api/scene/edits":
             return self._send_json(read_edits())
+
+        if path.startswith("/data/") and path.lower().endswith((".mp4", ".webm")):
+            media = (WEB_DIR / unquote(path).lstrip("/")).resolve()
+            if WEB_DIR.resolve() in media.parents and media.is_file():
+                return self._send_media(media)
 
         if path == "/api/field-log":  # the technician's job log, written by mcp_server.py
             return self._send_json(field_service.read_log())

@@ -136,8 +136,12 @@ async function init() {
   }
 
   let lastTs = performance.now();
+  const arDialog = document.getElementById("ar-view");
   function animate(now) {
     requestAnimationFrame(animate);
+    // The AR walkthrough covers the view: stop rendering the scan behind it so the video gets the GPU.
+    // The scene and the robot resume when it closes.
+    if (arDialog?.open) { lastTs = now; return; }
     const dt = Math.min(0.08, (now - lastTs) / 1000);
     lastTs = now;
     updateAttractMode(now);
@@ -2444,28 +2448,22 @@ async function bindArView() {
     return;
   }
 
-  let videoLoad;
   button.hidden = false;
   button.addEventListener("click", async () => {
     dialog.showModal();
     if (!video.getAttribute("src")) {
       status.textContent = "Loading walkthrough…";
       status.hidden = false;
-      // Buffer the local clip so seeking also works on servers without byte-range support.
-      videoLoad ??= fetch("./data/overlay_walk.mp4").then(async response => {
-        if (!response.ok) throw new Error("Walkthrough unavailable");
-        video.src = URL.createObjectURL(await response.blob());
-      });
-      try {
-        await videoLoad;
-        status.hidden = true;
-      } catch {
-        videoLoad = null;
-        status.textContent = "Could not load the walkthrough. Close and reopen to retry.";
-        return;
-      }
+      // Stream the clip: server.py serves byte ranges, so it starts at once and seeks (a 64 MB blob stayed black in Safari).
+      video.src = "./data/overlay_walk.mp4";
     }
     if (dialog.open) video.play().catch(() => {});
+  });
+  video.addEventListener("canplay", () => { status.hidden = true; });
+  video.addEventListener("error", () => {
+    status.textContent = "This browser could not play the walkthrough video. Close and reopen to retry.";
+    status.hidden = false;
+    video.removeAttribute("src");
   });
   video.addEventListener("loadedmetadata", () => {
     excerpt.hidden = !Number.isFinite(targetTime) || targetTime < 0 || targetTime > video.duration;

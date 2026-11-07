@@ -107,7 +107,7 @@ def main():
                            stdout=subprocess.PIPE)
     enc = subprocess.Popen(["ffmpeg", "-v", "error", "-y", "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", f"{W}x{H}",
                             "-r", str(FPS), "-i", "-", "-c:v", "libx264", "-preset", "veryfast", "-crf", "22",
-                            "-pix_fmt", "yuv420p", args.out], stdin=subprocess.PIPE)
+                            "-pix_fmt", "yuv420p", "-movflags", "+faststart", args.out], stdin=subprocess.PIPE)
     shown_prev, k = set(), 0
     seen_ids, attention_seen = set(), set()
     while True:
