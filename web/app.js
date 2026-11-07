@@ -1309,7 +1309,7 @@ function updateHudLabels() {
   // Read pass: panels to avoid, and the size of any label whose text changed.
   const origin = container.getBoundingClientRect();
   const placed = [];
-  for (const panel of document.querySelectorAll(".viewport-Controls-overlay, .layer-panel, .navigation-hud, .route-map-panel, .right-sidebar")) {
+  for (const panel of document.querySelectorAll(".viewport-Controls-overlay, .layer-panel, .aerial-tools, .navigation-hud, .route-map-panel, .right-sidebar")) {
     if (!panel.getClientRects().length) continue;
     const r = panel.getBoundingClientRect();
     placed.push({left:r.left-origin.left, right:r.right-origin.left, top:r.top-origin.top, bottom:r.bottom-origin.top});

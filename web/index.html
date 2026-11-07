@@ -18,6 +18,7 @@
   </script>
   <link rel="stylesheet" href="./view-layers.css">
   <link rel="stylesheet" href="./view-switch.css">
+  <link rel="stylesheet" href="./fault-panel.css">
 </head>
 <body>
   <div id="arrival-announcement" class="visually-hidden" role="status" aria-live="polite"></div>
@@ -46,7 +47,7 @@
         <div class="viewport-Controls-overlay">
           <div class="room-toolbar" role="toolbar" aria-label="Room controls">
             <div class="view-switch" id="view-switch">
-              <button class="view-fab" id="view-fab" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="view-menu" aria-label="Change view: Follow robot"><span class="view-icon" id="view-fab-icon" data-icon="follow"></span><span id="view-fab-label">Follow robot</span><span aria-hidden="true">⌄</span></button>
+              <button class="view-fab" id="view-fab" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="view-menu" aria-label="Change view: Follow robot"><span class="view-icon" id="view-fab-icon" data-icon="follow"></span><span id="view-fab-label">Follow robot</span><span class="view-chevron" data-icon="chevron" aria-hidden="true"></span></button>
               <div class="view-menu" id="view-menu" role="menu" aria-label="Camera" hidden>
                 <button class="view-item" type="button" role="menuitemradio" data-cam="aerial" data-icon="aerial" aria-label="Aerial view">Aerial view <small>Orbit freely around the room</small></button>
                 <button class="view-item active" type="button" role="menuitemradio" data-cam="walk" data-icon="follow" aria-label="Follow robot">Follow robot <small>Watch the inspection route</small></button>
@@ -69,18 +70,9 @@
               <div class="layer-row">Frames<div class="layer-mini-seg" role="group" aria-label="Equipment frames"><button type="button" class="active" id="btn-boxes-mode" data-bmode="proximity">Nearby</button><button type="button" id="btn-all-boxes" data-bmode="all">All</button><button type="button" id="btn-no-boxes" data-bmode="off">Off</button></div></div>
               <label id="btn-room-fill-label" class="room-fill-toggle"><input type="checkbox" id="room-fill-debug"> Tint synthetic fill</label>
             </div>
-            <div class="layer-group layer-aerial" role="group" aria-labelledby="layer-show-heading">
-              <span class="layer-heading" id="layer-show-heading">Show in room</span>
-              <label><input type="checkbox" id="layer-walls"> Walls</label>
-              <label><input type="checkbox" id="layer-pipes"> Pipes and overhead objects</label>
-              <label><input type="checkbox" id="layer-all"> All equipment</label>
-              <label><input type="checkbox" id="layer-relevant" checked> Large / registered equipment</label>
-            </div>
             <div class="layer-group layer-aerial">
-              <label class="layer-explode"><span class="view-icon" data-icon="explode"></span>Explode<input id="explode-range" type="range" min="0" max="1" step="0.01" value="0" aria-label="Explode objects"></label>
               <label class="layer-ceiling"><input id="ceiling-toggle" type="checkbox"> Hide ceiling</label>
             </div>
-                <div class="class-legend" id="class-legend" hidden aria-label="Object classes"></div>
               </section>
             </div>
             <button class="vp-btn" id="btn-ar-view" hidden>AR view</button>
@@ -93,6 +85,19 @@
             <button class="vp-btn autoplay-chip" id="autoplay-chip" hidden>AUTOPLAY, click to take over</button>
             <button class="vp-btn manual-walk-chip" id="btn-manual-walk" hidden>Manual walk · M = resume mission</button>
           </div>
+          <section class="aerial-tools layer-aerial" id="aerial-tools" aria-label="Aerial view tools">
+            <div class="layer-group">
+              <label class="layer-explode" title="Move objects apart"><span class="view-icon" data-icon="explode"></span>Explode<input id="explode-range" type="range" min="0" max="1" step="0.01" value="0" aria-label="Explode objects"></label>
+            </div>
+            <div class="layer-group layer-aerial" role="group" aria-labelledby="layer-show-heading">
+              <span class="layer-heading" id="layer-show-heading">Show in room</span>
+              <label><input type="checkbox" id="layer-walls"> Walls</label>
+              <label><input type="checkbox" id="layer-pipes"> Pipes and overhead objects</label>
+              <label><input type="checkbox" id="layer-all"> All equipment</label>
+              <label><input type="checkbox" id="layer-relevant" checked> Large / registered equipment</label>
+            </div>
+            <div class="class-legend" id="class-legend" hidden aria-label="Object classes"></div>
+          </section>
         </div>
         <div id="hud-overlay" class="hud-overlay"></div>
         <div class="navigation-hud" aria-label="Navigation status">
@@ -286,5 +291,6 @@
   <script type="module" src="app.js"></script>
   <script type="module" src="voice-assistant.mjs"></script>
   <script type="module" src="sidebar-toggle.mjs"></script>
+  <script type="module" src="fault-panel.mjs"></script>
 </body>
 </html>
