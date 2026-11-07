@@ -9,7 +9,7 @@
 // shade only the parts and the room never covers them).
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
-import { unitFor, unitDevices, faultParts, deviceIn, floorDistance, easeTo, spreadLabels, sizeText, codeText, RAW_FLOOR_Y } from "./parts-data.mjs";
+import { unitFor, unitDevices, faultParts, unplacedFaults, deviceIn, floorDistance, easeTo, spreadLabels, sizeText, codeText, RAW_FLOOR_Y } from "./parts-data.mjs";
 
 const DATA = "./data/take_apart/";
 const SPREAD = 1.9;     // further apart than on the card, so nothing overlaps from the eyes
@@ -179,7 +179,8 @@ export function createRoomParts(ctx) {
           <div class="rp-row"><button type="button" data-a="explode">Explode</button><button type="button" data-a="assemble">Reassemble</button>
             <button type="button" data-a="reset" title="All apart again, nothing selected">Reset</button><button type="button" class="rp-done" data-a="done" title="Put it back together (Esc)">Done</button></div></div>
         <div class="rp-box"><div class="rp-muted">The unit as it stands here: ${esc(entry.label)} · sizes ${esc(entry.size_label ?? "fitted to the scan")}</div>
-          ${faults.map(f => `<div class="rp-fault${f.own ? "" : " mate"}"><b>${esc(f.tag)} ${esc(codeText(f.code))}</b> (synthetic) → ${esc(parts.find(x => x.node === f.node)?.name)}</div>`).join("")}</div>
+          ${faults.map(f => `<div class="rp-fault${f.own ? "" : " mate"}"><b>${esc(f.tag)} ${esc(codeText(f.code))}</b> (synthetic) → ${esc(parts.find(x => x.node === f.node)?.name)}</div>`).join("")}
+          ${unplacedFaults(devices, faults).map(d => `<div class="rp-fault${d.own ? "" : " mate"}"><b>${esc(d.tag)} ${esc(codeText(d.issue))}</b> (synthetic): no part of this model carries it</div>`).join("")}</div>
         <div class="rp-box"><div class="rp-list"></div></div>
         <div class="rp-box rp-panel" hidden></div>
       </div>`;

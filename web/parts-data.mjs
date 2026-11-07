@@ -36,6 +36,11 @@ export function faultParts(entry, devices) {
   return out;
 }
 
+/** Our objects' real issues that no part of the model carries (shown in the dock, so none is silently dropped). */
+const NO_ISSUE = new Set(["", "NORMAL", "NO_PACK_RECORD", "MOVABLE", "NOT_INSTRUMENTED"]);
+export const unplacedFaults = (devices, faults) =>
+  devices.filter(d => !NO_ISSUE.has(String(d.issue ?? "").toUpperCase()) && !faults.some(f => f.tag === d.tag));
+
 /** The object a part holds (its centre inside the part's box), for the part's callout. */
 export const deviceIn = (part, devices) => devices.find(d => inside(part.box, d.at)) ?? null;
 

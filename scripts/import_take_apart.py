@@ -26,7 +26,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 SRC = Path(sys.argv[1]) if len(sys.argv) > 1 else Path.home() / "sinceai-mvp/demo/web/public/data/s2s"
 OUT = ROOT / "web" / "data" / "take_apart"
-UNITS = {"B019p+A069_r2.glb"}  # inline pump 2 (motor + casing): this viewer's M-005 and the casing below it
+UNITS = {"B019p+A069_r2.glb", "B013+B013m.glb", "B156+B156m_r2.glb", "B149+B149m.glb", "A101+G071.glb"}  # split units checked here
 # AI 3D: scan2service's own Higgsfield index (read only), every unit it fitted in place
 HF3D = Path.home() / "sinceai-2026/data/private/out/equip_v1/assets_export/hf3d"
 MIN_IOU = 0.5  # silhouette fit against the real photos; below it the shape is not trusted

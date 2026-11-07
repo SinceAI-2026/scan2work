@@ -124,7 +124,15 @@ On 6 objects (7 Nov 2026), `tests.eval_refine` held out each object's best frame
 
 ## Take a pump apart in the room
 
-Select M-005, the motor of the right-hand inline pump on the plinth, and choose **Take apart** in Equipment details (or press **T**). The pump casing below it (OBJ-034) does the same. For these objects the button takes the pump unit apart in the room. For every other object it keeps the take-apart described above.
+Select a pump or motor that stands inside one of the five split units and choose **Take apart** in Equipment details (or press **T**). For these objects the button takes the unit apart in the room. For every other object it keeps the take-apart described above.
+
+| Unit (scan2service) | This viewer's objects inside it |
+| --- | --- |
+| Inline pump 2, `B019p+A069_r2` | M-005 and the pump casing below it (OBJ-034) |
+| Inline pump 1, `B013+B013m` | M-004 |
+| Red circulator, `B156+B156m_r2` | M-006 |
+| Grundfos circulator, `B149+B149m` | P-001 |
+| Red circulator, `A101+G071` | P-005 and OBJ-434 |
 
 Away from the pump, the robot walks there first. The view glides into first person at the robot and turns to the unit, and the unit's parts ease apart where it stands. The room stays in view behind them, dimmed and blurred (3 px), and the objects' own scan splats are hidden under the model. Other frames, labels and the navigation panels are hidden until **Done** or **Esc**.
 
@@ -133,7 +141,7 @@ Away from the pump, the robot walks there first. The view glides into first pers
 - Click a part (or its callout or button) to select it. The eye eases about 30 % toward it.
 - The fault part is tinted and outlined in red. Another object's fault in the same unit is shown in amber.
 
-The models are AI-generated (Higgsfield) units, split into parts by geometry rules. scan2service fitted them in raw PLY coordinates of the same `Equipment Room.ply`. The viewer only levels them, `(x, 1.185 − y, −z)` as in `pipeline/ingest.py`, so each unit stands exactly where it was fitted. Objects are matched to a unit by **position**: an object belongs to the unit when its box centre lies inside the unit's box. Tags are never used for this, because the two repos tagged the Excel devices onto the scan independently. The faults come from the matched objects' own Excel records: M-005's current imbalance is shown on the motor, and the casing has no record.
+The models are AI-generated (Higgsfield) units, split into parts by geometry rules. scan2service fitted them in raw PLY coordinates of the same `Equipment Room.ply`. The viewer only levels them, `(x, 1.185 − y, −z)` as in `pipeline/ingest.py`, so each unit stands exactly where it was fitted. Objects are matched to a unit by **position**: an object belongs to the unit when its box centre lies inside the unit's box. Tags are never used for this, because the two repos tagged the Excel devices onto the scan independently. The faults come from the matched objects' own Excel records, on the part whose fault codes hold the issue, preferring the part the object stands in. For example, M-005's current imbalance is shown on the motor and P-005's fouling on the pump housing. An issue that no part of the model carries is still listed in the dock, such as P-001's misalignment on a circulator with no coupling.
 
 ### AI 3D models in the room
 

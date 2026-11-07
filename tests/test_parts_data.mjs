@@ -1,6 +1,6 @@
 // In-room Take apart, pure rules (web/parts-data.mjs): node tests/test_parts_data.mjs
 import assert from 'node:assert/strict';
-import {unitFor, unitDevices, faultParts, deviceIn, floorDistance, spreadLabels, toRaw} from '../web/parts-data.mjs';
+import {unitFor, unitDevices, faultParts, unplacedFaults, deviceIn, floorDistance, spreadLabels, toRaw} from '../web/parts-data.mjs';
 
 // inline pump 2 (B019p+A069_r2): raw PLY boxes from scripts/import_take_apart.py
 const part = (node, box, fault_codes = [], extra = {}) => ({node, name: node, box, fault_codes, dir: [0, -1, 0], dist: 0.1, ...extra});
@@ -24,6 +24,10 @@ const devs = unitDevices(unitFor(doc, m005), m005, assets);
 assert.deepEqual(devs.map(d => `${d.id}:${d.own}`), ['OBJ-204:true', 'OBJ-034:false']);
 assert.deepEqual(faultParts(entry, devs).map(f => `${f.tag}:${f.code}->${f.node}:${f.own}:${f.note}`),
   ['M-005:CURRENT_IMBALANCE->motor:true:supply'], 'its own Excel issue on the part it stands in; no record, no fault');
+assert.deepEqual(unplacedFaults(devs, faultParts(entry, devs)), [], 'the casing has no record: nothing left over');
+const misaligned = [{...devs[0], issue: 'MISALIGNMENT', tag: 'P-001'}];
+entry.parts[1].fault_codes = [];
+assert.deepEqual(unplacedFaults(misaligned, faultParts(entry, misaligned)).map(d => d.tag), ['P-001'], 'an issue no part carries is still listed');
 assert.equal(deviceIn(entry.parts[0], devs)?.tag, 'M-005');
 assert.equal(deviceIn(entry.parts[2], devs)?.id, 'OBJ-034');
 
