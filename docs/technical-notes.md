@@ -2,6 +2,8 @@
 
 Scan2Work is a local industrial field-service demonstrator. It connects a Gaussian-splat room, framed object proposals, a robot route, synthetic operating records, and a cited service workflow.
 
+For a stage-by-stage overview of the pipeline and how it got here, see [pipeline](pipeline.md); for the viewer features, [features in detail](features.md).
+
 ## Inputs and data meaning
 
 The confirmed scene input is `Equipment Room.ply`. The binary PLY contains 1,676,481 Gaussian records in the current artifact. The viewer exports 1,046,910 visible splats after filtering. The source and export counts describe geometry density, not object-recognition accuracy.
@@ -30,7 +32,7 @@ The extraction is a chain of independent stages, each with its own evidence. Eve
 
 With `VALMET_SEGMENTER=local`, `pipeline/local_objects.py` replaces the proposals, AI labelling, detection and clean-up stages above with the objects from `local_models/`. These come from SAM 2.1 masks on the posed video frames, stitched into 3D objects by view consensus (MaskClustering), and are named by SigLIP 2, DINOv2, OWLv2 and a linear probe. Each object's box is refitted on the levelled splat with the same box fitter, then pipes, photos, mapping and navigation run as usual. No hosted API is called. The README's "Two pipelines" section compares both.
 
-The current artifact contains **[refresh] objects**. AI-verified label sources, movable objects and pipe cylinders are counted in `scene.semantic_labelling`.
+The prepared release room contains **504 objects**; a fresh rebuild from source gives 467 with the heuristic segmenter and 485 with the local one ([pipeline](pipeline.md#two-segmenters)). AI-verified label sources, movable objects and pipe cylinders are counted in `scene.semantic_labelling`.
 
 ### Measured extraction quality
 
@@ -95,7 +97,7 @@ Telemetry is compared with the class median using a robust z-score. The remainin
 
 The artifact inspected on 7 November 2026 reports `decisions_api` for cluster labels and triage, and `embeddinggemma` for retrieval. It records 165 relabelled proposals out of 440 candidates and ten assets with AI triage. These are artifact facts, not an independent accuracy evaluation.
 
-Read the current values before each recording, especially after a concurrent AI rebuild. From the `valmet-twin` directory, run this read-only command.
+Read the current values before each recording, especially after a concurrent AI rebuild. From the repository root, run this read-only command.
 
 ```sh
 python3 - <<'PY'
@@ -137,7 +139,7 @@ The **Floor plan** in the viewer draws equipment footprints, fitted pipes, and t
 
 ## Verification
 
-Run these checks from the `valmet-twin` directory.
+Run these checks from the repository root.
 
 ```sh
 .venv/bin/python -m unittest discover -s tests -v

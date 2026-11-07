@@ -3,7 +3,7 @@
 Semantic extraction from Valmet's boiler-room Gaussian splat. Everything runs locally on open models: SAM 2.1,
 SigLIP 2, DINOv2 and OWLv2, with open weights downloaded from Hugging Face. No API key is needed.
 
-The twin uses these objects when it is built with `VALMET_SEGMENTER=local` (repo README, "Two pipelines").
+The twin uses these objects when it is built with `VALMET_SEGMENTER=local` (see docs/pipeline.md, "Two segmenters").
 `pipeline/local_objects.py` reads `data/pipeline/objects.json` and `objects.npz`, which are committed here so
 the twin can be built on them without re-running anything below.
 
