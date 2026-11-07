@@ -14,7 +14,7 @@ import { unitFor, shiftFor, unitDevices, faultParts, floorDistance, easeTo, spre
 const DATA = "./data/take_apart/";
 const SPREAD = 1.9;     // further apart than on the card, so nothing overlaps from the eyes
 const ROOM_FADE = 0.75; // the rest of the room only mildly dimmed: the same view, not a stage
-const BLUR = 9;         // and softly blurred: px² added to every splat's screen footprint (app.js uBlur)
+const BLUR = 6;         // and softly blurred: px² (CSS) added to every splat's screen footprint (app.js uBlur)
 const NEAR_M = 1.3;     // "at the device": the robot this close to its box, on the floor
 const GLIDE_S = 1.1;    // into the technician's eyes before the parts come apart
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => `&#${c.charCodeAt(0)};`);
@@ -28,18 +28,21 @@ export function createRoomParts(ctx) {
   const arrivedAt = a => ctx.state.journey.phase === "arrived" && ctx.state.journey.route?.asset_id === a.asset_id;
   const near = a => { const r = ctx.robot(); return floorDistance(a, r.x, r.z) <= NEAR_M || arrivedAt(a); };
 
-  // Equipment details: the button under Wael's Take apart, for devices with a split unit model
-  const btn = Object.assign(document.createElement("button"), { className: "btn-outline-full", id: "btn-take-apart-room", hidden: true });
-  document.getElementById("btn-take-apart")?.after(btn);
-  btn.addEventListener("click", () => open(ctx.state.selectedAsset));
+  // Equipment details: Wael's own "Take apart" button (and T) run this one for a device with a split unit model
+  // (walking there first if needed); for every other device they keep Wael's Take apart as it is.
+  const btn = document.getElementById("btn-take-apart"), ownTitle = btn?.title ?? "";
+  const mine = () => !!unitFor(doc, ctx.state.selectedAsset);
+  document.addEventListener("click", e => {
+    if (!e.target.closest?.("#btn-take-apart") || !mine()) return;
+    e.stopPropagation(); // before Wael's listener on the button
+    open(ctx.state.selectedAsset);
+  }, { capture: true });
   function syncButton() {
-    const a = ctx.state.selectedAsset, has = !!unitFor(doc, a);
-    const text = !has ? "" : pending === a ? "Walking there to take it apart…" : near(a) ? "Take apart in the room" : "Walk there and take apart";
-    if (btn.hidden !== !has) btn.hidden = !has;
-    if (has && btn.textContent !== text) {
-      btn.textContent = text;
-      btn.title = "The unit's parts apart where it stands, from the technician's eyes (Esc or Done puts it back)";
-    }
+    const a = ctx.state.selectedAsset;
+    const title = !mine() ? ownTitle : pending === a ? "Walking there to take it apart in the room…"
+      : near(a) ? "Take the unit apart here, in the room, from the technician's eyes (T; Esc or Done puts it back)"
+      : "Walk there and take the unit apart in the room (T)";
+    if (btn && btn.title !== title) btn.title = title;
   }
 
   function open(asset) {
@@ -388,9 +391,12 @@ export function createRoomParts(ctx) {
   }
 
   window.addEventListener("keydown", e => {
-    if (!live) return;
-    if (e.key === "Escape") live.close();
-    else if (e.key.toLowerCase() === "t" && !e.target.closest?.("input, textarea, select")) e.stopImmediatePropagation(); // not Wael's Take apart on top
+    const t = e.key.toLowerCase() === "t" && !e.repeat && !e.altKey && !e.ctrlKey && !e.metaKey && !e.target.closest?.("input, textarea, select");
+    if (live && e.key === "Escape") live.close();
+    else if (t && (live || mine())) { // T: this Take apart for a unit device, never Wael's on top of it
+      e.stopImmediatePropagation();
+      if (!live) open(ctx.state.selectedAsset);
+    }
   }, { capture: true });
 
   const api = {

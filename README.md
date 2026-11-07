@@ -112,7 +112,7 @@ On 6 objects (7 Nov 2026), `tests.eval_refine` held out each object's best frame
 
 ## Take a pump apart in the room
 
-Select a pump that has a split unit model and choose **Take apart in the room** in Equipment details. Away from it, the robot walks there first. The view glides into first person at the robot and turns to the device. The unit's parts then ease apart where it stands. The room stays in view, dimmed and softly blurred, and the device's own scan splats are hidden under the model. Other frames, labels and the navigation panels are hidden until **Done** or **Esc**.
+Select P-001 and choose **Take apart** in Equipment details (or press **T**). For P-001 the button takes its pump unit apart in the room; for every other object it keeps the take-apart described above. Away from the device, the robot walks there first. The view glides into first person at the robot and turns to the device. The unit's parts then ease apart where it stands. The room stays in view, dimmed and softly blurred, and the device's own scan splats are hidden under the model. Other frames, labels and the navigation panels are hidden until **Done** or **Esc**.
 
 - Each part has a callout with its name and size in mm, and the tag and synthetic fault of the device it serves.
 - The dock on the right has **Explode**, **Reassemble**, **Reset** and **Done**, a slider, the fault list, a button per part and the selected part's detail.

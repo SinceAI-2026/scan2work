@@ -504,6 +504,10 @@ ${SHADER_OFFSET}        if (uHasCovered > 0.5 && instId > 0.5 && texture2D(uCove
           float det0 = max(c_a * c_c - c_b * c_b, 1e-4);
           c_a += uBlur; c_c += uBlur;
           a *= sqrt(det0 / max(c_a * c_c - c_b * c_b, 1e-4));
+          if (a < 0.03) {   // small splats fade to nothing when blurred: drop them, or the fill would stall the GPU
+            gl_Position = vec4(0.0, 0.0, 2.0, 1.0);
+            return;
+          }
         }
 
         float mid = 0.5 * (c_a + c_c);
