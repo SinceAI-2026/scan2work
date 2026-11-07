@@ -11,6 +11,8 @@ web/data/*
 # ...except the inputs and the AI answer cache, which make a rebuild free and reproducible
 !web/data/decisions_cache.json
 !web/data/walk_poses.json
+# ...and the Take apart / AI 3D assets (scripts/import_take_apart.py regenerates them), so no import step is needed
+!web/data/take_apart/
 
 # the voice assistant MCP token: never commit
 .mcp_token
