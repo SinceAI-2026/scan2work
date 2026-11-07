@@ -56,6 +56,11 @@ The complete toolbar below is available in **Extended** mode. Simplified keeps t
 - **Arduino panel** (chip icon): the fault panel's live state, see [arduino/README.md](../arduino/README.md).
 - **Find equipment** and **To inspect** in the left sidebar. Selecting an item keeps the camera; **Take apart**, **Navigate here** and **Isolate item** are explicit actions. **Inspect faulty device** and **Tour the room** start
   the technician.
+- **Move in room** and **Remove from room** (object panel, Extended only): Move shows red and blue arrows on the
+  object. Drag an arrow, or the square between them, to slide it over the floor; its scan splats follow and the
+  old spot empties. The move applies on release, as does a click on the floor or map and Q / E (turn 15°). A spot
+  that overlaps another object, leaves the room or traps the technician snaps back with the reason. Routes are
+  rebuilt once per move. **Reset position** and **Room changes** undo moves and removals.
 
 ## Technician, hazards and guided demo
 
