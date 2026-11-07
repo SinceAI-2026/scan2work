@@ -1,0 +1,10 @@
+# core pipeline + server
+numpy
+scipy
+scikit-learn
+pandas
+openpyxl
+matplotlib
+pillow
+# optional: EmbeddingGemma semantic retrieval (falls back to TF-IDF if missing)
+# sentence-transformers>=5.0

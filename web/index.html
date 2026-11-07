@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Field Atlas · Valmet Boiler Room — Equipment Review & Autonomous Field Copilot</title>
+  <link rel="stylesheet" href="styles.css" />
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "./vendor/three/three.module.js",
+        "three/addons/": "./vendor/three/addons/"
+      }
+    }
+  </script>
+</head>
+<body>
+  <div id="arrival-announcement" class="visually-hidden" role="status" aria-live="polite"></div>
+  <header class="topbar">
+    <div class="topbar-left"><span class="diamond-logo">◆</span><strong class="brand-name">Field Atlas</strong><span class="room-name">Equipment Room</span></div>
+    <div class="topbar-right"><button id="btn-inspector" class="btn-export" aria-expanded="false">Equipment details</button></div>
+  </header>
+  <main class="workspace">
+    <aside class="sidebar left-sidebar">
+      <div class="sidebar-header"><h1>Explore the room</h1><p id="sidebar-stats-text" class="sidebar-stats">Loading room…</p></div>
+      <div class="mission-box">
+        <button class="btn-walk primary" id="btn-room-tour" disabled>Tour the room</button>
+        <button class="btn-walk" id="btn-go-target" disabled>Inspect faulty device</button>
+        <p class="navigation-help">Click a walkable point on the map to go there.</p>
+      </div>
+      <div class="filter-group"><label for="asset-search" class="field-label">Find equipment</label><input id="asset-search" class="clean-input" placeholder="Search tag or equipment…" type="search" /></div>
+      <select id="select-visual-review" class="clean-select" aria-label="Equipment filter"><option value="mapped">Registered equipment</option><option value="alerts">Needs attention</option><option value="all">All detected objects</option></select>
+      <div class="proposal-list" id="asset-list"></div>
+      <details class="nearby-panel"><summary>Nearby equipment <span id="prox-count"></span></summary><div class="prox-mini-list" id="proximity-list"></div></details>
+    </aside>
+    <section class="viewport-col">
+      <div id="canvas-container" class="canvas-container">
+        <div class="viewport-Controls-overlay">
+          <div class="vp-row">
+            <button class="vp-btn active" data-cam="walk">Follow robot</button>
+            <button class="vp-btn" data-cam="overview">Free view</button>
+            <button class="vp-btn" data-cam="inside">Target view</button>
+            <button class="vp-btn" id="btn-ar-view" hidden>AR view</button>
+            <button class="vp-btn autoplay-chip" id="autoplay-chip" hidden>AUTOPLAY, click to take over</button>
+            <details class="display-options"><summary class="vp-btn">Display</summary><div class="display-options-body">
+              <label for="select-splat-mode">Render quality</label><select id="select-splat-mode" class="vp-select"><option value="high">High detail</option><option value="balanced">Balanced</option></select>
+              <span>Equipment frames</span><div class="vp-row"><button class="vp-btn active" id="btn-boxes-mode" data-bmode="proximity">Nearby</button><button class="vp-btn" id="btn-all-boxes" data-bmode="all">All</button><button class="vp-btn" id="btn-no-boxes" data-bmode="off">Off</button></div>
+            </div></details>
+          </div>
+        </div>
+        <div id="hud-overlay" class="hud-overlay"></div>
+        <div class="navigation-hud" aria-label="Navigation status">
+          <div id="nav-hud-state">READY</div><strong id="nav-hud-target">Explore the room</strong><span id="nav-hud-metrics"></span>
+          <span id="walk-summary" hidden></span>
+          <div class="journey-controls"><button class="vp-btn" id="btn-play" disabled>Start</button><button class="vp-btn" id="btn-drop-obstacle" disabled>Drop obstacle</button><span id="sim-dist-label"></span></div>
+          <p id="replan-status" role="status"></p>
+          <p id="navigation-message" role="status"></p>
+        </div>
+        <div class="route-map-panel">
+          <span>MAP <small>+Z ↑</small></span><button id="btn-map-expand" aria-expanded="false" disabled>Expand map</button>
+          <canvas id="route-map" width="680" height="552" aria-label="Room map: click reachable floor to navigate"></canvas>
+          <p id="map-feedback" role="status"></p>
+          <small><i>▲</i> You · <em>◆</em> Destination · <b>●</b> Device<br><span class="movable-legend">■</span> Movable object · <span class="facility-legend">■</span> Facility item<br><span id="map-coverage">Green tint: reachable floor</span></small>
+        </div>
+      </div>
+    </section>
+    <aside class="sidebar right-sidebar">
+      <div class="inspector-scroll"><button id="btn-close-inspector" class="panel-close" aria-label="Close equipment details">×</button>
+        <div class="insp-meta-row">
+          <span id="detail-id-status"></span>
+          <span class="health-pill degraded" id="detail-health-pill"></span>
+        </div>
+        <h2 class="insp-title" id="detail-title" tabindex="-1"></h2>
+        <div class="insp-subhead" id="detail-subtitle">
+        </div>
+        <figure id="asset-photo" class="asset-photo" hidden>
+          <img alt="" decoding="async" referrerpolicy="no-referrer" hidden />
+          <figcaption>Real walkthrough frame</figcaption>
+        </figure>
+        <p id="detail-match-note" hidden></p>
+        <div class="action-bar-inline">
+          <button class="btn-outline-full" id="btn-navigate-selected">Navigate here</button><button class="btn-outline-full" id="btn-draft-wo">Draft work order</button>
+        </div>
+
+        <p id="movable-notice" class="movable-notice" hidden>Movable object (not instrumented)</p>
+
+        <!-- GROUNDED AI DIAGNOSTIC COPILOT -->
+        <div class="section-block copilot-block">
+          <div class="sec-title-row">
+            <h3 class="sec-title" id="service-guidance-title" tabindex="-1">Service guidance</h3>
+            <span class="doc-pill" id="detail-doc-id"></span>
+          </div>
+
+          <div class="copilot-summary" id="exec-summary-box"></div>
+          <p id="triage-severity" class="field-label" hidden></p>
+          <p id="arrival-safety" class="arrival-safety" hidden></p>
+
+<details id="arrival-evidence"><summary>Telemetry and evidence</summary>          <!-- 3-Day Telemetry Sparkline -->
+          <div class="field-label-row" style="margin-top:6px;">
+            <span class="field-label">3-day telemetry trend</span>
+            <span class="mono-small" id="chart-metric-label">Setpoint vs Actual</span>
+          </div>
+          <canvas id="telemetry-chart" width="310" height="82"></canvas>
+
+          <div class="field-label" style="margin-top:6px;">Grounded observations</div>
+          <div id="observations-list" class="clean-stack"></div>
+
+</details>          <div class="field-label" style="margin-top:6px;">Ranked root-cause hypotheses</div>
+          <div id="hypotheses-list" class="clean-stack"></div>
+
+          <div class="field-label" style="margin-top:6px;">Safe field verification (LOTO first)</div>
+          <div id="verification-steps-list" class="clean-stack"></div>
+
+          <!-- Interactive Copilot Q&A -->
+          <div class="field-label" style="margin-top:8px;">Ask copilot about this equipment</div>
+          <div class="chip-row">
+            <button class="q-chip" data-q="Why is this asset deviating from normal operation?">Root cause</button>
+            <button class="q-chip" data-q="What telemetry & data quality flags exist?">Data quality</button>
+            <button class="q-chip" data-q="What are the safe LOTO verification steps?">LOTO check</button>
+            <button class="q-chip" data-q="Summarize maintenance history and work order draft">Work order</button>
+          </div>
+          <form id="copilot-chat-form" class="qa-form">
+            <input type="text" id="copilot-chat-input" class="clean-input" placeholder="Ask question (e.g. CASE-017, stiction)..." />
+            <button type="submit" class="btn-ask">Ask</button>
+          </form>
+          <div class="qa-answer" id="copilot-chat-output"></div>
+        </div>
+<details class="technical-details"><summary>Scan details</summary>        <!-- 2D DETECTION VIEW WITH RED BOUNDING BOX (Just like IMG_4398.HEIC) -->
+        <div class="section-block">
+          <div class="field-label-row">
+            <span class="field-label">Detection view</span>
+            <span class="mono-small" id="detail-station-score"></span>
+          </div>
+          <div class="detection-photo-wrap">
+            <canvas id="detection-canvas" width="480" height="270"></canvas>
+          </div>
+          <p class="detector-prompt-note" id="detail-detector-prompt">
+          </p>
+        </div>
+
+        <!-- REVIEW BOUNDS IN SCAN UNITS (Just like IMG_4398.HEIC) -->
+        <div class="section-block">
+          <div class="sec-title">Review bounds</div>
+          <div class="field-label">Equipment class</div>
+          <div class="readonly-field" id="detail-class-box"></div>
+
+          <div class="field-label">Center in scan units (m)</div>
+          <div class="xyz-grid">
+            <div class="xyz-cell"><small>X</small><span id="bound-cx"></span></div>
+            <div class="xyz-cell"><small>Y</small><span id="bound-cy"></span></div>
+            <div class="xyz-cell"><small>Z</small><span id="bound-cz"></span></div>
+          </div>
+
+          <div class="field-label">Size in scan units (m)</div>
+          <div class="xyz-grid">
+            <div class="xyz-cell"><small>X</small><span id="bound-sx"></span></div>
+            <div class="xyz-cell"><small>Y</small><span id="bound-sy"></span></div>
+            <div class="xyz-cell"><small>Z</small><span id="bound-sz"></span></div>
+          </div>
+        </div>
+
+</details>      </div>
+    </aside>
+  </main>
+  <dialog id="ar-view" class="ar-view" aria-labelledby="ar-view-title">
+    <header class="ar-view-header">
+      <h2 id="ar-view-title">AR walkthrough</h2>
+      <div class="vp-row"><button class="vp-btn" id="btn-ar-target" hidden>Target excerpt</button><button class="vp-btn" id="btn-close-ar">Close AR view</button></div>
+    </header>
+    <p id="ar-view-status" role="status" hidden></p>
+    <video controls playsinline preload="none" aria-label="Walkthrough video with equipment overlay"></video>
+  </dialog>
+  <div class="modal-backdrop hidden" id="wo-modal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 id="wo-modal-title">Maintenance Work Order Draft</h3>
+        <button class="modal-close" id="wo-modal-close">✕</button>
+      </div>
+      <div class="modal-body" id="wo-modal-body"></div>
+    </div>
+  </div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

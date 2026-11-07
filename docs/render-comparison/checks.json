@@ -1,0 +1,60 @@
+{
+  "date": "2026-11-07",
+  "baseline": {
+    "css": [
+      1224,
+      772
+    ],
+    "buffer": [
+      2448,
+      1544
+    ]
+  },
+  "final_high": {
+    "css": [
+      1224,
+      772
+    ],
+    "buffer": [
+      3060,
+      1930
+    ]
+  },
+  "balanced": {
+    "css": [
+      1224,
+      772
+    ],
+    "buffer": [
+      1224,
+      772
+    ]
+  },
+  "temporary_resize": {
+    "css": [
+      862,
+      668
+    ],
+    "buffer": [
+      1724,
+      1336
+    ]
+  },
+  "viewport_restored": true,
+  "arrival": {
+    "target": "CV-003",
+    "hud": "ARRIVED",
+    "report_open": true,
+    "evidence_open": true
+  },
+  "browser_errors": [],
+  "tests": [
+    "11 Python navigation tests",
+    "JavaScript navigation suite",
+    "JavaScript journey suite",
+    "JavaScript render quality suite",
+    "app.js syntax"
+  ],
+  "protected_artifact_hashes": "unchanged",
+  "filter_experiment": "rejected; no clear visual improvement"
+}

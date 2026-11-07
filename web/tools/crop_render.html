@@ -1,0 +1,106 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Crop renderer</title>
+<style>html,body{margin:0;background:#18181b}canvas{display:block}</style>
+<script type="importmap">{"imports":{"three":"../vendor/three/three.module.js"}}</script>
+</head><body>
+<script type="module">
+// Offline crop renderer: real EWA Gaussian-splat rendering of one object + surroundings, with the
+// object's oriented box drawn in yellow. Driven by scripts/render_crops.mjs (Playwright).
+import * as THREE from "three";
+const W = 448, H = 448;
+const renderer = new THREE.WebGLRenderer({ antialias: false, preserveDrawingBuffer: true });
+renderer.setPixelRatio(1); renderer.setSize(W, H); renderer.setClearColor(0x18181b, 1);
+document.body.appendChild(renderer.domElement);
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(50, 1, 0.02, 50);
+let mesh = null, box = null;
+
+const material = new THREE.ShaderMaterial({
+  uniforms: { uViewport: { value: new THREE.Vector2(W, H) }, uFocal: { value: new THREE.Vector2(1, 1) } },
+  vertexShader: `
+    attribute vec3 iCenter; attribute vec4 iColor; attribute vec3 iCovA; attribute vec3 iCovB;
+    uniform vec2 uViewport; uniform vec2 uFocal;
+    varying vec4 vColor; varying vec2 vQuad;
+    void main() {
+      vec4 cam = modelViewMatrix * vec4(iCenter, 1.0);
+      if (cam.z > -0.02) { gl_Position = vec4(0.0, 0.0, 2.0, 1.0); return; }
+      vec4 p = projectionMatrix * cam;
+      mat3 V = mat3(iCovA.x, iCovA.y, iCovA.z, iCovA.y, iCovB.x, iCovB.y, iCovA.z, iCovB.y, iCovB.z);
+      float tz = -cam.z, tz2 = tz * tz;
+      float cx = clamp(cam.x, -1.3 * tz, 1.3 * tz), cy = clamp(cam.y, -1.3 * tz, 1.3 * tz);
+      vec3 ju = vec3(uFocal.x / tz, 0.0, uFocal.x * cx / tz2);
+      vec3 jv = vec3(0.0, uFocal.y / tz, uFocal.y * cy / tz2);
+      mat3 R = mat3(modelViewMatrix);
+      vec3 wu = ju * R, wv = jv * R;
+      float a = dot(wu, V * wu) + 0.3, b = dot(wu, V * wv), c = dot(wv, V * wv) + 0.3;
+      float mid = 0.5 * (a + c), rad = sqrt(max(0.0001, (a - c) * (a - c) * 0.25 + b * b));
+      float l1 = mid + rad, l2 = max(0.3, mid - rad);
+      vec2 dv = (a >= c) ? normalize(vec2(max(l1 - c, 1e-6), b)) : normalize(vec2(b, max(l1 - a, 1e-6)));
+      vec2 major = min(2.0 * sqrt(l1), 256.0) * dv, minor = min(2.0 * sqrt(l2), 256.0) * vec2(-dv.y, dv.x);
+      vColor = iColor; vQuad = position.xy;
+      vec2 off = (position.x * major + position.y * minor) / uViewport;
+      gl_Position = vec4(p.xy + off * p.w, p.z, p.w);
+    }`,
+  fragmentShader: `
+    varying vec4 vColor; varying vec2 vQuad;
+    void main() {
+      float pw = -0.5 * dot(vQuad, vQuad);
+      if (pw < -4.5) discard;
+      float alpha = min(0.99, vColor.a * exp(pw));
+      if (alpha < 0.004) discard;
+      gl_FragColor = vec4(vColor.rgb * alpha, alpha);
+    }`,
+  transparent: true, depthWrite: false, depthTest: false,
+  blending: THREE.CustomBlending, blendSrc: THREE.OneFactor, blendDst: THREE.OneMinusSrcAlphaFactor,
+});
+
+// buf: 40-byte records (xyz f32, rgba u8, cov6 f32) ; job: {eye, target, up, box:{center,size,yaw}}
+window.renderCrop = (buf, job) => {
+  const w = job.W || W, h = job.H || H;
+  renderer.setSize(w, h); material.uniforms.uViewport.value.set(w, h);
+  camera.fov = job.fov || 50; camera.aspect = w / h;
+  const n = buf.byteLength / 40, dv = new DataView(buf), u8 = new Uint8Array(buf);
+  camera.position.set(...job.eye); camera.up.set(...job.up); camera.lookAt(...job.target);
+  camera.updateMatrixWorld(); camera.updateProjectionMatrix();
+  const f = h / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)));
+  material.uniforms.uFocal.value.set(f, f);
+  // back-to-front order by view depth
+  const view = camera.matrixWorldInverse.elements, z = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    const o = i * 40, x = dv.getFloat32(o, true), y = dv.getFloat32(o + 4, true), w = dv.getFloat32(o + 8, true);
+    z[i] = view[2] * x + view[6] * y + view[10] * w + view[14];
+  }
+  const order = Array.from({ length: n }, (_, i) => i).sort((a, b) => z[a] - z[b]);
+  const C = new Float32Array(n * 3), K = new Float32Array(n * 4), A = new Float32Array(n * 3), B = new Float32Array(n * 3);
+  order.forEach((i, k) => {
+    const o = i * 40;
+    C[k * 3] = dv.getFloat32(o, true); C[k * 3 + 1] = dv.getFloat32(o + 4, true); C[k * 3 + 2] = dv.getFloat32(o + 8, true);
+    K[k * 4] = u8[o + 12] / 255; K[k * 4 + 1] = u8[o + 13] / 255; K[k * 4 + 2] = u8[o + 14] / 255; K[k * 4 + 3] = u8[o + 15] / 255;
+    A[k * 3] = dv.getFloat32(o + 16, true); A[k * 3 + 1] = dv.getFloat32(o + 20, true); A[k * 3 + 2] = dv.getFloat32(o + 24, true);
+    B[k * 3] = dv.getFloat32(o + 28, true); B[k * 3 + 1] = dv.getFloat32(o + 32, true); B[k * 3 + 2] = dv.getFloat32(o + 36, true);
+  });
+  if (mesh) { scene.remove(mesh); mesh.geometry.dispose(); }
+  const g = new THREE.InstancedBufferGeometry(), quad = new THREE.PlaneGeometry(6, 6);
+  g.index = quad.index; g.attributes.position = quad.attributes.position;
+  g.setAttribute("iCenter", new THREE.InstancedBufferAttribute(C, 3));
+  g.setAttribute("iColor", new THREE.InstancedBufferAttribute(K, 4));
+  g.setAttribute("iCovA", new THREE.InstancedBufferAttribute(A, 3));
+  g.setAttribute("iCovB", new THREE.InstancedBufferAttribute(B, 3));
+  g.instanceCount = n;
+  mesh = new THREE.Mesh(g, material); mesh.frustumCulled = false; scene.add(mesh);
+  if (box) { scene.remove(box); box = null; }
+  if (!job.box) {
+    renderer.render(scene, camera);
+    return { image: renderer.domElement.toDataURL("image/jpeg", 0.9),
+             view: Array.from(camera.matrixWorldInverse.elements), proj: Array.from(camera.projectionMatrix.elements) };
+  }
+  const [sx, sy, sz] = job.box.size;
+  box = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(sx, sy, sz)),
+    new THREE.LineBasicMaterial({ color: 0xffd600, depthTest: false, transparent: true, opacity: 0.9 }));
+  box.position.set(...job.box.center); box.rotation.y = -job.box.yaw; box.renderOrder = 10;
+  scene.add(box);
+  renderer.render(scene, camera);
+  return renderer.domElement.toDataURL("image/jpeg", 0.88);
+};
+window.ready = true;
+</script></body></html>
