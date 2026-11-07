@@ -92,6 +92,9 @@
    containing block, so its fixed-position launcher moves with it. */
 elevenlabs-convai { transition: transform .2s ease; }
 .inspector-open elevenlabs-convai { transform: translateX(calc(-1 * min(370px, 95vw))); }
+.voice-load-status { position: fixed; bottom: 18px; right: 18px; z-index: 50; max-width: min(290px, calc(100vw - 36px)); padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--card-bg); color: var(--text-main); font-size: 12px; line-height: 1.4; }
+.inspector-open .voice-load-status { right: calc(min(370px, 95vw) + 18px); }
+@media (max-width: 700px) { .inspector-open .voice-load-status { right: 18px; bottom: 70px; } }
 
 /* Show / hide the left sidebar (sidebar-toggle.mjs). Same approach as the BIM view, which also hides it. */
 .sidebar-toggle {

@@ -6,9 +6,9 @@ routes = [{pattern = "scan2work.app", custom_domain = true}]
 
 [vars]
 ORIGIN = "http://v2202609409444511285.goodsrv.de:20229"
-# Voice assistant (off until the host runs it): the public port Caddy maps to mcp_server.py, and "1" to let the
-# viewer's job card save checks and notes. See distribution/host/README.md.
-# MCP_ORIGIN = "http://v2202609409444511285.goodsrv.de:<public MCP port>"
+# Separate encrypted MCP transport; update if its supervised quick tunnel restarts.
+MCP_ORIGIN = "https://student-leather-designing-recommended.trycloudflare.com"
+# Opt in only with matching baseline/MCP VALMET_PUBLIC_ASSISTANT=1 settings.
 # ASSISTANT = "1"
 
 [env.review]

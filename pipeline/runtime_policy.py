@@ -15,7 +15,7 @@ def configure_server_runtime(root: Path, environ=None) -> bool:
     env = os.environ if environ is None else environ
     # A hosted preview must never discover credentials or initialize online
     # services, even if the host inherited an explicit online setting.
-    if env.get("VALMET_PUBLIC_DEMO") == "1":
+    if env.get("VALMET_PUBLIC_DEMO") == "1" or env.get("FIELD_ATLAS_MCP_PUBLIC") == "1":
         env["VALMET_OFFLINE"] = "1"
         return True
     if env.get("VALMET_OFFLINE") == "1":

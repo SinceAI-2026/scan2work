@@ -32,7 +32,7 @@ def main(argv=None):
                         help='Optional separately hosted full extraction review')
     parser.add_argument('--port', type=int, default=8080)
     parser.add_argument('--assistant', action='store_true',
-                        help='Show the voice assistant and keep a shared inspection job log (run mcp_server.py with the same --data-dir)')
+                        help='Show the voice assistant and keep shared inspection jobs (MCP must use the same VALMET_DATA_DIR and VALMET_PUBLIC_ASSISTANT=1)')
     parser.add_argument('--check', action='store_true', help='Check prepared files, then exit')
     args = parser.parse_args(argv)
     if not 1 <= args.port <= 65535:

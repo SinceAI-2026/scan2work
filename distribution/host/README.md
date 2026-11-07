@@ -78,31 +78,42 @@ need no change when the upstream listeners stay the same.
 
 ## Voice assistant (Ilkka) and shared inspection jobs
 
-Off by default. When enabled, scan2work.app shows the Ilkka voice widget, and both the visitor's job card and
-the assistant (through `mcp_server.py`) save checks and notes to one shared job log in the baseline data
-directory. Scene edits and library writes stay read-only.
+Off by default. The dedicated MCP process uses the same prepared baseline as
+its viewer. Read-only mode exposes six reading tools; explicitly enabling
+`VALMET_PUBLIC_ASSISTANT=1` gives both processes the shared inspection job log
+and ten MCP tools. Scene edits and library writes stay read-only in either mode.
 
-1. **Token on the host.** Create `/workspace/scan2work/deploy/mcp.env` (never commit it):
-   `FIELD_ATLAS_MCP_TOKEN=<the same value as the ElevenLabs workspace secret>`, with no trailing newline.
-2. **Release.** Deploy a release that contains these changes (0.1.2 or later), and update `install_dir` in
-   `run-service.sh` to match.
-3. **Services.** Install the updated `scan2work.conf` and `run-service.sh`, then reload supervisor. It adds
-   `scan2work-mcp` (127.0.0.1:9082) and starts the baseline viewer with `--assistant`.
-4. **Caddy.** Install the updated `Caddyfile`: port 10300 forwards to the MCP server. Map a public port to
-   10300 the same way 20229 maps to 10100.
-5. **Worker.** In `distribution/cloudflare/wrangler.toml`, set `MCP_ORIGIN` to that public port and
-   `ASSISTANT = "1"`, then deploy the Worker. `/mcp` is forwarded with the visitor's `Authorization` header;
-   every other path still drops credentials.
-6. **ElevenLabs.** In Agents → Integrations → MCP servers → "Field Atlas", change the server URL to
-   `https://scan2work.app/mcp`. Keep the same secret token.
+1. Deploy code containing these changes (a new release or an immutable source
+   snapshot). The 0.1.1 archives remain unchanged; they do not contain this
+   shared-assistant integration.
+2. Store the random MCP bearer credential in
+   `/workspace/scan2work/private/mcp-token`, mode 600, with its directory mode 700.
+   The private value belongs in ElevenLabs as a workspace secret too.
+3. Install `mcp-service.sh` and `supervisor-mcp.conf`. Substitute the immutable
+   code path for `MCP_CODE_SNAPSHOT`; do not register another `scan2work-mcp`
+   block. These define the single MCP listener at `127.0.0.1:9090` and its
+   separate supervised HTTPS quick tunnel. Existing Caddy/management routing
+   stays unchanged; no raw public MCP HTTP port is needed.
+4. For shared inspection jobs, create `/workspace/scan2work/deploy/assistant.env`
+   with `VALMET_PUBLIC_ASSISTANT=1`. The baseline wrapper and dedicated MCP
+   wrapper both read that flag. Set Worker `ASSISTANT = "1"` to permit
+   `/api/field-jobs` POSTs at the edge. Leave these off for read-only service.
+5. Set Worker `MCP_ORIGIN` to the dedicated **HTTPS** tunnel origin. It forwards
+   only `/mcp` credentials there. A quick-tunnel restart may change that
+   hostname; update the binding and re-test before declaring the service ready.
+6. In ElevenLabs, point the public agent's MCP connection at
+   `https://scan2work.app/mcp`, set the matching bearer secret and refresh its
+   tool list. See [voice setup](../../docs/voice-mcp.md) for the widget's dynamic
+   variable and browser client tool. An explicit voice agent ID is optional;
+   Wael's `--assistant` mode retains the original Ilkka integration.
 
-Check before switching ElevenLabs over (expect 401 without the token, then a JSON-RPC result with it):
+Restart only the named application services whose settings changed. Verify
+unauthenticated MCP calls return 401, authenticated initialization/tool calls
+work, and write tools are rejected in read-only mode. In shared mode, test a
+synthetic job through both the viewer and MCP against a disposable dataset,
+including safety-first checks and the 1,000-character field limit. Do not reset
+an existing log while validating the deployment.
 
-```sh
-curl -s -o /dev/null -w "%{http_code}\n" -X POST https://scan2work.app/mcp -H 'Content-Type: application/json' -d '{"jsonrpc":"2.0","id":1,"method":"ping"}'
-curl -s -X POST https://scan2work.app/mcp -H "Authorization: Bearer $FIELD_ATLAS_MCP_TOKEN" -H 'Content-Type: application/json' -d '{"jsonrpc":"2.0","id":1,"method":"ping"}'
-```
-
-The public job log is shared by every visitor. Anyone on the site can start jobs and add notes, limited to
-1,000 characters per field. To clear it, stop `scan2work-baseline` and `scan2work-mcp`, write
-`{"jobs":{}}` to `data/baseline/field_log.json`, and start both again.
+Shared mode deliberately exposes one demonstration job log to every visitor.
+For a fresh scenario use a separate prepared data copy and keep the old log.
+Never enable it accidentally by changing the general scene-write setting.

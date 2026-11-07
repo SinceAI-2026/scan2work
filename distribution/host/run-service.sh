@@ -12,14 +12,8 @@ export PROC_NAME="scan2work-${service}"
 . /opt/supervisor-scripts/utils/logging.sh "/var/log/portal/${PROC_NAME}.log"
 
 if [[ "$service" == mcp ]]; then
-  # The voice assistant's MCP server (ElevenLabs calls it through the Worker at https://scan2work.app/mcp).
-  # The token lives only on this host, in deploy/mcp.env: FIELD_ATLAS_MCP_TOKEN=<the ElevenLabs workspace secret>.
-  # It writes the same inspection job log as the baseline viewer, so both use the baseline data directory.
-  set -a; . "$deploy_dir/mcp.env"; set +a
-  : "${FIELD_ATLAS_MCP_TOKEN:?Set FIELD_ATLAS_MCP_TOKEN in $deploy_dir/mcp.env}"
-  export VALMET_DATA_DIR="$install_dir/data/baseline" VALMET_OFFLINE=1 HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1
-  cd "$install_dir"
-  pty "$install_dir/.venv/bin/python" "$install_dir/app/mcp_server.py" 9082
+  # Same implementation as the dedicated supervised MCP service; no second listener.
+  exec /bin/bash "$deploy_dir/mcp-service.sh" server
 elif [[ "$service" == proxy ]]; then
   # A second Caddy must not reuse the management process's autosave/storage.
   export XDG_CONFIG_HOME=/workspace/scan2work/proxy/config
@@ -32,7 +26,11 @@ else
   install_url=https://assets.scan2work.app/releases/0.1.1/index.html
   cd "$install_dir"
   if [[ "$service" == baseline ]]; then
-    pty "$python_cmd" "$launcher" --data-dir "$install_dir/data/baseline" --assistant \
+    assistant_args=()
+    if [[ -f "$deploy_dir/assistant.env" ]] && grep -qx 'VALMET_PUBLIC_ASSISTANT=1' "$deploy_dir/assistant.env"; then
+      assistant_args=(--assistant)
+    fi
+    pty "$python_cmd" "$launcher" --data-dir "$install_dir/data/baseline" "${assistant_args[@]}" \
       --install-url "$install_url" --proposal-url https://review.scan2work.app/ --port 9080
   else
     pty "$python_cmd" "$launcher" --data-dir "$install_dir/data/extraction" \

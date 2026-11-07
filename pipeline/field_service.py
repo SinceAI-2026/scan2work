@@ -237,6 +237,24 @@ class FieldService:
         return {"tag": a["tag"], "status": outcome, "open_checks": open_checks}
 
 
+class ReadOnlyFieldService(FieldService):
+    """Public scenario inspection with no shared operator history or write path."""
+    def _read(self):
+        return {"jobs": {}}
+
+    def _write(self, log):
+        raise RuntimeError("The public demo does not save field jobs")
+
+    def get_job(self, equipment: str):
+        return {"tag": self.asset(equipment)["tag"], "job": None,
+                "note": "This hosted assistant is read-only; no visitor jobs are stored."}
+
+    def _deny_write(self, *args, **kwargs):
+        raise ValueError("This hosted assistant cannot start jobs, save notes or mark equipment repaired.")
+
+    start_job = complete_check = add_note = close_job = _deny_write
+
+
 _EQUIP = {"type": "string", "description": "Equipment tag as spoken or written, for example CV-003, P-001 or ASSET-003"}
 _TECH = {"type": "string", "description": "Technician name, if known"}
 TOOLS = [

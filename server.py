@@ -69,13 +69,7 @@ def saving_status() -> dict:
 RETRIEVER = None
 
 
-class PreviewFieldService(field_service.FieldService):
-    """Read the packaged scenario without loading any operator's job history."""
-    def _read(self):
-        return {"jobs": {}}
-
-    def _write(self, log):
-        raise RuntimeError("The public demo does not save field jobs")
+PreviewFieldService = field_service.ReadOnlyFieldService
 
 
 def public_install_url():
@@ -95,6 +89,22 @@ def served_manifest():
             'offline': True, 'external_models_enabled': False, 'shared_writes_enabled': False,
             'voice_assistant': PUBLIC_ASSISTANT, 'field_jobs_enabled': PUBLIC_ASSISTANT,
             'install_url': public_install_url()}
+    # With --assistant and no explicit agent override, preserve the upstream
+    # Ilkka opt-in. An explicit (even empty) agent setting remains authoritative.
+    if PUBLIC_ASSISTANT and 'VALMET_VOICE_AGENT_ID' not in os.environ:
+        manifest['runtime'] = {**(manifest.get('runtime') or {})}
+        manifest['runtime'].pop('voice', None)
+    elif PUBLIC_DEMO or 'VALMET_VOICE_AGENT_ID' in os.environ:
+        agent_id = os.environ.get('VALMET_VOICE_AGENT_ID', '').strip()
+        enabled = bool(re.fullmatch(r'agent_[A-Za-z0-9_-]{1,100}', agent_id))
+        mcp_url = os.environ.get('VALMET_VOICE_MCP_URL', '').strip()
+        parsed = urlparse(mcp_url)
+        if parsed.scheme != 'https' or not parsed.netloc or parsed.username or parsed.password:
+            mcp_url = None
+        manifest['runtime'] = {**(manifest.get('runtime') or {}), 'voice': {
+            'enabled': enabled, 'provider': 'elevenlabs', 'agent_id': agent_id if enabled else None,
+            'agent_name': os.environ.get('VALMET_VOICE_AGENT_NAME', 'Ilkka').strip()[:80] or 'Ilkka',
+            'service_mode': 'shared_jobs' if PUBLIC_ASSISTANT else 'read_only', 'mcp_url': mcp_url}}
     return manifest
 
 INTENT_KEYWORDS = {
@@ -424,7 +434,7 @@ class TwinRequestHandler(SimpleHTTPRequestHandler):
             return self._live("GET", path, {})
         qs = parse_qs(parsed.query)
 
-        if path == '/data/digital_twin.json' and (PUBLIC_DEMO or 'VALMET_PROPOSAL_VIEW_URL' in os.environ):
+        if path == '/data/digital_twin.json' and (PUBLIC_DEMO or 'VALMET_PROPOSAL_VIEW_URL' in os.environ or 'VALMET_VOICE_AGENT_ID' in os.environ):
             return self._send_json(served_manifest())
 
         if path == "/api/scene/edits":

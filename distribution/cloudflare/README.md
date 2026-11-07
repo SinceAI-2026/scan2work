@@ -1,9 +1,13 @@
 # HTTPS browser demo edge
 
 `proxy.mjs` streams the isolated public backend, including video range responses.
-It forwards only GET/HEAD and the bounded offline diagnosis/draft POST endpoints;
-visitor cookies and authorization are not forwarded. The backend independently
-rejects shared mutations. The fixed `ORIGIN` is deployment configuration, never a
+For scene content it forwards GET/HEAD and the bounded offline diagnosis/draft
+POST endpoints; visitor cookies and authorization are not forwarded. The separate
+`/mcp` route accepts authenticated MCP GET/POST only when `MCP_ORIGIN` is set to
+an HTTPS origin. Only that route forwards its bearer credential; it strips
+query strings, never follows redirects and enforces the same 16 KiB request cap. The backend independently
+rejects scene/library mutations. Worker `ASSISTANT="1"` also permits the
+field-job POST route, but the backend must separately enable `--assistant`. The fixed `ORIGIN` is deployment configuration, never a
 visitor-supplied URL. Each prepared release runs in its own environment; the edge
 uses no model keys.
 
@@ -35,3 +39,19 @@ indexes. Downloads do not depend on the demo host. See
 Run `node --test distribution/cloudflare/proxy.test.mjs` from the repository root.
 After deploying, verify the manifest, 206 video range response, blocked shared
 writes, actual room rendering, navigation, and the installer download URL.
+
+## Optional public MCP route
+
+`MCP_ORIGIN` must be a dedicated HTTPS origin serving only the MCP process. Never
+point it at the ordinary HTTP scene origin: the connection carries a workspace
+bearer credential. The backend verifies that credential independently and serves
+read tools by default, or shared inspection tools when the host explicitly
+enables `VALMET_PUBLIC_ASSISTANT=1`. With no `MCP_ORIGIN`, `/mcp` returns 503.
+
+The current demo uses a separately supervised Cloudflare quick tunnel to the
+loopback MCP service. Restarting that tunnel may change its hostname; update
+`MCP_ORIGIN` and re-run authenticated initialization, tool listing and denied-write
+checks. This is a demo transport, not a persistent named tunnel. The existing
+management tunnel, Caddy and scene proxy do not need changes.
+
+See [voice/MCP setup](../../docs/voice-mcp.md) for the ElevenLabs handoff.

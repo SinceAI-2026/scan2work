@@ -50,6 +50,17 @@ class PublicRuntimeTests(unittest.TestCase):
         self.assertEqual(failure.exception.code, 1)
         execute.assert_not_called()
 
+    def test_hosted_assistant_is_explicit_and_keeps_offline_loopback(self):
+        with mock.patch.object(serve_public_demo, 'check_dataset', return_value=504), \
+             mock.patch.object(serve_public_demo.os, 'execve') as execute:
+            for enabled in (False, True):
+                serve_public_demo.main(['--data-dir', '/prepared', '--install-url', 'https://downloads.example/']
+                                       + (['--assistant'] if enabled else []))
+                env = execute.call_args.args[2]
+                self.assertEqual(env['VALMET_PUBLIC_ASSISTANT'], '1' if enabled else '0')
+                self.assertEqual(env['VALMET_OFFLINE'], '1')
+                self.assertEqual(env['VALMET_BIND_HOST'], '127.0.0.1')
+
     def test_hosted_launcher_requires_explicit_safe_download_url(self):
         for value in ('javascript:alert(1)', 'http://downloads.example/', 'https://user:pass@example.com/'):
             with self.assertRaises(serve_public_demo.argparse.ArgumentTypeError):
@@ -86,6 +97,7 @@ class PublicHTTPTests(unittest.TestCase):
                    mock.patch.object(server, 'DATA_PATH', self.manifest),
                    mock.patch.object(server, 'TWIN_DATA', self.twin),
                    mock.patch.object(server, 'PUBLIC_DEMO', True),
+                   mock.patch.object(server, 'PUBLIC_ASSISTANT', False),
                    mock.patch.object(server, 'ASSETS_BY_ID', {'ASSET-003': self.asset}),
                    mock.patch.object(server, 'ASSETS_BY_OBJ', {'OBJ-206': self.asset}),
                    mock.patch.object(server, 'WORK_ORDER_DRAFTS', [{'notes': 'private draft'}]),
@@ -118,10 +130,24 @@ class PublicHTTPTests(unittest.TestCase):
         self.assertEqual(manifest['runtime'], {'public_demo': True, 'offline': True,
             'external_models_enabled': False, 'shared_writes_enabled': False,
             'voice_assistant': False, 'field_jobs_enabled': False,   # off unless VALMET_PUBLIC_ASSISTANT=1
-            'install_url': 'https://downloads.example/releases/0.1.0/'})
+            'install_url': 'https://downloads.example/releases/0.1.0/', 'voice': {
+                'enabled': False, 'provider': 'elevenlabs', 'agent_id': None,
+                'agent_name': 'Ilkka', 'service_mode': 'read_only', 'mcp_url': None}})
         self.assertEqual(self.twin, before)
         self.assertEqual(self.manifest.read_bytes(), self.original)
         self.assertTrue(self.request('GET', '/data//digital_twin.json')[1]['runtime']['public_demo'])
+
+    def test_explicit_voice_config_does_not_enable_shared_writes_or_backend_models(self):
+        with mock.patch.dict(os.environ, {'VALMET_VOICE_AGENT_ID': 'agent_fixture123',
+            'VALMET_VOICE_AGENT_NAME': 'Public guide', 'VALMET_VOICE_MCP_URL': 'https://example.test/mcp'}):
+            runtime = self.request('GET', '/data/digital_twin.json')[1]['runtime']
+        self.assertEqual(runtime['voice'], {'enabled': True, 'provider': 'elevenlabs',
+            'agent_id': 'agent_fixture123', 'agent_name': 'Public guide',
+            'service_mode': 'read_only', 'mcp_url': 'https://example.test/mcp'})
+        self.assertTrue(runtime['offline'])
+        self.assertFalse(runtime['external_models_enabled'])
+        self.assertFalse(runtime['shared_writes_enabled'])
+        self.assertEqual(self.manifest.read_bytes(), self.original)
 
     def test_shared_mutations_are_denied_without_invoking_writers(self):
         with mock.patch.object(server, 'apply_edit', side_effect=AssertionError('write')), \
@@ -135,6 +161,43 @@ class PublicHTTPTests(unittest.TestCase):
                     self.assertEqual(status, 403)
                     self.assertEqual(result['code'], 'public_demo_read_only')
                     self.assertFalse(result['persisted'])
+
+    def test_assistant_preserves_upstream_voice_and_explicit_agent_overrides(self):
+        before = copy.deepcopy(self.twin)
+        with mock.patch.object(server, 'PUBLIC_ASSISTANT', True), mock.patch.dict(os.environ, {}, clear=True):
+            self.twin['runtime']['voice'] = {'enabled': False}
+            runtime = self.request('GET', '/data/digital_twin.json')[1]['runtime']
+            self.assertTrue(runtime['voice_assistant'])
+            self.assertTrue(runtime['field_jobs_enabled'])
+            self.assertNotIn('voice', runtime)
+            self.assertFalse(runtime['shared_writes_enabled'])
+            with mock.patch.dict(os.environ, {'VALMET_VOICE_AGENT_ID': 'agent_fixture123'}):
+                voice = self.request('GET', '/data/digital_twin.json')[1]['runtime']['voice']
+                self.assertTrue(voice['enabled'])
+                self.assertEqual(voice['service_mode'], 'shared_jobs')
+            with mock.patch.dict(os.environ, {'VALMET_VOICE_AGENT_ID': ''}):
+                self.assertFalse(self.request('GET', '/data/digital_twin.json')[1]['runtime']['voice']['enabled'])
+            self.assertEqual(self.twin['runtime']['voice'], {'enabled': False})
+        self.twin['runtime'] = before['runtime']
+        self.assertEqual(self.manifest.read_bytes(), self.original)
+
+    def test_explicit_assistant_shares_jobs_only_and_bounds_notes(self):
+        log = self.data / 'shared_test_log.json'
+        field = server.field_service.FieldService({'assets': [self.asset]})
+        with mock.patch.object(server, 'PUBLIC_ASSISTANT', True), mock.patch.object(server, 'FIELD', field), \
+             mock.patch.object(server.field_service, 'LOG_PATH', log):
+            status, _, _ = self.request('POST', '/api/field-jobs', {'action': 'start_job', 'equipment': 'CV-003'})
+            self.assertEqual(status, 200)
+            before = log.read_bytes()
+            status, _, _ = self.request('POST', '/api/field-jobs', {'action': 'add_note', 'equipment': 'CV-003', 'text': 'x' * 1001})
+            self.assertEqual(status, 413)
+            self.assertEqual(log.read_bytes(), before)
+            status, _, _ = self.request('POST', '/api/field-jobs', {'action': 'add_note', 'equipment': 'CV-003', 'text': 'Demo observation'})
+            self.assertEqual(status, 200)
+            self.assertIn('Demo observation', json.dumps(self.request('GET', '/api/field-log')[1]))
+            for path in ('/api/scene/edits', '/api/library', '/api/live/board/action'):
+                self.assertEqual(self.request('POST', path, {})[0], 403)
+            self.assertEqual(self.request('GET', '/data/field_log.json')[0], 404)
 
     def test_operator_state_is_not_exposed_by_api_or_static_paths(self):
         for path, expected in [('/api/scene/edits', {'removed': []}),

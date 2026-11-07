@@ -12,9 +12,3 @@ http://:10100 {
 http://:10200 {
 	reverse_proxy 127.0.0.1:9081
 }
-
-# Voice assistant MCP server (mcp_server.py). Only the Worker's /mcp route should reach this port;
-# requests through it must carry the FIELD_ATLAS_MCP_TOKEN bearer token.
-http://:10300 {
-	reverse_proxy 127.0.0.1:9082
-}

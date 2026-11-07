@@ -6,9 +6,8 @@
 // field-jobs.mjs shows the job log the agent writes (inspection queue, checklist, technician notes).
 
 import { mountFieldJobs, showEquipment } from "./field-jobs.mjs";
-import { voiceAssistantEnabled } from "./runtime-access.mjs";
+import { voiceConfig } from "./voice-config.mjs";
 
-const AGENT_ID = "agent_5501m6v02k69e2r8fwc0hznmfda5";
 const WIDGET_SRC = "https://unpkg.com/@elevenlabs/convai-widget-embed@0.21.4/dist/index.js";
 let registeredTags=new Set();
 
@@ -19,22 +18,20 @@ function selectedTag() {
 }
 
 async function mount() {
-  // Offline imports must not load an external widget or start an external model session.
+  // Offline imports stay local unless the server explicitly configures a voice service.
   let runtime;
   try {
     const twin=await fetch("./data/digital_twin.json").then(res=>res.json());
     runtime=twin.runtime;
-    registeredTags=new Set(twin.assets.filter(asset=>asset.mapped).map(asset=>asset.tag));
+    registeredTags=new Set((twin.assets || []).filter(asset=>asset.mapped).map(asset=>asset.tag));
   }
   catch { return; }
-  // Offline imports and the hosted demo stay without it, unless the server opts in (runtime.voice_assistant).
-  if (!voiceAssistantEnabled(runtime)) {
-    mountFieldJobs(selectedTag, runtime);
-    return;
-  }
+  mountFieldJobs(selectedTag, runtime);
+  const voice = voiceConfig(runtime);
+  if (!voice) return;
   const widget = document.createElement("elevenlabs-convai");
-  widget.setAttribute("agent-id", AGENT_ID);
-  widget.setAttribute("action-text", "Call Ilkka for support");
+  widget.setAttribute("agent-id", voice.agentId);
+  widget.setAttribute("action-text", `Call ${voice.agentName} for support`);
   widget.setAttribute("start-call-text", "Start call");
   widget.setAttribute("end-call-text", "End call");
   widget.setAttribute("placement", "bottom-right"); // field-jobs.css moves it clear of Equipment details when that is open
@@ -46,10 +43,27 @@ async function mount() {
   const script = document.createElement("script");
   script.src = WIDGET_SRC;
   script.async = true;
-  script.onerror = () => console.warn("voice assistant: the ElevenLabs widget did not load (offline?)");
+  let failed = false;
+  const unavailable = () => {
+    if (failed) return;
+    failed = true;
+    clearTimeout(loadingTimeout);
+    widget.remove();
+    const status = document.createElement("div");
+    status.className = "voice-load-status";
+    status.setAttribute("role", "status");
+    status.textContent = "Voice unavailable. Use workbook guidance in Equipment details.";
+    document.body.appendChild(status);
+  };
+  const loadingTimeout = setTimeout(unavailable, 20000);
+  script.onerror = unavailable;
+  // Loading the widget does not start a call or request microphone access.
+  if (globalThis.customElements) customElements.whenDefined("elevenlabs-convai").then(() => clearTimeout(loadingTimeout));
   document.head.appendChild(script);
   // The widget asks for client tools when a call starts; their return value is what the agent hears back.
   window.addEventListener("elevenlabs-convai:call", (event) => {
+    if (!event.detail?.config) return;
+    sync();
     event.detail.config.clientTools = {
       show_equipment: async ({ equipment }) => {
         try {
@@ -61,7 +75,6 @@ async function mount() {
       },
     };
   });
-  mountFieldJobs(selectedTag, runtime);
   window.__voiceAssistant = { selectedTag, showEquipment };
 }
 

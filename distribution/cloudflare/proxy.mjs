@@ -1,8 +1,4 @@
 // Stream the prepared public demo through HTTPS. No arbitrary proxy targets.
-// With MCP_ORIGIN set, /mcp goes to the voice assistant's MCP server (mcp_server.py), keeping the Authorization
-// bearer token ElevenLabs sends; every other path still drops visitor credentials. With ASSISTANT = "1",
-// POST /api/field-jobs is allowed so the viewer's job card can save checks and notes (the server must also run
-// with --assistant). Both are off unless set in wrangler.toml.
 const PUBLIC_POSTS = ['/api/copilot/diagnose', '/api/work-orders/draft'];
 export default {
   async fetch(request, env) {
@@ -10,22 +6,34 @@ export default {
       return new Response('Method not allowed', { status: 405 });
     }
     const incoming = new URL(request.url);
-    const mcp = incoming.pathname === '/mcp' && !!env.MCP_ORIGIN;
+    const mcp = incoming.pathname === '/mcp';
+    if (mcp && !['GET', 'POST'].includes(request.method)) return new Response('Method not allowed', {status: 405});
+    if (mcp && !env.MCP_ORIGIN) return new Response('MCP is not configured', {status: 503});
     const posts = env.ASSISTANT === '1' ? [...PUBLIC_POSTS, '/api/field-jobs'] : PUBLIC_POSTS;
     if (request.method === 'POST' && !mcp && !posts.includes(incoming.pathname)) {
       return Response.json({error: 'public_demo_read_only'}, {status: 403});
     }
     const origin = new URL(mcp ? env.MCP_ORIGIN : env.ORIGIN);
+    // The ordinary origin contains public scene data. MCP carries a private
+    // workspace credential, so it must use its separate encrypted origin.
+    if (mcp && (origin.protocol !== 'https:' || origin.username || origin.password)) {
+      return new Response('MCP requires a secure origin', {status: 503});
+    }
     origin.pathname = incoming.pathname;
-    origin.search = incoming.search;
+    origin.search = mcp ? '' : incoming.search;
     const headers = new Headers();
-    const forward = ['accept', 'content-type', 'range', 'if-range', 'if-none-match', 'if-modified-since',
-      ...(mcp ? ['authorization', 'mcp-session-id', 'mcp-protocol-version'] : [])];
-    for (const key of forward) {
+    if (mcp) {
+      const authorization = request.headers.get('authorization') || '';
+      if (!/^Bearer [^\s]{1,512}$/i.test(authorization)) return new Response('Unauthorized', {status: 401});
+      headers.set('authorization', authorization);
+      for (const name of ['mcp-protocol-version', 'mcp-session-id']) {
+        if (request.headers.has(name)) headers.set(name, request.headers.get(name));
+      }
+      headers.set('x-forwarded-for', request.headers.get('cf-connecting-ip') || 'cloudflare');
+    }
+    for (const key of ['accept', 'content-type', 'range', 'if-range', 'if-none-match', 'if-modified-since']) {
       if (request.headers.has(key)) headers.set(key, request.headers.get(key));
     }
-    // mcp_server.py requires the bearer token for any request that arrives through a proxy.
-    if (mcp) headers.set('x-forwarded-for', request.headers.get('cf-connecting-ip') || 'cloudflare');
     let body;
     if (request.method === 'POST') {
       if (Number(request.headers.get('content-length') || 0) > 16384) return new Response('Request too large', {status: 413});

@@ -33,7 +33,7 @@ AR evidence, and download existing library artifacts. Client-side geometry and
 IFC exports remain available. Room edits in the hosted UI are browser-local
 simulations. They are not maintenance updates to the shared model.
 
-The server rejects scene-edit, field-job, library-generation and library-removal
+By default, the server rejects scene-edit, field-job, library-generation and library-removal
 requests with `403 public_demo_read_only`. It serves an empty operator log/edit
 state and a fresh read-only inspection queue; direct static log, edit and cache
 files are unavailable. Directory listings and symlinks escaping the web/data
@@ -62,3 +62,19 @@ write boundary, stateless drafts, blocked operator history, local copilot,
 manifest preservation, launcher preflight, normal writable mode, active-dataset
 video ranges and original online/offline runtime compatibility. This is distinct
 from browser interaction QA and deployment connectivity checks.
+
+## Optional voice connection
+
+The later [voice/MCP integration](voice-mcp.md) allows an explicitly configured
+ElevenLabs widget while backend inference remains offline and shared writes stay
+disabled. No voice configuration means no external widget load. The current
+0.1.1 package has voice disabled; the newer source requires Wael's cloud-agent
+configuration before activation. The separate public MCP service exposes only
+reading tools and requires a bearer credential over its encrypted origin.
+
+Wael's explicit `--assistant` option is retained in the follow-up source. It
+allows shared field jobs and the original Ilkka widget while scene/library
+writes remain blocked. The matching MCP service can opt into the same shared
+log with `VALMET_PUBLIC_ASSISTANT=1`; Worker `ASSISTANT="1"` allows only the
+additional field-job POST route. Keep all three settings aligned. This opt-in
+is separate from explicit read-only `runtime.voice` configuration.
