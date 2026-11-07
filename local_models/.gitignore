@@ -1,0 +1,11 @@
+brain/
+.DS_Store
+data/*
+# The pipeline's results are committed (the inputs, crops and models are too large):
+!data/pipeline/
+data/pipeline/*
+!data/pipeline/objects.json
+!data/pipeline/objects.npz
+!data/pipeline/types.json
+.venv
+__pycache__/

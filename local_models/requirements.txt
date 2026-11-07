@@ -1,0 +1,12 @@
+accelerate==1.15.0
+numpy==2.5.4
+openpyxl==3.1.5
+pillow==13.0.0
+playwright==1.64.1
+plyfile==1.1.5
+pycolmap==4.2.1
+scikit-image==0.26.0
+scipy==1.18.1
+torch==2.15.0
+torchvision==0.29.2
+transformers==5.22.2

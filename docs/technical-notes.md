@@ -28,6 +28,8 @@ The extraction is a chain of independent stages, each with its own evidence. Eve
 | Pipe cylinders | `pipes.py` | Surface-normal voting for pipe axes and radii (port of Linards' `cylinders.py`, after Qiu et al., ECCV 2014), with a continuous-arc test that rejects walls and box faces | NumPy, SciPy |
 | Clean-up | `semantic_labels.py` | Drops AI-confirmed clutter and merges touching pieces of the same pipe, tank or cabinet | — |
 
+With `VALMET_SEGMENTER=local`, `pipeline/local_objects.py` replaces the proposals, AI labelling, detection and clean-up stages above with the objects from `local_models/`. These come from SAM 2.1 masks on the posed video frames, stitched into 3D objects by view consensus (MaskClustering), and are named by SigLIP 2, DINOv2, OWLv2 and a linear probe. Each object's box is refitted on the levelled splat with the same box fitter, then pipes, photos, mapping and navigation run as usual. No hosted API is called. The README's "Two pipelines" section compares both.
+
 The current artifact contains **[refresh] objects**. AI-verified label sources, movable objects and pipe cylinders are counted in `scene.semantic_labelling`.
 
 ### Measured extraction quality
