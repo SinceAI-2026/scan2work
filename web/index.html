@@ -15,6 +15,8 @@
       }
     }
   </script>
+  <link rel="stylesheet" href="./view-layers.css">
+  <link rel="stylesheet" href="./view-switch.css">
 </head>
 <body>
   <div id="arrival-announcement" class="visually-hidden" role="status" aria-live="polite"></div>
@@ -28,7 +30,6 @@
       <div class="mission-box">
         <button class="btn-walk primary" id="btn-room-tour" disabled>Tour the room</button>
         <button class="btn-walk" id="btn-go-target" disabled>Inspect faulty device</button>
-        <p class="navigation-help">Free view: drag to orbit, right-drag to pan, scroll to zoom. Click the map to walk.</p>
       </div>
       <div class="filter-group"><label for="asset-search" class="field-label">Find equipment</label><input id="asset-search" class="clean-input" placeholder="Search tag or equipment…" type="search" /></div>
       <select id="select-visual-review" class="clean-select" aria-label="Equipment filter"><option value="all">All extracted regions</option><option value="mapped">Excel-linked equipment</option><option value="alerts">Needs attention</option><option value="baseline">Linards baseline regions</option><option value="new">New candidate regions</option><option value="floor">Floor patches</option></select>
@@ -42,49 +43,47 @@
     <section class="viewport-col">
       <div id="canvas-container" class="canvas-container">
         <div class="viewport-Controls-overlay">
-          <div class="vp-row">
-            <button class="vp-btn active" data-cam="walk">Follow robot</button>
-            <button class="vp-btn" data-cam="first">First person</button>
-            <button class="vp-btn" data-cam="overview" title="Drag to orbit · right-drag to pan · scroll to zoom · WASD to walk">Free view</button>
-            <button class="vp-btn" data-cam="inside">Target view</button>
-            <button class="vp-btn" id="btn-bim-back" data-cam="overview" hidden>Scan view</button>
-            <button class="vp-btn" data-cam="bim">BIM 3D</button>
-            <button class="vp-btn" id="btn-semantic-plan" disabled>Floor plan</button>
+          <div class="vp-row view-row">
+            <div class="view-switch" id="view-switch">
+              <button class="view-fab" id="view-fab" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="view-menu" aria-label="Change view: Follow robot" data-tip="Follow robot"><span class="view-icon" id="view-fab-icon" data-icon="follow"></span></button>
+              <div class="view-menu" id="view-menu" role="menu" aria-label="Views" hidden>
+                <button class="view-item active" type="button" role="menuitemradio" data-cam="walk" data-icon="follow" data-tip="Follow robot" aria-label="Follow robot"></button>
+                <button class="view-item" type="button" role="menuitemradio" data-cam="first" data-icon="first" data-tip="First person: the robot's camera. Drag to look, WASD or arrows to walk" aria-label="First person"></button>
+                <button class="view-item" type="button" role="menuitemradio" data-cam="aerial" data-icon="aerial" data-tip="Aerial view" aria-label="Aerial view"></button>
+              </div>
+            </div>
             <button class="vp-btn" id="btn-ar-view" hidden>AR view</button>
             <button class="vp-btn autoplay-chip" id="autoplay-chip" hidden>AUTOPLAY, click to take over</button>
             <button class="vp-btn manual-walk-chip" id="btn-manual-walk" hidden>Manual walk · M = resume mission</button>
-            <details class="display-options"><summary class="vp-btn">Display</summary><div class="display-options-body">
-              <label for="select-splat-mode">Render quality</label><select id="select-splat-mode" class="vp-select"><option value="high">High detail</option><option value="balanced">Balanced</option></select>
-              <span>Equipment frames</span><div class="vp-row"><button class="vp-btn" data-bmode="selected">Selected</button><button class="vp-btn active" id="btn-boxes-mode" data-bmode="proximity">Nearby</button><button class="vp-btn" id="btn-all-boxes" data-bmode="all">All</button><button class="vp-btn" id="btn-no-boxes" data-bmode="off">Off</button></div>
-              <label id="btn-room-fill-label" class="room-fill-toggle"><input type="checkbox" id="room-fill-debug"> Tint synthetic fill</label>
-            </div></details>
           </div>
-        </div>
-        <div id="bim-options" hidden>
-          <section class="bim-panel" aria-label="BIM layers">
-            <strong>Room model</strong>
-            <span id="bim-counts" class="layer-counts" aria-live="polite"></span>
-            <label for="bim-search">Find any region</label>
-            <input id="bim-search" type="search" placeholder="Name, tag, or source ID" />
-            <div id="bim-search-results"></div>
-            <label><input type="checkbox" id="bim-walls" checked> Walls</label>
-            <label><input type="checkbox" id="bim-pipes"> Include overhead regions</label>
-            <label><input type="checkbox" id="bim-all"> Include small regions</label>
-            <label><input type="checkbox" id="bim-floor" checked> Observed floor / floor patches</label>
-            <label><input type="checkbox" id="bim-context-pipes" checked> Fitted pipe geometry</label>
-            <label><input type="checkbox" id="bim-plane"> 1.1 m section plane</label>
-            <span id="bim-context-counts" class="layer-counts"></span>
-            <button id="btn-bim-reset" type="button">Reset view</button>
+          <div class="view-tools" id="layer-options">
+          <section class="layer-panel" aria-label="Room view">
+            <div class="layer-seg layer-aerial" role="radiogroup" aria-label="Layer">
+              <button type="button" role="radio" class="active" data-layer="scan" data-tip="The scan, frames coloured by status"><span class="view-icon" data-icon="scan"></span>Scan</button>
+              <button type="button" role="radio" data-layer="detected" data-tip="Objects coloured by class"><span class="view-icon" data-icon="detected"></span>Coloured</button>
+              <button type="button" role="radio" data-layer="bim" data-tip="BIM model"><span class="view-icon" data-icon="bim"></span>BIM</button>
+            </div>
+            <div class="layer-group layer-display" role="group" aria-labelledby="layer-display-heading">
+              <span class="layer-heading" id="layer-display-heading">Display</span>
+              <label class="layer-row">Render quality<select id="select-splat-mode" class="layer-select"><option value="high">High detail</option><option value="balanced">Balanced</option></select></label>
+              <div class="layer-row">Frames<div class="layer-mini-seg" role="group" aria-label="Equipment frames"><button type="button" class="active" id="btn-boxes-mode" data-bmode="proximity">Nearby</button><button type="button" id="btn-all-boxes" data-bmode="all">All</button><button type="button" id="btn-no-boxes" data-bmode="off">Off</button></div></div>
+              <label id="btn-room-fill-label" class="room-fill-toggle"><input type="checkbox" id="room-fill-debug"> Tint synthetic fill</label>
+            </div>
+            <div class="layer-group layer-aerial" role="group" aria-labelledby="layer-show-heading">
+              <span class="layer-heading" id="layer-show-heading">Show in room</span>
+              <span id="room-layer-count" class="layer-counts" aria-live="polite"></span>
+              <label><input type="checkbox" id="layer-walls"> Walls</label>
+              <label><input type="checkbox" id="layer-pipes"> Pipes and overhead objects</label>
+              <label><input type="checkbox" id="layer-all"> All equipment</label>
+              <label><input type="checkbox" id="layer-relevant" checked> Relevant equipment</label>
+            </div>
+            <div class="layer-group layer-aerial">
+              <label class="layer-explode"><span class="view-icon" data-icon="explode"></span>Explode<input id="explode-range" type="range" min="0" max="1" step="0.01" value="0" aria-label="Explode objects"></label>
+              <label class="layer-ceiling"><input id="ceiling-toggle" type="checkbox"> Hide ceiling</label>
+            </div>
+            <button type="button" class="layer-link layer-aerial" id="btn-semantic-plan" disabled><span class="view-icon" data-icon="plan2d"></span>2D drawing and IFC</button>
           </section>
-          <p id="bim-selection" class="bim-selection" aria-live="polite" hidden></p>
-          <div class="bim-legend" aria-label="Model colours">
-            <span><i style="background:#58a9db"></i>Valves</span>
-            <span><i style="background:#3cbaa2"></i>Pumps and motors</span>
-            <span><i style="background:#e7a05a"></i>Vessels</span>
-            <span><i style="background:#aa7bd1"></i>Movables</span>
-            <span><i style="background:#ee705e"></i>Target</span>
-            <span data-unreviewed-legend><i style="background:#78909b"></i>Unreviewed envelopes</span>
-            <span data-floor-legend><i style="background:#a89e6a"></i>Observed floor samples</span>
+            <div class="class-legend" id="class-legend" hidden aria-label="Object classes"></div>
           </div>
         </div>
         <div id="hud-overlay" class="hud-overlay"></div>
@@ -278,5 +277,6 @@
 
   <script type="module" src="app.js"></script>
   <script type="module" src="voice-assistant.mjs"></script>
+  <script type="module" src="sidebar-toggle.mjs"></script>
 </body>
 </html>

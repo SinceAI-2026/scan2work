@@ -1,22 +1,54 @@
-/* Inspection queue and technician job card (field-jobs.mjs). */
-.inspection-queue { display: flex; flex-direction: column; gap: 6px; }
-.inspection-queue h2 { font-weight: 600; display: flex; gap: 6px; align-items: center; }
-.iq-count, .iq-done-count { font-family: var(--mono); color: var(--text-main); }
-.iq-list, .iq-done-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; max-height: 220px; overflow-y: auto; }
+/* Left sidebar tabs, inspection queue and technician job card (field-jobs.mjs). */
+
+/* Two tabs share the sidebar's free height: "To inspect" and "All equipment". Each scrolls on its own. */
+.side-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 3px; padding: 3px; border-radius: 8px; background: #e6eae0; flex-shrink: 0; }
+.side-tabs [role=tab] {
+  display: flex; align-items: center; justify-content: center; gap: 5px; padding: 7px 4px; border: 0; border-radius: 6px;
+  background: transparent; color: var(--text-muted); font: inherit; font-size: 11.5px; font-weight: 600; white-space: nowrap; cursor: pointer;
+}
+.side-tabs [role=tab][aria-selected=true] { background: var(--card-bg); color: var(--text-main); box-shadow: 0 1px 3px #0002; }
+.side-tabs [role=tab]:focus-visible { outline: 2px solid var(--forest); outline-offset: 1px; }
+.tab-count { min-width: 18px; padding: 1px 6px; border-radius: 99px; background: var(--terracotta); color: #fff; font-size: 10px; line-height: 1.5; }
+.side-panel { display: flex; flex-direction: column; gap: 8px; flex: 1 1 auto; min-height: 120px; overflow-y: auto; }
+.side-panel[hidden] { display: none; }
+.equipment-panel .proposal-list { flex: 1 1 auto; overflow: visible; }
+.equipment-panel .proposal-card { border: 1px solid var(--border); background: var(--card-bg); }
+.equipment-panel .prop-meta { display: block; }
+.equipment-panel .prop-meta span { display: block; margin-top: 2px; }
+@media (max-width: 650px) { .side-tabs { grid-template-columns: 1fr; } }
+/* Only what a technician needs: the asset count is on the tab badge, and the search box says what it searches. */
+#sidebar-stats-text { display: none; }
+.equipment-panel .filter-group > .field-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* The inspection queue */
+.iq-list, .iq-done-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 5px; }
 .iq-row {
-  width: 100%; display: grid; grid-template-columns: auto 1fr auto; gap: 2px 8px; align-items: baseline;
-  padding: 7px 9px; border: 1px solid var(--border); border-radius: 6px; background: var(--card-bg);
+  width: 100%; display: flex; flex-direction: column; align-items: stretch; gap: 4px;
+  padding: 8px 10px; border: 1px solid var(--border); border-radius: 7px; background: var(--card-bg);
   font: inherit; font-size: 11px; text-align: left; color: var(--text-main); cursor: pointer;
 }
-.iq-row:hover, .iq-row:focus-visible { border-color: var(--forest); }
-.iq-tag { font-family: var(--mono); font-weight: 600; }
+.iq-row:hover { border-color: #9fb59a; background: #fafbf7; }
+.iq-row:focus-visible { outline: 2px solid var(--forest); outline-offset: 1px; }
+.iq-row.selected { border-color: var(--forest); box-shadow: inset 3px 0 0 var(--forest); background: #eef4ea; }
+.iq-name { display: flex; gap: 7px; align-items: baseline; min-width: 0; }
+.iq-meta { display: flex; gap: 7px; align-items: center; min-width: 0; }
+.iq-tag { font-family: var(--mono); font-weight: 700; font-size: 12px; flex-shrink: 0; }
 .iq-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-muted); }
-.iq-state { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--amber); }
-.iq-state.attention_required, .iq-state.degraded { color: var(--terracotta); }
-.iq-progress { grid-column: 1 / -1; color: var(--text-muted); font-size: 10px; }
-.iq-done summary { font-size: 11px; color: var(--text-muted); cursor: pointer; padding: 2px 0; }
-.iq-done .iq-row { opacity: .75; }
-.iq-done .iq-state { color: var(--forest); }
+.iq-state { flex-shrink: 0; padding: 1px 7px; border-radius: 99px; font-size: 10px; font-weight: 700; white-space: nowrap; background: #f6ecd9; color: #8a5a14; }
+.iq-state.attention_required { background: var(--terracotta); color: #fff; }
+.iq-state.degraded { background: #f7e3df; color: #a23b2a; }
+.iq-state.fixed { background: #e1ede4; color: var(--forest); }
+.iq-progress { color: var(--text-muted); font-size: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.iq-bar { height: 3px; border-radius: 3px; background: #e3e7de; overflow: hidden; }
+.iq-bar i { display: block; height: 100%; background: var(--forest); }
+.iq-more { align-self: flex-start; padding: 4px 0; border: 0; background: none; color: var(--forest); font: inherit; font-size: 11px; font-weight: 600; cursor: pointer; }
+.iq-more:hover { text-decoration: underline; }
+.iq-more[hidden] { display: none; }
+.iq-done { border-top: 1px solid var(--border); padding-top: 6px; }
+.iq-done summary { font-size: 11px; font-weight: 600; color: var(--text-muted); cursor: pointer; padding: 2px 0; }
+.iq-done-count { font-family: var(--mono); }
+.iq-done .iq-done-list { margin-top: 6px; }
+.iq-done .iq-row { opacity: .8; }
 .iq-empty, .fj-empty { font-size: 11px; color: var(--text-muted); padding: 4px 0; }
 
 .field-job[hidden] { display: none; }
@@ -60,3 +92,14 @@
    containing block, so its fixed-position launcher moves with it. */
 elevenlabs-convai { transition: transform .2s ease; }
 .inspector-open elevenlabs-convai { transform: translateX(calc(-1 * min(370px, 95vw))); }
+
+/* Show / hide the left sidebar (sidebar-toggle.mjs). Same approach as the BIM view, which also hides it. */
+.sidebar-toggle {
+  display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; margin-right: 4px;
+  border: 1px solid #ffffff33; border-radius: 6px; background: transparent; color: #f5f7f0; cursor: pointer; flex-shrink: 0;
+}
+.sidebar-toggle:hover { background: #ffffff1a; }
+.sidebar-toggle:focus-visible { outline: 2px solid #9fd0b0; outline-offset: 2px; }
+.sidebar-collapsed .sidebar-toggle { background: #ffffff1f; }
+.sidebar-collapsed .workspace { grid-template-columns: minmax(0, 1fr); }
+.sidebar-collapsed .left-sidebar { display: none; }

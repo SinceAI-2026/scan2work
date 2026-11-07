@@ -1,8 +1,8 @@
 """Stage 3 - Knowledge ingestion & 3D-to-Excel semantic asset binding.
 
 Loads all sheets from Valmet_SinceAI_2026_Synthetic_Industrial_Metaverse_Builder_Pack.xlsx
-and binds the 30 canonical Valmet assets (plus procedural telemetry for all
-remaining extracted 3D objects) onto the segmented 3D boiler room clusters.
+and binds the 30 canonical Valmet assets onto segmented 3D boiler room clusters.
+Other scan objects remain inspectable without borrowed workbook readings.
 """
 from __future__ import annotations
 
@@ -233,16 +233,6 @@ def load_excel_pack(xlsx_path=C.XLSX_PATH) -> dict:
         ],
     }
 
-
-# Extracted 3D class -> Excel asset_class whose healthy records supply telemetry profiles
-PROFILE_CLASS = {
-    "control_valve": "CONTROL_VALVE", "circulation_pump": "PROCESS_PUMP", "electric_motor": "ELECTRIC_MOTOR",
-    "pressure_sensor": "PRESSURE_TRANSMITTER", "vibration_sensor": "VIBRATION_SENSOR",
-    "expansion_vessel": "PRESSURE_TRANSMITTER", "heat_exchanger": "PRESSURE_TRANSMITTER",
-    "vertical_pipe": "PRESSURE_TRANSMITTER", "horizontal_pipe": "PRESSURE_TRANSMITTER",
-    "overhead_pipe": "PRESSURE_TRANSMITTER", "pipe_fitting": "PRESSURE_TRANSMITTER",
-    "electrical_cabinet": "ELECTRIC_MOTOR",
-}
 
 CANONICAL_CLASS_LABELS = {
     "CONTROL_VALVE": ("control_valve", "control valve"),
@@ -489,11 +479,21 @@ def _movable_record(obj: dict, scan_center, n: int, excel_pack: dict) -> dict:
     return rec
 
 
+def _unrecorded_record(obj: dict, scan_center, excel_pack: dict) -> dict:
+    """A fixed object the scan found that has no row in the builder pack: no telemetry, no health,
+    no invented tag. Shown grey for situational awareness and as an obstacle."""
+    rec = _movable_record(obj, scan_center, 0, excel_pack)
+    rec.update({"asset_class": "UNRECORDED_DEVICE", "asset_id": f"SCAN-{obj['id'].split('-')[1]}",
+                "tag": obj["id"], "instrumented": False, "process_context": "scan_only",
+                "condition_state": "not_instrumented", "issue_code": "NO_PACK_RECORD",
+                "criticality": "unknown - no pack record",
+                "recommended_next_check": "none - no record in the builder pack",
+                "issue_summary": "Found in the scan; the builder pack has no record for it, so no status or telemetry is shown."})
+    return rec
+
+
 def bind_assets_to_scene(extracted_assets: list, excel_pack: dict) -> list:
-    """Bind the 30 canonical Excel records to 30 distinct 3D objects, and enrich
-    all remaining 3D objects with procedural telemetry & status so every single
-    3D bounding box is inspectable.
-    """
+    """Bind canonical records to distinct objects; leave all others uninstrumented."""
     records = excel_pack["records"]
     # Order so TARGET_ASSET_ID is bound first, then degraded/watch assets, then healthy
     priority_order = sorted(
@@ -524,10 +524,6 @@ def bind_assets_to_scene(extracted_assets: list, excel_pack: dict) -> list:
             used_centers.append(best_obj["center"])
             obj_to_excel[best_obj["id"]] = rec
 
-    rng = np.random.default_rng(C.RANDOM_SEED)
-    healthy_by_class = {"_any": sorted((r for r in records.values() if r["condition_state"] == "healthy"), key=lambda r: r["asset_id"])}
-    for r in healthy_by_class["_any"]:
-        healthy_by_class.setdefault(r["asset_class"], []).append(r)
     enriched = []
     aux_counter = 1
     for obj in extracted_assets:
@@ -581,64 +577,13 @@ def bind_assets_to_scene(extracted_assets: list, excel_pack: dict) -> list:
                 "telemetry": rec["telemetry"],
             })
         else:
-            # Surrounding asset: borrow a HEALTHY Excel record of the closest equipment class as its
-            # metadata/telemetry profile, so every number shown in 3D traces back to the Builder Pack.
+            # Preserve scan geometry and labels without assigning another device's readings.
             if obj.get("movable") or obj["class"] in NON_DEVICE:
                 enriched.append(_movable_record(obj, scan_center, aux_counter, excel_pack))
                 aux_counter += 1
                 continue
-            prof_class = PROFILE_CLASS.get(obj["class"], "PRESSURE_TRANSMITTER")
-            pool = healthy_by_class.get(prof_class) or healthy_by_class["_any"]
-            prof = pool[int(oid.split("-")[1]) % len(pool)]
-            tag_prefix = {
-                "vertical_pipe": "PR", "overhead_pipe": "OM", "horizontal_pipe": "HP",
-                "expansion_vessel": "EV", "circulation_pump": "CP", "flow_marker": "FM",
-                "electrical_cabinet": "EC", "pressure_sensor": "PS", "control_valve": "AV",
-                "electric_motor": "EM", "heat_exchanger": "HX", "pipe_fitting": "PF",
-                "process_unit": "PU", "structural_column": "SC", "ceiling_fixture": "CF",
-                "industrial_asset": "AX", "clutter": "AX",
-            }.get(obj["class"], "AX")
-            tag = f"{tag_prefix}-{aux_counter:03d}"
-            aux_counter += 1
-            cam_view = _assign_camera_view(obj["center"], obj["size"], obj["class"])
-            enriched.append({
-                **obj,
-                "scan_center": scan_center,
-                "camera_view": cam_view,
-                "mapped": False,
-                "is_target": False,
-                "asset_id": f"AUX-{oid.split('-')[1]}",
-                "tag": tag,
-                "asset_class": prof["asset_class"],
-                "excel_profile_source": prof["asset_id"],
-                "excel_profile_tag": prof["tag"],
-                "area_id": prof["area_id"],
-                "area_name": prof["area_name"],
-                "process_context": prof["process_context"],
-                "criticality": "C - standard",
-                "health_score": prof["health_score"],
-                "condition_state": "healthy",
-                "issue_code": "NORMAL",
-                "issue_summary": f"Nominal; telemetry profile from {prof['tag']} ({prof['asset_id']})",
-                "urgency": "routine",
-                "recommended_next_check": "monitor",
-                "model_confidence": prof["model_confidence"],
-                "mapping_confidence": obj["class_confidence"],
-                "effective_confidence": round(min(prof["model_confidence"], obj["class_confidence"]), 2),
-                "dq_penalty": 0.0,
-                "qr_id": f"QR-AUX-{aux_counter:04d}",
-                "nfc_id": f"NFC-AUX-{aux_counter:04d}",
-                "installation_date": prof["installation_date"],
-                "last_service_date": prof["last_service_date"],
-                "connectivity_profile": prof["connectivity_profile"],
-                "knowledge_doc_id": prof["knowledge_doc_id"],
-                "knowledge_doc": prof["knowledge_doc"],
-                "rag_docs": [],
-                "data_quality_issues": [],
-                "alarms": [],
-                "maintenance_history": [],
-                "matched_cases": [],
-                "telemetry": prof["telemetry"],
-            })
+            # No builder-pack record for this object: show what the scan says it is, with no borrowed
+            # telemetry, status or identifiers (all values shown must come from the pack for the 30 mapped assets).
+            enriched.append(_unrecorded_record(obj, scan_center, excel_pack))
 
     return enriched

@@ -1,11 +1,20 @@
-// The technician's jobs on screen: an inspection queue in the left sidebar (what still needs inspection, and what is
-// done) and a job card in Equipment details (checklist, notes, a note field and Mark done). The voice assistant writes
+// The technician's jobs on screen: the left sidebar gets two tabs, "To inspect" (the inspection queue: what still
+// needs inspection, worst first, and what is done) and "All equipment" (the viewer's own search, filter and list,
+// moved in unchanged, so app.js and showEquipment keep working on the same elements); and a job card and a job card in Equipment details (checklist, notes, a note field and Mark done). The voice assistant writes
 // the same log through mcp_server.py, so this polls /api/field-jobs and shows its notes and ticks as they land.
 // showEquipment(tag) selects the equipment and moves the camera to it; the assistant calls it as a client tool.
 // It drives the viewer through its own controls (the list cards and View location), so app.js needs no changes.
 
 const POLL_MS = 3000;
-const STATE_TEXT = { attention_required: "Attention", degraded: "Degraded", watch: "Watch" };
+const STATE_TEXT = { attention_required: "Urgent", degraded: "Degraded", watch: "Watch" };
+const STATE_HELP = {
+  attention_required: "Needs attention now",
+  degraded: "Not working as it should; inspect soon",
+  watch: "Readings drifting; check when nearby",
+};
+const QUEUE_PREVIEW = 6; // rows shown before "Show all"
+const TAB_KEY = "field-atlas-sidebar-tab";
+let showAll = false;
 let data = { needs_inspection: [], done: [], jobs: {} };
 let lastJson = "";
 let currentTag = () => "none";
@@ -54,22 +63,36 @@ function flash(text) {
 function progress(job) {
   if (!job) return "Not started";
   const done = job.checks.filter((c) => c.done).length;
-  return job.status === "in_progress" ? `${done}/${job.checks.length} steps` : job.status.replace("_", " ");
+  if (job.status === "in_progress") return `In progress · ${done} of ${job.checks.length} steps done`;
+  return { fixed: "Fixed", not_fixed: "Closed, not fixed", escalated: "Escalated" }[job.status] || job.status;
 }
 
 function row(r) {
-  return `<li><button type="button" class="iq-row" data-tag="${esc(r.tag)}" title="Show ${esc(r.tag)} in the room">
-    <span class="iq-tag">${esc(r.tag)}</span><span class="iq-label">${esc(r.label || r.type)}</span>
-    <span class="iq-state ${esc(r.state)}">${esc(STATE_TEXT[r.state] || r.state)}</span>
-    <span class="iq-progress">${esc(progress(r.job))}${r.job?.notes?.length ? ` · ${r.job.notes.length} note${r.job.notes.length > 1 ? "s" : ""}` : ""}</span>
+  const job = r.job;
+  const total = job?.checks.length || 0;
+  const done = job ? job.checks.filter((c) => c.done).length : 0;
+  const notes = job?.notes?.length || 0;
+  const fixed = job?.status === "fixed";
+  const selected = r.tag === currentTag();
+  return `<li><button type="button" class="iq-row${selected ? " selected" : ""}" data-tag="${esc(r.tag)}"
+      title="${esc(fixed ? "Fixed" : STATE_HELP[r.state] || r.state)}. Click to see it in the room." ${selected ? 'aria-current="true"' : ""}>
+    <span class="iq-name"><span class="iq-tag">${esc(r.tag)}</span><span class="iq-label">${esc(r.label || r.type)}</span></span>
+    <span class="iq-meta"><span class="iq-state ${fixed ? "fixed" : esc(r.state)}">${fixed ? "✓ Fixed" : esc(STATE_TEXT[r.state] || r.state)}</span>
+      ${job ? `<span class="iq-progress">${esc(progress(job))}${notes ? ` · ${notes} note${notes > 1 ? "s" : ""}` : ""}</span>` : ""}</span>
+    ${job?.status === "in_progress" && total ? `<span class="iq-bar" aria-hidden="true"><i style="width:${Math.round((100 * done) / total)}%"></i></span>` : ""}
   </button></li>`;
 }
 
 function renderQueue(root) {
-  root.querySelector(".iq-count").textContent = data.needs_inspection.length;
-  root.querySelector(".iq-list").innerHTML = data.needs_inspection.map(row).join("") || `<li class="iq-empty">Nothing left to inspect.</li>`;
+  const todo = data.needs_inspection;
+  const shown = showAll ? todo : todo.slice(0, QUEUE_PREVIEW);
+  document.querySelectorAll(".iq-count").forEach((el) => { el.textContent = todo.length; });
+  root.querySelector(".iq-list").innerHTML = shown.map(row).join("") || `<li class="iq-empty">Nothing left to inspect. Well done.</li>`;
+  const more = root.querySelector(".iq-more");
+  more.hidden = todo.length <= QUEUE_PREVIEW;
+  more.textContent = showAll ? "Show fewer" : `Show all ${todo.length}`;
   root.querySelector(".iq-done-count").textContent = data.done.length;
-  root.querySelector(".iq-done-list").innerHTML = data.done.map(row).join("") || `<li class="iq-empty">No jobs closed as fixed yet.</li>`;
+  root.querySelector(".iq-done-list").innerHTML = data.done.map(row).join("") || `<li class="iq-empty">Jobs closed as fixed appear here.</li>`;
 }
 
 // ------------------------------------------------------------------ the job card (Equipment details)
@@ -123,18 +146,61 @@ function apply(next) {
 }
 
 function mountQueue() {
-  const root = document.createElement("details");
+  const sidebar = document.querySelector(".left-sidebar");
+  if (!sidebar) return;
+  const tabs = document.createElement("div");
+  tabs.className = "side-tabs";
+  tabs.setAttribute("role", "tablist");
+  tabs.setAttribute("aria-label", "Equipment lists");
+  tabs.innerHTML = `<button type="button" role="tab" id="tab-inspect" aria-controls="inspection-queue" data-tab="inspect">To inspect <span class="iq-count tab-count"></span></button>
+    <button type="button" role="tab" id="tab-equipment" aria-controls="equipment-panel" data-tab="equipment">All equipment</button>`;
+
+  const root = document.createElement("section");
   root.id = "inspection-queue";
-  root.className = "inspection-queue";
-  root.setAttribute("aria-label", "Inspection queue");
-  root.innerHTML = `<summary class="field-label">Inspection queue <span class="iq-count"></span></summary><ol class="iq-list"></ol>
+  root.className = "inspection-queue side-panel";
+  root.setAttribute("role", "tabpanel");
+  root.setAttribute("aria-labelledby", "tab-inspect");
+  root.innerHTML = `<ol class="iq-list"></ol>
+    <button type="button" class="iq-more" hidden></button>
     <details class="iq-done"><summary>Done <span class="iq-done-count"></span></summary><ol class="iq-done-list"></ol></details>`;
   root.addEventListener("click", (e) => {
+    if (e.target.closest(".iq-more")) { showAll = !showAll; renderQueue(root); return; }
     const b = e.target.closest(".iq-row");
     if (b) showEquipment(b.dataset.tag).catch((err) => flash(err.message));
   });
-  const anchor = document.querySelector(".left-sidebar .mission-box");
-  anchor ? anchor.after(root) : document.querySelector(".left-sidebar")?.appendChild(root);
+
+  // The viewer's own search, filter and list move into the second tab as they are (same elements, same listeners).
+  const panel = document.createElement("section");
+  panel.id = "equipment-panel";
+  panel.className = "equipment-panel side-panel";
+  panel.setAttribute("role", "tabpanel");
+  panel.setAttribute("aria-labelledby", "tab-equipment");
+  for (const el of [document.querySelector(".left-sidebar .filter-group"), document.getElementById("select-visual-review"),
+    document.getElementById("asset-result-count"), document.getElementById("asset-list")]) if (el) panel.appendChild(el);
+
+  const anchor = sidebar.querySelector(".mission-box");
+  anchor ? anchor.after(tabs, root, panel) : sidebar.append(tabs, root, panel);
+
+  const select = (name) => {
+    for (const b of tabs.querySelectorAll("[role=tab]")) {
+      const on = b.dataset.tab === name;
+      b.setAttribute("aria-selected", String(on));
+      b.tabIndex = on ? 0 : -1;
+    }
+    root.hidden = name !== "inspect";
+    panel.hidden = name !== "equipment";
+    try { localStorage.setItem(TAB_KEY, name); } catch { /* private window */ }
+  };
+  tabs.addEventListener("click", (e) => { const b = e.target.closest("[role=tab]"); if (b) select(b.dataset.tab); });
+  tabs.addEventListener("keydown", (e) => {
+    if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+    const next = tabs.querySelector('[role=tab][aria-selected="false"]');
+    select(next.dataset.tab);
+    next.focus();
+  });
+  let saved = "inspect";
+  try { saved = localStorage.getItem(TAB_KEY) || saved; } catch { /* private window */ }
+  select(saved === "equipment" ? "equipment" : "inspect");
 }
 
 function mountJob() {
@@ -189,7 +255,11 @@ function mountJob() {
   const anchor = document.querySelector("#active-asset-details .action-bar-inline");
   anchor ? anchor.after(root) : document.getElementById("active-asset-details")?.appendChild(root);
   const title = document.getElementById("detail-title");
-  if (title) new MutationObserver(() => renderJob(root)).observe(title, { childList: true, characterData: true, subtree: true });
+  if (title) new MutationObserver(() => {
+    renderJob(root);
+    const queue = document.getElementById("inspection-queue");
+    if (queue) renderQueue(queue); // highlight the selected equipment
+  }).observe(title, { childList: true, characterData: true, subtree: true });
 }
 
 async function poll() {

@@ -20,6 +20,7 @@ from urllib.parse import parse_qs, urlparse
 # Explicit VALMET_OFFLINE=0 is required to opt into the legacy API-enabled mode.
 os.environ.setdefault("VALMET_OFFLINE", "1")
 from pipeline import asset_export, decisions_client, field_service, retrieval, config as C
+from pipeline.asset_records import asset_for_api, route_for_api, UNMAPPED_NOTICE
 
 ROOT = Path(__file__).resolve().parent
 WEB_DIR = ROOT / "web"
@@ -110,6 +111,9 @@ def load_data():
 
 
 def answer_copilot_question(asset_id: str, question: str) -> dict:
+    asset = ASSETS_BY_ID.get(asset_id) or ASSETS_BY_OBJ.get(asset_id)
+    if asset and not asset.get("mapped"):
+        return {**_answer(asset_id, "other"), "intent": "other", "router": "unmapped"}
     intent, router = classify_intent(question or "")
     res = _answer(asset_id, intent)
     res["intent"], res["router"] = intent, router
@@ -128,7 +132,7 @@ def _answer(asset_id: str, intent: str) -> dict:
     if not asset:
         return {"error": "Asset not found", "asset_id": asset_id, "answer": "No such scene item exists.", "citations": []}
     if not asset.get("mapped"):
-        return {"asset_id": asset["asset_id"], "tag": asset["tag"], "answer": asset["diagnostics"]["executive_summary"],
+        return {"asset_id": asset["asset_id"], "tag": asset["id"], "answer": UNMAPPED_NOTICE,
                 "citations": [], "mapped": False}
     diag = asset["diagnostics"]
     tag = asset["tag"]
@@ -305,7 +309,7 @@ class TwinRequestHandler(SimpleHTTPRequestHandler):
 
         if path == "/api/assets":
             mapped_only = qs.get("mapped", ["false"])[0].lower() == "true"
-            items = [a for a in TWIN_DATA["assets"] if (a["mapped"] if mapped_only else True)]
+            items = [asset_for_api(a) for a in TWIN_DATA["assets"] if (a["mapped"] if mapped_only else True)]
             return self._send_json({"count": len(items), "assets": items})
 
         if path.startswith("/api/assets/"):
@@ -314,6 +318,7 @@ class TwinRequestHandler(SimpleHTTPRequestHandler):
             asset = ASSETS_BY_ID.get(aid) or ASSETS_BY_OBJ.get(aid)
             if not asset:
                 return self._send_json({"error": f"Asset {aid} not found"}, 404)
+            asset = asset_for_api(asset)
             if len(parts) == 3:
                 return self._send_json(asset)
             sub = parts[3]
@@ -332,7 +337,7 @@ class TwinRequestHandler(SimpleHTTPRequestHandler):
             if not route:
                 return self._send_json({"status": "unavailable", "validated": False, "waypoints": [],
                                        "reason": "No floor-supported route was generated for this item", "asset_id": target}, 404)
-            return self._send_json(route)
+            return self._send_json(route_for_api(route))
 
         if path == "/api/work-orders":
             return self._send_json({"drafts": WORK_ORDER_DRAFTS})

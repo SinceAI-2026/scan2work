@@ -4,7 +4,7 @@ import {decodeInstanceIds,escapeHtml as esc} from "./imported-assets.mjs";
 import {validateProposalCatalog,findProposals,proposalVisibilityText} from "./proposal-review-data.mjs";
 
 /** Optional read-only overlay. Canonical catalog, ownership and navigation are never changed. */
-export function mountProposalReview({config,container,scene,camera,controls,button,uniforms,count,texSize,onOpen,onOriginal}) {
+export function mountProposalReview({config,container,scene,camera,controls,button,uniforms,count,texSize,onOpen,onOriginal,originalLabel=id=>id}) {
   const empty={close(){},get isOpen(){return false;}};
   if(!config?.catalog_url)return empty;
   button.hidden=false;
@@ -76,7 +76,7 @@ export function mountProposalReview({config,container,scene,camera,controls,butt
     if(!originals.length)matches.textContent="No source-point overlap with a room object.";
     for(const match of originals.slice(0,8)){
       const node=document.createElement("button");node.type="button";
-      node.textContent=`${match.id}${match.tag ? ` · ${match.tag}` : ""} · ${Number(match.shared_rows || 0).toLocaleString()} shared rows`;
+      node.textContent=`${originalLabel(match.id)} · ${Number(match.shared_rows || 0).toLocaleString()} shared rows`;
       node.addEventListener("click",()=>{close();onOriginal(match.id);});matches.appendChild(node);
     }
     if(originals.length>8){const note=document.createElement("small");note.textContent=`${originals.length-8} further overlaps in the candidate catalog.`;matches.appendChild(note);}
@@ -84,16 +84,22 @@ export function mountProposalReview({config,container,scene,camera,controls,butt
   }
 
   async function open(){
-    onOpen();restore={position:camera.position.clone(),target:controls.target.clone()};opened=true;panel.hidden=false;group.visible=true;
+    restore={position:camera.position.clone(),target:controls.target.clone()};
+    restore.view=onOpen();opened=true;panel.hidden=false;group.visible=true;
     button.setAttribute("aria-expanded","true");container.classList.add("proposal-review-open");
     if(!loaded){status.textContent="Loading candidate review…";try{await(loadPromise ||= load());}catch(error){loadPromise=null;status.textContent=error.message;}}
     if(opened && selected)select(selected);
     if(opened)search.focus();
   }
   function close(){
+    if(!opened)return;
     opened=false;panel.hidden=true;group.visible=false;uniforms().uProposalId.value=0;
     container.classList.remove("proposal-review-open");button.setAttribute("aria-expanded","false");
-    if(restore){camera.position.copy(restore.position);controls.target.copy(restore.target);controls.update();restore=null;}
+    if(restore){
+      if(typeof restore.view==="function")restore.view();
+      else {camera.position.copy(restore.position);controls.target.copy(restore.target);controls.update();}
+      restore=null;
+    }
   }
   button.addEventListener("click",()=>opened ? close() : open());
   panel.querySelector("[data-close]").addEventListener("click",close);

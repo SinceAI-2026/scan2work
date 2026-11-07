@@ -1,6 +1,7 @@
 import { mapFrame, mapPoint } from "./game-map.mjs";
 import { exportRoomIfc, roomBimWalls } from "./bim-export.mjs";
 import { bimCylinder, mergedVesselEnvelope } from "./bim-geometry.mjs";
+import { displayAssetTag } from "./asset-presentation.mjs";
 
 import { overhead, major, groupOf, floorRegion, visualGeometry, regionVisible, layerSummary, layerSummaryText } from "./scene-layers.mjs";
 export { overhead, major, groupOf } from "./scene-layers.mjs";
@@ -92,7 +93,7 @@ export function bindSemanticPlan({snapshot, inspect, navigate, viewModel}) {
 
   function select(asset) {
     selected=asset;
-    details.textContent=`${asset.tag || asset.id} · ${asset.label || asset.class}${asset.source_region_id ? " · unreviewed" : ""}`;
+    details.textContent=`${displayAssetTag(asset)} · ${asset.label || asset.class}${asset.source_region_id ? " · unreviewed" : ""}`;
     go.disabled=false;
     openAsset.disabled=false;
     const node=[...svg.querySelectorAll("[data-plan-asset]")].find(item=>item.dataset.planAsset===asset.id);
@@ -112,7 +113,7 @@ export function bindSemanticPlan({snapshot, inspect, navigate, viewModel}) {
     for (const asset of matches.slice(0,7)) {
       const button=document.createElement("button");
       button.type="button";
-      button.textContent=`${asset.tag || asset.id} · ${asset.label || asset.class}`;
+      button.textContent=`${displayAssetTag(asset)} · ${asset.label || asset.class}`;
       button.addEventListener("click",()=>select(asset));
       results.append(button);
     }
@@ -180,7 +181,7 @@ export function bindSemanticPlan({snapshot, inspect, navigate, viewModel}) {
       const raised=overhead(asset);
       const stroke=asset.is_target ? "#ad3127" : (asset.mapped ? STATUS[asset.condition_state] : null) || "#577078";
       const node=svgNode("g",{class:"semantic-plan-asset",tabindex:0,role:"button","data-plan-asset":asset.id,
-        "aria-label":`${asset.tag || asset.id} · ${asset.label || asset.class}`,"aria-pressed":String(selected?.id===asset.id)});
+        "aria-label":`${displayAssetTag(asset)} · ${asset.label || asset.class}`,"aria-pressed":String(selected?.id===asset.id)});
       const group=groupOf(asset), cylinder=bimCylinder(asset);
       const envelope=mergedVesselEnvelope(asset,cylinder);
       const fill=raised ? "none" : floorRegion(asset) ? "#d6d0ae" : FILLS[group];
@@ -235,6 +236,9 @@ export function bindSemanticPlan({snapshot, inspect, navigate, viewModel}) {
 
   document.getElementById("btn-semantic-plan").addEventListener("click",()=>{
     current=snapshot();
+    // Opened from the Aerial view: start from its Show in room choices (pipes = overhead objects).
+    showAll.checked=!!document.getElementById("layer-all")?.checked;
+    showOverhead.checked=!!document.getElementById("layer-pipes")?.checked;
     selected=current.assets.find(asset=>asset.id===current.selected?.id) || current.assets.find(asset=>asset.is_target);
     dialog.showModal();
     draw();

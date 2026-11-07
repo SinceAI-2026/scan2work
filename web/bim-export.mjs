@@ -104,7 +104,8 @@ export function exportRoomIfc(assets, walls, meta, timestamp = new Date(), deriv
   const products = [];
   for (const sourceAsset of assets) {
     const asset = visualGeometry(sourceAsset);
-    const {id,tag,label,center,size} = asset;
+    const {id,label,center,size} = asset;
+    const tag=asset.mapped === false ? null : asset.tag;
     const cylinder=bimCylinder(asset);
     const [x,y,z]=center, [sx,sy,sz]=size;
     let geometry, method;

@@ -104,7 +104,7 @@ export function createTakeApart(ctx) {
     const job = savingNow(asset);
     const busy = Boolean(job);
     const files = entry?.files || {};
-    const tag = asset.tag ? `${esc(asset.tag)} · ${esc(asset.asset_id)} · ${esc(asset.condition_state)}` : "Not in the Excel pack";
+    const tag = asset.mapped && asset.tag ? `${esc(asset.tag)} · ${esc(asset.asset_id)} · ${esc(asset.condition_state)}` : "No device record in the Excel pack";
     const exact = Boolean(ctx.state.exactMembership || asset.source_region_id || asset.membership_mode === "exact-source-rows");
     const facts = entry ? describe(entry)
       : exact ? `<p class="apart-facts">${busy ? `Exporting ${esc(asset.id)}${job?.seconds ? ` (${job.seconds} s so far)` : ""}. You can close this card; the save carries on.` : `${plural(asset.exact_owned_gaussians ?? asset.n_gaussians ?? 0, "source Gaussian")} · ${esc(asset.review_status || (ctx.state.baseline ? "original room membership" : "unreviewed"))}. Save exports this exact region for your team.`} Original membership is retained; missing geometry is not rebuilt.</p>`
@@ -228,10 +228,12 @@ export function createTakeApart(ctx) {
     if (!asset) return;
     const index = ctx.state.twin.assets.findIndex(original => original.id === asset.id);
     if (index < 0) return;
+    ctx.beforeOpen?.();
     if (!api.active) {
       const c = ctx.controls;
       restore = {
         preset: ctx.state.cameraPreset, position: ctx.camera.position.clone(), target: c.target.clone(),
+        layer:ctx.state.viewLayer,ceilingCut:ctx.state.ceilingCut,
         minDistance: c.minDistance, maxDistance: c.maxDistance, minPolar: c.minPolarAngle, maxPolar: c.maxPolarAngle,
       };
       ctx.setPreset("apart");
@@ -262,9 +264,11 @@ export function createTakeApart(ctx) {
     c.autoRotate = false;
     Object.assign(c, { minDistance: restore.minDistance, maxDistance: restore.maxDistance,
       minPolarAngle: restore.minPolar, maxPolarAngle: restore.maxPolar });
+    ctx.setPreset(restore.preset === "apart" ? "aerial" : restore.preset);
+    if(restore.layer)ctx.setLayer?.(restore.layer);
+    ctx.setCeilingCut?.(restore.ceilingCut);
     ctx.camera.position.copy(restore.position);
     c.target.copy(restore.target);
-    ctx.setPreset(restore.preset === "apart" ? "overview" : restore.preset);
     c.update();
   }
 

@@ -414,3 +414,21 @@ Browser verification confirmed:
   (83 archived cylinders plus four legacy runtime vessel fits), and four walls.
   IfcOpenShell reported zero schema validation errors. This checks IFC structure,
   not measured scale, segmentation correctness or construction readiness.
+
+### Compatibility with the upstream no-borrowed-profile policy
+
+Upstream commit `ef96298` stops assigning healthy workbook profiles to unmapped
+fixed objects in new builds. The supplied original archive still contains 321
+such historical profiles. Its files and fields remain unchanged for provenance
+and reproducibility; they are not treated as assigned device records. The viewer
+gates operational presentation on `mapped`, and `pipeline/asset_records.py` applies
+the same rule to API asset lists, details, telemetry, events, maintenance,
+diagnostics and route-proximity records. The route's geometry is unchanged.
+Unmapped records expose their object ID, scan geometry and evidence,
+with no health score, borrowed readings or service history. An explicit provenance
+field identifies any archived profile excluded from the response.
+
+Unmapped copilot requests return a no-assigned-record explanation without model
+routing or quoting archived diagnoses. Work orders and the technician queue remain
+limited to mapped records. This compatibility layer does not rewrite the archive,
+rebind devices, regenerate extraction or change the original 30 workbook records.

@@ -1,7 +1,6 @@
 import * as THREE from "three";
 import { scenePolicy, firstNavigationPoint, regionSummary, escapeHtml as esc } from "./imported-assets.mjs";
-import { inspectionCameraPose } from "./inspection-camera.mjs";
-import { assetPresentation } from "./asset-presentation.mjs";
+import { assetPresentation, displayAssetTag } from "./asset-presentation.mjs";
 import { renderAssetPhoto } from "./asset-photo.mjs";
 import { blockBox, planObstacleDrop } from "./temporary-obstacles.mjs";
 import { resolveRenderQuality } from "./render-quality.mjs";
@@ -18,6 +17,10 @@ import { createBimRoom } from "./bim-room.mjs";
 import { fitBimVessels } from "./bim-geometry.mjs";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { explodeState, explodeOffset, loadInstanceUniforms, applyExplode, mountExplodeControls, SHADER_DECL, SHADER_OFFSET, SHADER_COLOR } from "./explode.mjs";
+import { classColour, setTintMask } from "./explode.mjs";
+import { classCss } from "./asset-presentation.mjs";
+import { filterShows, onFilterChange } from "./view-filter.mjs";
+import { ICONS } from "./view-icons.mjs";
 import { createTakeApart } from "./take-apart.mjs";
 import { mountProposalReview } from "./proposal-review.mjs";
 import { sampleRoute, nearbyAssets, planFromPosition, reachableFloor, floorDestination, assetDestination, planRoomTour, advanceAlongRoute, segmentIsFree } from "./navigation-view.mjs";
@@ -36,7 +39,9 @@ const state = {
   splatMode: "ewa",        // "ewa" | "semantic"
   cameraPreset: "walk",
   boxesMode: "proximity",  // "proximity" | "all" | "off"
-  visualReviewFilter: "all",
+  viewLayer: "scan",
+  ceilingCut: false,
+  visualReviewFilter: "mapped",
   listLimit: 100,
   imported: false,
   exactMembership: false,
@@ -56,6 +61,14 @@ let hudLastUpdate = -1;
 let proximityKey = "";
 let mapBackground;
 let semanticPlan;
+const AERIAL = new Set(["aerial"]);   // the view from above: Room view panel, layers, every label
+const isAerial = () => AERIAL.has(state.cameraPreset);
+const VIEW_NAMES = {walk:"Follow robot", first:"First person", aerial:"Aerial view"};
+const VIEW_ICONS = {walk:"follow", first:"first", aerial:"aerial"};
+const firstLook = {yaw:0, pitch:0, at:-1e9};   // first person: drag-to-look offsets from the walking direction
+const CEILING_CUT_M = 1.7;   // above the tallest pump or valve top, below the overhead pipe runs
+const ROBOT_EYE_M = 1.45;    // robot head and first-person camera height, a little under a standing person's eyes
+// Free view frames every object; Aerial view frames what its "Show in room" boxes pick (view-filter.mjs).
 let bimView;
 
 let currentNavigation;
@@ -98,19 +111,17 @@ async function init() {
   if (state.baseline) document.getElementById("dataset-note").textContent = "Wael room model · synthetic service data · scale unverified";
   document.getElementById("btn-room-fill-label").hidden = state.exactMembership;
   if (state.scaleUnverified) {
-    document.querySelector("#bim-plane").parentNode.lastChild.textContent = " 1.1-unit section plane";
     document.querySelectorAll(".room-move-fields label").forEach(el => {el.firstChild.textContent=el.firstChild.textContent.replace("(m)","(units)");});
+    document.querySelectorAll(".technical-details .field-label").forEach(el => {el.textContent=el.textContent.replace("scan units (m)","scan units (unverified)");});
   }
   if (state.imported) {
     state.boxesMode = "selected";
     document.querySelectorAll("[data-bmode]").forEach(b => b.classList.toggle("active", b.dataset.bmode === "selected"));
     document.getElementById("dataset-note").textContent = "Expanded extraction · regions need review · scale unverified";
     document.getElementById("btn-room-fill-label").hidden = true;
-    document.querySelector("[data-cam=bim]").textContent = "Geometry preview";
+    document.querySelector("[data-layer=bim]").lastChild.textContent = "Geometry";
     document.getElementById("semantic-plan-model").textContent = "Geometry preview";
     document.getElementById("semantic-plan-export").textContent = "Approximate IFC";
-    document.querySelector(".bim-panel > strong").textContent = "Approximate geometry · scale unverified";
-    document.querySelector("#bim-plane").parentNode.lastChild.textContent = " 1.1-unit section plane";
     document.querySelectorAll(".technical-details .field-label").forEach(el => { el.textContent = el.textContent.replace("scan units (m)", "scan units (unverified)"); });
     document.querySelector("#arrival-evidence .field-label").textContent = "Synthetic workbook telemetry";
     document.querySelectorAll(".room-move-fields label").forEach(el => { el.firstChild.textContent = el.firstChild.textContent.replace("(m)", "(scan units)"); });
@@ -142,6 +153,7 @@ async function init() {
   mountExplodeControls();
   takeApart = createTakeApart({
     camera, controls, state, uniforms: () => splatMaterial?.uniforms, setPreset: applyCameraPreset,
+    setLayer:setViewLayer, setCeilingCut, beforeOpen:()=>proposalReview?.close(),
     container: document.getElementById("canvas-container"), scene, renderer,
   });
   buildRobotAvatar();
@@ -157,12 +169,25 @@ async function init() {
     config:twin.proposal_review, container:document.getElementById("canvas-container"), scene,camera,controls,
     button:document.getElementById("btn-review-proposals"), uniforms:()=>splatMaterial.uniforms,
     count:sourceScan[4], texSize:splatMaterial.uniforms.uTexSize.value,
-    onOpen:()=>{ takeApart.close(); setInspectorOpen(false); if(state.journey.phase==="moving")applyJourneyEvent({type:"pause"}); applyCameraPreset("overview"); },
+    onOpen:()=>{
+      takeApart.close(); setInspectorOpen(false);
+      if(state.journey.phase==="moving")applyJourneyEvent({type:"pause"});
+      const previous={preset:state.cameraPreset,layer:state.viewLayer,cut:state.ceilingCut,
+        explode:explodeState.amount,position:camera.position.clone(),target:controls.target.clone()};
+      applyCameraPreset("aerial"); setViewLayer("scan"); setCeilingCut(false);
+      explodeState.amount=0; document.getElementById("explode-range").value="0";
+      return ()=>{
+        applyCameraPreset(previous.preset);setViewLayer(previous.layer);setCeilingCut(previous.cut);
+        explodeState.amount=previous.explode;document.getElementById("explode-range").value=String(previous.explode);
+        camera.position.copy(previous.position);controls.target.copy(previous.target);controls.update();
+      };
+    },
     onOriginal:id=>{ const asset=state.assetsByObj.get(id); if(asset){selectAsset(asset,true);viewRoomLocation(asset);} },
+    originalLabel:id=>{const asset=state.assetsByObj.get(id);return asset?.mapped && asset.tag ? `${id} · ${asset.tag}` : id;},
   });
   renderProposalList();
   selectAsset(targetAsset, false);
-  applyCameraPreset("overview");
+  applyCameraPreset("aerial");
   const apartHash = decodeURIComponent(location.hash).match(/^#apart=(.+)$/);
   if (apartHash && liveRoomAssets.has(apartHash[1])) {
     selectAsset(liveRoomAssets.get(apartHash[1]), false);
@@ -178,14 +203,11 @@ async function init() {
     stepSimulation(dt, now * 0.001);
     takeApart.frame(boxMeshes);
     if (proposalReview?.isOpen) for (const entry of boxMeshes.values()) entry.group.visible=false;
-    if (bimView.active) {
-      bimView.update(currentNavigation,state.journey,state.selectedAsset);
-      renderer.render(bimView.scene,camera);
-    } else {
-      maybeTriggerDepthSort();
-      renderer.render(scene, camera);
-      updateHudLabels();
-    }
+    bimView.update(state.selectedAsset);
+    updateMotionResolution(now);
+    maybeTriggerDepthSort();
+    renderer.render(scene, camera);
+    updateHudLabels();
   }
   requestAnimationFrame(animate);
 }
@@ -237,7 +259,29 @@ function initThreeScene() {
   let downPos = { x: 0, y: 0 };
   renderer.domElement.addEventListener("pointerdown", (e) => {
     downPos = { x: e.clientX, y: e.clientY };
+    if (state.cameraPreset === "first") lookDrag = { x: e.clientX, y: e.clientY };
   });
+  // First person: drag to look around (yaw and pitch); WASD / arrows walk, Shift walks faster.
+  let lookDrag = null;
+  window.addEventListener("pointermove", (e) => {
+    if (!lookDrag || state.cameraPreset !== "first") return;
+    firstLook.yaw -= (e.clientX - lookDrag.x) * 0.004;
+    firstLook.pitch = Math.max(-1.2, Math.min(1.2, firstLook.pitch - (e.clientY - lookDrag.y) * 0.004));
+    firstLook.at = performance.now();
+    lookDrag = { x: e.clientX, y: e.clientY };
+  });
+  window.addEventListener("pointerup", () => { lookDrag = null; });
+  renderer.domElement.addEventListener("wheel", (e) => {
+    if (state.cameraPreset !== "first") return;
+    e.preventDefault();
+    if (!state.manualWalk) beginManualWalk();
+    const manual = state.manualWalk;
+    manual.yaw += firstLook.yaw; firstLook.yaw = 0;
+    const step = Math.max(-0.4, Math.min(0.4, -e.deltaY * 0.004));
+    const start = robotPosition();
+    const end = manualStep(state.twin.navigation, equipmentObstacles, start, Math.sin(manual.yaw) * step, Math.cos(manual.yaw) * step);
+    robotGroup.position.x = end.x; robotGroup.position.z = end.z;
+  }, { passive: false });
   renderer.domElement.addEventListener("pointerup", (e) => {
     if (Math.hypot(e.clientX - downPos.x, e.clientY - downPos.y) > 5) return;
     const rect = renderer.domElement.getBoundingClientRect();
@@ -247,11 +291,6 @@ function initThreeScene() {
     if (movePreview) {
       const point = raycaster.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0,1,0),0),new THREE.Vector3());
       if (point) setMovePoint(point);
-      return;
-    }
-    if (bimView?.active) {
-      const asset=bimView.pick(raycaster);
-      if (asset) selectAsset(asset,true);
       return;
     }
     const pickables = [];
@@ -267,11 +306,24 @@ function initThreeScene() {
   });
 }
 
+// While the camera moves, every view draws at the Balanced pixel ratio; 400 ms after it stops, the chosen
+// quality comes back. High detail renders 2 to 2.5 times the pixels per side, and the splat pass is
+// fill-rate bound when much of the room is on screen (Aerial, Floor plan, First person): measured, Balanced
+// doubles first person's frame rate. All views now render the same way.
+const motionRes = { moving: false, still: 0, last: new THREE.Matrix4() };
+function updateMotionResolution(now) {
+  const changed = !camera.matrixWorld.equals(motionRes.last);
+  motionRes.last.copy(camera.matrixWorld);
+  if (changed) motionRes.still = now;
+  const moving = now - motionRes.still < 400;
+  if (moving !== motionRes.moving) { motionRes.moving = moving; resizeRenderer(); }
+}
+
 function resizeRenderer() {
   const container = document.getElementById("canvas-container");
   const width = container.clientWidth, height = container.clientHeight;
   const quality = resolveRenderQuality({
-    quality: document.getElementById("select-splat-mode").value,
+    quality: motionRes.moving ? "balanced" : document.getElementById("select-splat-mode").value,
     cssWidth: width, cssHeight: height,
     devicePixelRatio: window.devicePixelRatio, maxDimension: maxRenderDimension,
   });
@@ -430,6 +482,10 @@ ${SHADER_DECL}      uniform float uSplatAxisLimit;
         vec2 fillUv = (vec2(3.0 * mod(fillIndex, fillWidth), floor(fillIndex / fillWidth)) + 0.5) / uRoomFillSize;
         vec4 fillCovB = synthetic ? texture2D(uRoomFill, fillUv + vec2(2.0 / uRoomFillSize.x, 0.0)) : vec4(0.0);
         vec4 centerRgba = synthetic ? texture2D(uRoomFill, fillUv) : texture2D(uCenterTex, uv);
+        if (uCeilCut > 0.0 && centerRgba.y > uCeilCut) {
+          gl_Position = vec4(0.0, 0.0, 2.0, 1.0);
+          return;
+        }
         vec3 center = centerRgba.xyz;
 ${SHADER_OFFSET}        vec4 cam = modelViewMatrix * vec4(center, 1.0);
 
@@ -639,6 +695,11 @@ function initSortWorker(positions, geometry) {
   };
 }
 
+// Each finished sort uploads the whole splat order (about 4 MB) to the GPU. Re-sorting on every tiny camera
+// change kept that upload running every frame whenever the camera moved (profiled: bufferSubData/bufferData
+// were most of the main thread while walking). Splat order only needs refreshing after a real change in
+// view: 1.5 degrees of turn or 5 cm of travel, or any change once 300 ms have passed.
+const sortView = { pos: new THREE.Vector3(Infinity, 0, 0), dir: new THREE.Vector3(), at: 0 };
 function maybeTriggerDepthSort() {
   if (!sortWorker || sortBusy) return;
   camera.updateMatrixWorld();
@@ -646,37 +707,117 @@ function maybeTriggerDepthSort() {
   // Row 2 of matrixWorldInverse is [m[2], m[6], m[10], m[14]]
   const key = `${m[2].toFixed(3)},${m[6].toFixed(3)},${m[10].toFixed(3)},${m[14].toFixed(3)}`;
   if (key === lastSortCamKey) return;
+  const pos = camera.position, dir = camera.getWorldDirection(new THREE.Vector3()), now = performance.now();
+  const turned = dir.dot(sortView.dir) < Math.cos(THREE.MathUtils.degToRad(1.5));
+  const moved = pos.distanceToSquared(sortView.pos) > 0.05 * 0.05;
+  if (!turned && !moved && now - sortView.at < 300 && lastSortCamKey !== "") return;
+  sortView.pos.copy(pos); sortView.dir.copy(dir); sortView.at = now;
   lastSortCamKey = key;
   sortBusy = true;
   sortWorker.postMessage({ viewZ: [m[2], m[6], m[10], m[14]] });
 }
 
 function applyCameraPreset(preset) {
-  if (preset === "bim" && takeApart?.isOpen) takeApart.close();
-  if (preset === "bim") proposalReview?.close();
+  // Aerial view is one header mode; its Show bar picks the layer drawn in this same view (Scan, Coloured
+  // objects, BIM model). Leaving it returns to the plain scan.
+  const wasAerial = isAerial();
   state.cameraPreset = preset;
+  const aerial = isAerial();
+  if (aerial && !wasAerial) setCeilingCut(true);
+  if (!aerial && wasAerial) {
+    setCeilingCut(false);
+    explodeState.amount = 0;
+    const range = document.getElementById("explode-range");
+    if (range) range.value = "0";
+  }
   controls.enabled = preset !== "first" && !(state.manualWalk && preset === "walk");
+  if (preset === "first") { firstLook.yaw = 0; firstLook.pitch = 0; firstLook.body = undefined; }
+  if (preset === "walk") followRig.snap = true;
   document.querySelectorAll("[data-cam]").forEach((b) => {
     b.classList.toggle("active", b.dataset.cam === preset);
+    b.setAttribute("aria-checked", String(b.dataset.cam === preset));
   });
-  if (preset === "bim") {
-    setInspectorOpen(false);
-    bimView.setRoom(state.roomAssets,state.twin.scene.walls,state.twin.navigation.grid_meta,state.twin.scene.derived_context);
+  const fab = document.getElementById("view-fab");
+  if (fab) {
+    document.getElementById("view-fab-icon").innerHTML = ICONS[VIEW_ICONS[preset]] || "";
+    fab.dataset.tip = VIEW_NAMES[preset] || "View";
+    fab.setAttribute("aria-label", `Change view: ${VIEW_NAMES[preset] || preset}`);
   }
-  bimView?.setActive(preset === "bim");
+  setViewLayer(aerial ? state.viewLayer : "scan");
 
-  if (preset === "overview") {
-    camera.position.set(-0.35, 1.48, 1.85);
-    controls.target.set(0.25, 0.88, -1.75);
+  if (AERIAL.has(preset)) {
+    // Angled from above over the whole room (the objects' extent).
+    const xs = state.roomAssets.map(a => a.center[0]), zs = state.roomAssets.map(a => a.center[2]);
+    const [x0, x1, z0, z1] = [Math.min(...xs), Math.max(...xs), Math.min(...zs), Math.max(...zs)];
+    const distance = Math.hypot(x1 - x0, z1 - z0) / 2 / Math.sin(THREE.MathUtils.degToRad(camera.fov / 2)) * 0.95;
+    const view = new THREE.Vector3(0.92, 0.88, 1.13).normalize();
+    controls.target.set((x0 + x1) / 2, 0.4, (z0 + z1) / 2);
+    camera.position.copy(controls.target).addScaledVector(view, Math.min(controls.maxDistance - 0.2, distance));
     controls.update();
-  } else if (preset === "inside" || preset === "detail") {
-    const target = state.assetsById.get(state.twin.target_asset_id);
-    const asset = preset === "detail" ? state.selectedAsset || target : target;
-    if (!asset) return;
-    const pose = inspectionCameraPose(state.twin.navigation, asset, robotPosition());
-    camera.position.fromArray(pose.position);
-    controls.target.fromArray(pose.target);
-    controls.update();
+
+  }
+}
+
+// Show bar: three masks over the same view and camera. Scan: the splat, frames by status. Coloured objects:
+// splats and frames coloured by class, every object labelled. BIM model: the splat swapped for the BIM
+// geometry (bim-room.mjs), frames kept invisible so labels and clicks still work. Explode works in all three.
+function setViewLayer(layer) {
+  state.viewLayer = layer;
+  const bim = layer === "bim";
+  if (bim && takeApart?.isOpen) takeApart.close();
+  const aerialNow = isAerial();
+  if (aerialNow) bimView?.setRoom(state.roomAssets,state.twin.scene.walls,state.twin.navigation.grid_meta);
+  bimView?.setActive(bim);
+  bimView?.setWallsAllowed(aerialNow);
+  for (const el of document.querySelectorAll(".layer-aerial")) el.hidden = !aerialNow;
+  setTintMask(a => filterShows(a) || a.is_target);
+  if (splatMesh) splatMesh.visible = !bim;
+  document.querySelectorAll("[data-layer]").forEach(b => b.classList.toggle("active", b.dataset.layer === layer));
+  const aerial = aerialNow;
+  document.getElementById("ceiling-toggle").closest("label").hidden = bim;
+  const legend = document.getElementById("class-legend");
+  legend.hidden = !(aerial && layer !== "scan");
+  if (!legend.hidden) renderClassLegend(legend);
+  updateLayerCount();
+}
+
+function updateLayerCount() {
+  const el=document.getElementById("room-layer-count");
+  if(!el || !state.roomAssets)return;
+  const visible=state.roomAssets.filter(a=>(filterShows(a)||a.is_target||a.id===state.selectedAsset?.id)
+    && (state.viewLayer==="bim"||!state.ceilingCut||a.id===state.selectedAsset?.id||a.center[1]-a.size[1]/2<=CEILING_CUT_M-.15)).length;
+  el.textContent=`Filter: ${visible.toLocaleString()} of ${state.roomAssets.length.toLocaleString()} objects${state.viewLayer!=="bim"&&state.ceilingCut?" · ceiling hidden":""}`;
+}
+
+// Coloured objects legend: every class in the room with its colour and count, most common first.
+function renderClassLegend(el) {
+  const counts = new Map();
+  for (const a of state.roomAssets) if (filterShows(a) || a.is_target) counts.set(a.class, (counts.get(a.class) || 0) + 1);
+  el.innerHTML = [...counts].sort((x, y) => y[1] - x[1]).map(([cls, n]) =>
+    `<span><i style="background:${classCss(String(cls).toLowerCase())}"></i>${String(cls).replaceAll("_", " ").replace(/^movable /, "")} ${n}</span>`).join("");
+}
+
+function setCeilingCut(on) {
+  state.ceilingCut = on;
+  const box = document.getElementById("ceiling-toggle");
+  if (box) box.checked = on;
+  if (splatMaterial?.uniforms.uCeilCut) splatMaterial.uniforms.uCeilCut.value = on ? CEILING_CUT_M : 0;
+  updateLayerCount();
+}
+
+// After applyExplode: class colours in the Detected layer, and no frames above a hidden ceiling.
+function applyLayerFrames() {
+  for (const entry of boxMeshes.values()) {
+    if (entry.removed) continue;
+    const a = entry.asset;
+    const isSel = state.selectedAsset?.id === a.id;
+    if (isAerial() && !isSel && !a.is_target && !filterShows(a)) { entry.group.visible = false; continue; }
+    if (state.ceilingCut && !isSel && a.center[1] - a.size[1] / 2 > CEILING_CUT_M - 0.15) { entry.group.visible = false; continue; }
+    if (state.viewLayer === "bim") { entry.lineMat.opacity = 0; entry.fillMat.opacity = 0; continue; }
+    if (state.viewLayer !== "detected" || a.is_target) continue;
+    const c = classColour(a);
+    entry.lineMat.color.copy(c);
+    entry.fillMat.color.copy(c);
   }
 }
 
@@ -784,25 +925,27 @@ function buildRobotAvatar() {
   baseMesh.position.y = 0.06;
   robotGroup.add(baseMesh);
 
+  // Close to human height (about 1.6 m to the top of the sensor), so its camera sees the room the way a
+  // technician does. The room's ceiling slab starts at 1.97 m.
   const mast = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.025, 0.035, 0.44, 16),
+    new THREE.CylinderGeometry(0.03, 0.045, 1.3, 16),
     new THREE.MeshStandardMaterial({ color: 0x475569, metalness: 0.4, roughness: 0.4 })
   );
-  mast.position.y = 0.32;
+  mast.position.y = 0.76;
   robotGroup.add(mast);
 
   const head = new THREE.Mesh(
-    new THREE.BoxGeometry(0.14 * widthScale, 0.09, 0.18 * widthScale),
+    new THREE.BoxGeometry(0.16 * widthScale, 0.12, 0.2 * widthScale),
     new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.5, roughness: 0.3 })
   );
-  head.position.y = 0.56;
+  head.position.y = ROBOT_EYE_M;
   robotGroup.add(head);
 
   lidarRing = new THREE.Mesh(
     new THREE.CylinderGeometry(0.05, 0.05, 0.025, 16, 1, true),
     new THREE.MeshBasicMaterial({ color: 0x8fd14f, wireframe: true })
   );
-  lidarRing.position.y = 0.63;
+  lidarRing.position.y = ROBOT_EYE_M + 0.1;
   robotGroup.add(lidarRing);
 
   const proxRadius = state.twin.navigation.grid_meta.proximity_radius_m || 1.65;
@@ -955,20 +1098,9 @@ function stepSimulation(dt, elapsedSec) {
   if (lidarRing) lidarRing.rotation.y = elapsedSec * 5.0;
 
   robotGroup.visible = state.navigationAvailable && state.cameraPreset !== "first";
-  if (state.cameraPreset === "first" || (state.cameraPreset === "walk" && state.manualWalk)) {
-    updateWalkCamera(nav);
-  } else if (state.cameraPreset === "walk") {
-    // Both camera and robot follow the validated corridor; no offset through walls.
-    const behind = sampleRoute(route, Math.max(0, state.journey.elapsed - 1.2));
-    const ahead = sampleRoute(route, Math.min(route.duration_s, state.journey.elapsed + 0.8));
-    camera.position.set(behind.x, 1.12, behind.z);
-    controls.target.set(ahead.x, 1.05, ahead.z);
-    if (state.journey.phase === "arrived" || Math.hypot(ahead.x - behind.x, ahead.z - behind.z) < 0.05) {
-      const target = route.asset_id ? roomAsset(state.assetsById.get(route.asset_id)) : null;
-      if (target) controls.target.fromArray(target.center);
-    }
-    controls.update();
-  } else controls.update();
+  if (state.cameraPreset === "first") updateWalkCamera(nav, dt, route);
+  else if (state.cameraPreset === "walk") updateFollowCamera(nav, dt, route);
+  else controls.update();
 
   const refreshHud = elapsedSec - hudLastUpdate >= 0.15 || hudLastUpdate < 0;
   if (refreshHud) {
@@ -990,6 +1122,8 @@ function stepSimulation(dt, elapsedSec) {
       vis = false;
     } else if (state.boxesMode === "selected") {
       vis = isSel;
+    } else if (isAerial()) {
+      vis = isSel || a.is_target || filterShows(a);
     } else if (state.boxesMode === "all") {
       vis = true;
     } else {
@@ -1020,8 +1154,10 @@ function stepSimulation(dt, elapsedSec) {
   }
 
 
+  explodeState.segment = state.viewLayer === "detected";
   applyExplode(boxMeshes, splatMaterial);
   renderJourneyControls(nav);
+  if (state.boxesMode !== "off") applyLayerFrames();
   document.getElementById("prox-count").textContent = `${(state.nearby || []).length} in range`;
   drawRouteMap(nav);
   semanticPlan.update(nav,state.journey);
@@ -1048,6 +1184,18 @@ function recordPassedAssets(position) {
   line.hidden = false;
 }
 
+// Labels were the main-thread hotspot in Aerial view (profiled: getBoundingClientRect about 12% of the frame
+// with every object shown). Each frame rewrote every label's text and title, then measured each label right
+// after styling it, forcing a layout per label. Now text, title and colour are written only when they
+// change, a label's size is measured only when its text changes (all measurements in one read pass), and
+// placement only writes.
+const labelTop = new THREE.Vector3();
+function showLabel(el, on) {
+  if (el._shown === on) return;
+  el._shown = on;
+  el.style.display = on ? "block" : "none";
+}
+
 function updateHudLabels() {
   const container = document.getElementById("canvas-container");
   const w = container.clientWidth;
@@ -1055,85 +1203,81 @@ function updateHudLabels() {
   const rx = robotGroup.position.x;
   const rz = robotGroup.position.z;
   const proxR = state.twin.navigation.grid_meta.proximity_radius_m || 1.65;
+  const everyLabel = isAerial();
+  const byClass = state.viewLayer !== "scan";   // Coloured objects and BIM: labels name the class, in its colour
 
   const candidates = [];
   for (const [objId, el] of hudElements.entries()) {
-    if (state.boxesMode === "off") {
-      el.style.display = "none";
-      continue;
-    }
     const entry = boxMeshes.get(objId);
-    if (!entry.group.visible) {
-      el.style.display = "none";
-      continue;
-    }
+    if (state.boxesMode === "off" || !entry.group.visible) { showLabel(el, false); continue; }
     const a = entry.asset;
     const isSel = state.selectedAsset && state.selectedAsset.id === objId;
     const dist = Math.hypot(a.center[0] - rx, a.center[2] - rz);
-    const isNear = dist <= proxR;
-
-    if (!isSel && !a.is_target && !isNear) {
-      el.style.display = "none";
-      continue;
-    }
+    if (!isSel && !a.is_target && dist > proxR && !everyLabel) { showLabel(el, false); continue; }
 
     // Anchor label pill to top of the 3D bounding box
-    const topPos = new THREE.Vector3(a.center[0], a.center[1] + a.size[1] / 2 + 0.03, a.center[2]).add(explodeOffset(a));
-    topPos.project(camera);
-    if (topPos.z > 1.0 || topPos.z < -1.0) {
-      el.style.display = "none";
-      continue;
-    }
-    const x = (topPos.x * 0.5 + 0.5) * w;
-    const y = (-topPos.y * 0.5 + 0.5) * h;
-    if (x < 50 || x > w - 50 || y < 50 || y > h - 40) {
-      el.style.display = "none";
-      continue;
-    }
+    labelTop.set(a.center[0], a.center[1] + a.size[1] / 2 + 0.03, a.center[2]).add(explodeOffset(a)).project(camera);
+    if (labelTop.z > 1.0 || labelTop.z < -1.0) { showLabel(el, false); continue; }
+    const x = (labelTop.x * 0.5 + 0.5) * w;
+    const y = (-labelTop.y * 0.5 + 0.5) * h;
+    if (x < 50 || x > w - 50 || y < 50 || y > h - 40) { showLabel(el, false); continue; }
 
-    el.textContent = `${a.tag || a.label} · ${dist.toFixed(1)} ${state.scaleUnverified || state.imported ? "units" : "m"} · ${a.source_region_id ? a.review_status : a.condition_state.replaceAll("_", " ")}`;
-    if (state.imported) el.title = `${a.label} · ${regionSummary(a)}${a.mapped ? " · Synthetic Excel mapping" : " · No assigned device data"}`;
-    else el.title = `${a.label} · ${a.mapped ? "Excel registry" : `Excel profile from ${a.excel_profile_tag || "registry"}`} · ${a.health_score == null ? "Movable object" : `Health ${a.health_score}%`}`;
-    if (assetPresentation(a).notice) el.title = `${a.label} · ${assetPresentation(a).notice}`;
-    const prio = isSel ? 0 : a.is_target ? 1 : assetPresentation(a).needsAttention ? 2 : a.mapped ? 3 : 4;
-    candidates.push({ el, x, y, dist, prio, isSel });
+    const text = byClass
+      ? (a.mapped ? `${a.tag} · ${a.label}` : a.label)
+      : `${displayAssetTag(a)} · ${dist.toFixed(1)} ${state.scaleUnverified ? "units" : "m"} · ${assetPresentation(a).kind === "instrumented" ? String(a.condition_state).replaceAll("_", " ") : assetPresentation(a).kind}`;
+    if (el._text !== text) { el.textContent = text; el._text = text; el._size = null; }
+    if (el._byClass !== byClass) {
+      el._byClass = byClass;
+      el.classList.toggle("detected", byClass);
+      if (byClass) el.style.setProperty("--class-colour", `#${classColour(a).getHexString()}`);
+    }
+    if (el._title === undefined) {
+      const notice = assetPresentation(a).notice;
+      el._title = notice ? `${a.label} · ${notice}`
+        : `${a.label} · ${a.mapped ? "Excel registry" : "Scan only"} · ${a.health_score == null ? "No health reading" : `Health ${a.health_score}%`}`;
+      el.title = el._title;
+      el._prio = a.is_target ? 1 : assetPresentation(a).needsAttention ? 2 : a.mapped ? 3 : 4;
+    }
+    candidates.push({ el, x, y, dist, prio: isSel ? 0 : el._prio });
   }
-
   candidates.sort((a, b) => a.prio - b.prio || a.dist - b.dist);
+  const budget = everyLabel ? 28 : 8;
+
+  // Read pass: panels to avoid, and the size of any label whose text changed.
   const origin = container.getBoundingClientRect();
   const placed = [];
-  for (const panel of document.querySelectorAll(".viewport-Controls-overlay, .display-options-body, .navigation-hud, .route-map-panel, .right-sidebar")) {
+  for (const panel of document.querySelectorAll(".viewport-Controls-overlay, .layer-panel, .navigation-hud, .route-map-panel, .right-sidebar")) {
     if (!panel.getClientRects().length) continue;
     const r = panel.getBoundingClientRect();
     placed.push({left:r.left-origin.left, right:r.right-origin.left, top:r.top-origin.top, bottom:r.bottom-origin.top});
   }
+  const unmeasured = candidates.slice(0, budget * 3).filter(c => !c.el._size);
+  for (const c of unmeasured) { c.el.style.visibility = "hidden"; showLabel(c.el, true); }
+  for (const c of unmeasured) { const r = c.el.getBoundingClientRect(); c.el._size = { width: r.width, height: r.height }; }
+
+  // Write pass: place up to the budget without overlaps.
   let visibleCount = 0;
   for (const c of candidates) {
-    c.el.style.display = "none";
-    if (visibleCount >= 8) continue;
-    c.el.style.display = "block";
-    c.el.style.visibility = "hidden";
-    const measured = c.el.getBoundingClientRect();
-    const width = measured.width, height = measured.height;
-    if (width > w - 16 || height > h - 16) { c.el.style.display = "none"; continue; }
-    const left = THREE.MathUtils.clamp(c.x - width / 2, 8, w - width - 8);
+    const size = c.el._size;
     let accepted = false;
-    for (const offset of [0, -30, 30, -60, 60, -90, 90]) {
-      const top = c.y + offset - height;
-      const rect = {left, right:left+width, top, bottom:top+height};
-      if (rect.top < 8 || rect.bottom > h - 8) continue;
-      if (placed.some(p => rect.left < p.right + 6 && rect.right > p.left - 6 && rect.top < p.bottom + 6 && rect.bottom > p.top - 6)) continue;
-      placed.push(rect);
-      c.el.style.left = `${left}px`;
-      c.el.style.top = `${top}px`;
-      c.el.style.visibility = "visible";
-      visibleCount++;
-      accepted = true;
-      break;
+    if (visibleCount < budget && size && size.width <= w - 16 && size.height <= h - 16) {
+      const left = THREE.MathUtils.clamp(c.x - size.width / 2, 8, w - size.width - 8);
+      for (const offset of [0, -30, 30, -60, 60, -90, 90]) {
+        const top = c.y + offset - size.height;
+        const rect = {left, right:left+size.width, top, bottom:top+size.height};
+        if (rect.top < 8 || rect.bottom > h - 8) continue;
+        if (placed.some(p => rect.left < p.right + 6 && rect.right > p.left - 6 && rect.top < p.bottom + 6 && rect.bottom > p.top - 6)) continue;
+        placed.push(rect);
+        c.el.style.left = `${left}px`;
+        c.el.style.top = `${top}px`;
+        c.el.style.visibility = "visible";
+        visibleCount++;
+        accepted = true;
+        break;
+      }
     }
-    if (!accepted) c.el.style.display = "none";
+    showLabel(c.el, accepted);
   }
-
 }
 
 function renderProximityStream(mappedNearby) {
@@ -1149,7 +1293,7 @@ function renderProximityStream(mappedNearby) {
       const status = kind === "instrumented" ? (n.mapped ? `${n.health_score}%` : "procedural") : kind;
       return `
         <div class="prox-row ${cls}" data-obj="${n.id}">
-          <span>${n.tag} · ${a ? a.label : ""}</span>
+          <span>${esc(displayAssetTag(n))} · ${esc(a ? a.label : "")}</span>
           <span>${n.distance_m.toFixed(1)} ${state.scaleUnverified || state.imported ? "units" : "m"} · ${status}</span>
         </div>
       `;
@@ -1185,7 +1329,7 @@ function renderProposalList() {
     const status = a.source_region_id ? regionSummary(a) : assetPresentation(a).notice || `${Number.isFinite(a.health_score) ? `Health ${a.health_score}% · ` : ""}${String(a.condition_state || "").replaceAll("_", " ")}`;
     return `<button class="proposal-card ${selected ? "selected" : ""}" data-obj="${esc(a.id)}" aria-pressed="${selected}">
       <span class="prop-class">${esc(a.label || a.id)}</span>
-      <span class="prop-meta"><span>${esc(a.tag ? a.tag + " · " + a.id : a.id)}</span>
+      <span class="prop-meta"><span>${esc(a.mapped && a.tag ? a.tag + " · " + a.id : a.id)}</span>
       <span>${esc(status)}</span>${a.mapped && state.imported ? '<span class="prop-mapping">Synthetic Excel mapping</span>' : ""}</span></button>`;
   }).join("") || '<p class="list-empty">No matching regions. Try a name or source ID.</p>';
   if (filtered.length > shown.length) listEl.insertAdjacentHTML("beforeend", '<button id="show-more-regions" class="btn-outline-full">Show next 100 regions</button>');
@@ -1265,6 +1409,7 @@ function selectAsset(asset, openInspector = false) {
   asset = roomAsset(asset);
   if (removedIds.has(asset.id) && takeApart?.isOpen) takeApart.close();
   state.selectedAsset = asset;
+  updateLayerCount();
   if (takeApart?.isOpen && takeApart.active.asset !== asset) takeApart.open(asset);
   copilotRequestId++;
   const presentation = assetPresentation(asset);
@@ -1275,7 +1420,7 @@ function selectAsset(asset, openInspector = false) {
     renderAssetPhoto(null,document.getElementById("asset-photo"),location.href);
     document.getElementById("detail-id-status").textContent = `${asset.id} · Removed from room`;
     document.getElementById("detail-health-pill").hidden = true;
-    document.getElementById("detail-title").textContent = `${asset.label} · ${asset.tag}`;
+    document.getElementById("detail-title").textContent = `${asset.label} · ${displayAssetTag(asset)}`;
     document.getElementById("detail-subtitle").textContent = presentation.category;
     renderProposalList();
     if (openInspector) setInspectorOpen(true);
@@ -1296,13 +1441,13 @@ function selectAsset(asset, openInspector = false) {
   if (openInspector) setInspectorOpen(true);
 
   document.getElementById("detail-id-status").textContent =
-    `${asset.asset_id} · ${asset.id} / ${asset.condition_state}`;
+    uninstrumented ? `${asset.id} · ${presentation.kind}` : `${asset.asset_id} · ${asset.id} / ${asset.condition_state}`;
   const hp = document.getElementById("detail-health-pill");
   hp.hidden = uninstrumented;
   hp.className = `health-pill ${asset.condition_state}`;
   hp.textContent = uninstrumented ? presentation.notice : `${asset.health_score == null ? "Movable object" : `Health ${asset.health_score}%`}`;
 
-  document.getElementById("detail-title").textContent = `${asset.label} · ${asset.tag}`;
+  document.getElementById("detail-title").textContent = `${asset.label} · ${displayAssetTag(asset)}`;
   document.getElementById("service-guidance-title").textContent = `${state.twin.runtime?.offline ? "Workbook guidance" : "Service guidance"} for ${asset.tag}`;
   document.getElementById("detail-subtitle").textContent =
     presentation.category;
@@ -1311,6 +1456,7 @@ function selectAsset(asset, openInspector = false) {
   const dqTxt = asset.dq_penalty ? ` (includes -${Math.round(asset.dq_penalty * 100)}% data quality penalty)` : "";
   document.getElementById("detail-match-note").textContent =
     asset.source_region_id ? `${regionSummary(asset)}. Labels and boundaries are unverified.${asset.mapped ? " Device readings are synthetic Excel data mapped procedurally." : ""}` :
+    uninstrumented ? `${presentation.notice}. Original scan geometry; no device reading is assigned.` :
     `Original box: ${asset.label}. Effective AI confidence: ${effPct === null ? "not measured" : effPct + "%"}${dqTxt}.`;
   document.getElementById("detail-match-note").hidden = false;
 
@@ -1500,7 +1646,6 @@ function activateRoute(route, {preserveWalk=false, preserveHistory=false, keepVi
   if (!preserveHistory) clearRouteHistory();
   recordPassedAssets(robotPosition());
   rebuildRouteGeometry();rebuildReachableOverlay();
-  if (!keepView) applyCameraPreset(state.cameraPreset === "first" ? "first" : "walk");
   if(result.arrivedAssetId)showArrivalReport(result.arrivedAssetId);
   renderJourneyControls(sampleRoute(route,state.journey.elapsed));
 }
@@ -2002,6 +2147,30 @@ function bindRoomEdits() {
   });
 }
 
+// Circular view button: opens a row of view icons to its right; picking one switches view and closes it.
+function bindViewSwitch() {
+  for (const el of document.querySelectorAll("[data-icon]")) if (ICONS[el.dataset.icon]) el.insertAdjacentHTML("afterbegin", ICONS[el.dataset.icon]);
+  const fab = document.getElementById("view-fab"), menu = document.getElementById("view-menu");
+  const setOpen = open => {
+    menu.hidden = !open;
+    fab.setAttribute("aria-expanded", String(open));
+    if (open) menu.querySelector(".view-item.active, .view-item")?.focus();
+  };
+  fab.addEventListener("click", () => setOpen(menu.hidden));
+  for (const btn of menu.querySelectorAll("[data-cam]")) {
+    btn.addEventListener("click", () => { proposalReview?.close(); applyCameraPreset(btn.dataset.cam); setOpen(false); fab.focus(); });
+  }
+  document.addEventListener("pointerdown", e => { if (!menu.hidden && !e.target.closest("#view-switch")) setOpen(false); });
+  document.addEventListener("keydown", e => {
+    if (menu.hidden) return;
+    if (e.key === "Escape") { setOpen(false); fab.focus(); }
+    if (e.key === "ArrowRight" || e.key === "ArrowLeft") {   // roving focus inside the open menu
+      const items = [...menu.querySelectorAll(".view-item")], i = items.indexOf(document.activeElement);
+      if (i >= 0) { e.preventDefault(); e.stopPropagation(); items[(i + (e.key === "ArrowRight" ? 1 : items.length - 1)) % items.length].focus(); }
+    }
+  }, true);
+}
+
 function robotPosition() {return {x:robotGroup.position.x,z:robotGroup.position.z};}
 
 function cameraYaw() {
@@ -2010,7 +2179,8 @@ function cameraYaw() {
 }
 
 function beginManualWalk() {
-  const position = robotPosition(), yaw = cameraYaw();
+  const position = robotPosition();
+  const yaw = state.cameraPreset === "first" ? (firstLook.body ?? cameraYaw()) : cameraYaw();
   state.manualWalk = {yaw};
   state.journey = createJourney({kind:"idle", tag:"Explore the room", duration_s:0, total_distance_m:0,
     waypoints:[{position:[position.x, 0, position.z], t:0, distance_m:0, yaw}]});
@@ -2018,48 +2188,88 @@ function beginManualWalk() {
   document.getElementById("arrival-announcement").textContent = "";
   clearRouteHistory();
   rebuildRouteGeometry();
-  applyCameraPreset(state.cameraPreset === "first" ? "first" : "walk");
 }
 
 function keyboardWalk(dt) {
   const manual = state.manualWalk;
+  if (state.cameraPreset === "first" && firstLook.yaw) {   // walk where you look
+    manual.yaw += firstLook.yaw;
+    firstLook.yaw = 0;
+  }
   const forward = Number(walkKeys.has("w") || walkKeys.has("arrowup")) - Number(walkKeys.has("s") || walkKeys.has("arrowdown"));
   const side = Number(walkKeys.has("d")) - Number(walkKeys.has("a"));
-  const turn = Number(walkKeys.has("arrowleft")) - Number(walkKeys.has("arrowright"));
-  if (!["walk", "first"].includes(state.cameraPreset)) {
+  let turn = Number(walkKeys.has("arrowleft")) - Number(walkKeys.has("arrowright"));
+  let sideways = side;
+  if (state.cameraPreset === "aerial") {
+    // Aerial view: drive the robot relative to the screen (up = away from the camera), arrows strafe.
     manual.yaw = cameraYaw();
-    if (turn) applyCameraPreset("walk");
+    sideways = side - turn;
+    turn = 0;
   }
   manual.yaw += turn * 1.8 * dt;
   const x = Math.sin(manual.yaw), z = Math.cos(manual.yaw);
   const start = robotPosition();
-  const step = dt / (Math.hypot(forward, side) || 1);
+  const step = dt * (walkKeys.has("shift") ? 1.8 : 1) / (Math.hypot(forward, sideways) || 1);   // Shift: faster
   const end = manualStep(state.twin.navigation, equipmentObstacles, start,
-    (x * forward - z * side) * step, (z * forward + x * side) * step);
+    (x * forward - z * sideways) * step, (z * forward + x * sideways) * step);
   const dx = end.x - start.x, dz = end.z - start.z;
   const yaw = state.cameraPreset === "first" ? manual.yaw :
     dx || dz ? Math.atan2(dx, dz) : robotGroup.rotation.y;
   return {...end, yaw, distance:0};
 }
 
-function updateWalkCamera(nav) {
-  const yaw = state.manualWalk?.yaw ?? nav.yaw;
-  const dx = Math.sin(yaw), dz = Math.cos(yaw);
-  if (state.cameraPreset === "first") {
-    camera.position.set(nav.x, .69, nav.z);
-    controls.target.set(nav.x + dx, .69, nav.z + dz);
-  } else {
-    // Keep the trailing camera on this side of a wall when space behind the robot is tight.
-    const start = [nav.x, 0, nav.z];
-    let distance = 1.55;
-    while (distance > .1 && !segmentIsFree(state.twin.navigation, start, [nav.x - dx * distance, 0, nav.z - dz * distance])) {
-      distance *= .5;
-    }
-    if (distance <= .1) distance = 0;
-    camera.position.set(nav.x - dx * distance, 1.4, nav.z - dz * distance);
-    const lookAhead = .14 + .2 * distance;
-    controls.target.set(nav.x + dx * lookAhead, .47, nav.z + dz * lookAhead);
+// First person used to look along the current route segment (nav.yaw), which snaps at every waypoint of
+// the 5 cm grid path: the view jerked at each corner. It now eases toward a point 0.8 s ahead on the route
+// (or the keyboard heading), and drag-to-look adds an offset that relaxes back while the robot walks itself.
+function firstPersonYaw(nav, dt, route) {
+  let goal = state.manualWalk?.yaw;
+  if (goal === undefined) {
+    const ahead = route?.waypoints?.length ? sampleRoute(route, state.journey.elapsed + 0.8) : null;
+    goal = ahead && Math.hypot(ahead.x - nav.x, ahead.z - nav.z) > 0.05 ? Math.atan2(ahead.x - nav.x, ahead.z - nav.z) : (firstLook.body ?? nav.yaw);
   }
+  if (firstLook.body === undefined || state.manualWalk) firstLook.body = goal;
+  else firstLook.body += Math.atan2(Math.sin(goal - firstLook.body), Math.cos(goal - firstLook.body)) * (1 - Math.exp(-5 * dt));
+  if (!state.manualWalk && state.journey.phase === "moving" && performance.now() - firstLook.at > 2500) {
+    const relax = Math.exp(-2 * dt);
+    firstLook.yaw *= relax;
+    firstLook.pitch *= relax;
+  }
+  return firstLook.body + firstLook.yaw;
+}
+
+function updateWalkCamera(nav, dt = 0, route = null) {
+  const yaw = firstPersonYaw(nav, dt, route), pitch = firstLook.pitch;
+  // The robot's own camera: the front of its head, at a standing person's eye height.
+  const eyeX = nav.x + Math.sin(yaw) * 0.1, eyeZ = nav.z + Math.cos(yaw) * 0.1, eyeY = ROBOT_EYE_M;
+  camera.position.set(eyeX, eyeY, eyeZ);
+  controls.target.set(eyeX + Math.sin(yaw) * Math.cos(pitch), eyeY + Math.sin(pitch), eyeZ + Math.cos(yaw) * Math.cos(pitch));
+  camera.lookAt(controls.target);
+}
+
+// Third person: one rig for every case (route, keyboard, standing still, arrived). The camera trails the
+// robot's smoothed heading at 1.6 m and 1.75 m up. A wall behind shortens the distance, never below 0.6 m:
+// the old rig halved it down to zero and then jumped on top of the robot. Position and heading both ease,
+// so corners and wall checks never make the camera jump.
+const followRig = { yaw: undefined, pos: new THREE.Vector3(), target: new THREE.Vector3(), snap: true };
+function updateFollowCamera(nav, dt, route) {
+  const ease = rate => followRig.snap ? 1 : 1 - Math.exp(-rate * dt);
+  const goalYaw = nav.yaw ?? robotGroup.rotation.y;
+  if (followRig.yaw === undefined || followRig.snap) followRig.yaw = goalYaw;
+  else followRig.yaw += Math.atan2(Math.sin(goalYaw - followRig.yaw), Math.cos(goalYaw - followRig.yaw)) * ease(3);
+  const dx = Math.sin(followRig.yaw), dz = Math.cos(followRig.yaw), start = [nav.x, 0, nav.z];
+  let distance = 1.6;
+  while (distance > 0.6 && !segmentIsFree(state.twin.navigation, start, [nav.x - dx * distance, 0, nav.z - dz * distance])) distance -= 0.1;
+  // Over the right shoulder (0.3 m to the side), so the robot's mast does not block the middle of the view.
+  const rx = -dz * 0.3, rz = dx * 0.3;
+  const goalPos = new THREE.Vector3(nav.x - dx * distance + rx, 1.75, nav.z - dz * distance + rz);
+  const arrivedAt = state.journey.phase === "arrived" && route?.asset_id ? roomAsset(state.assetsById.get(route.asset_id)) : null;
+  const goalTarget = arrivedAt ? new THREE.Vector3().fromArray(arrivedAt.center)
+    : new THREE.Vector3(nav.x + dx * 0.6 + rx, 1.1, nav.z + dz * 0.6 + rz);
+  followRig.pos.lerp(goalPos, ease(6));
+  followRig.target.lerp(goalTarget, ease(6));
+  followRig.snap = false;
+  camera.position.copy(followRig.pos);
+  controls.target.copy(followRig.target);
   camera.lookAt(controls.target);
 }
 
@@ -2116,13 +2326,14 @@ function updateAttractMode(now) {
 function bindUIEvents() {
   bindArView();
   bindRoomEdits();
-  bimView=createBimRoom({camera,controls,container:document.getElementById("canvas-container"),onSelect:asset=>selectAsset(asset,true)});
+  bimView=createBimRoom({scene,camera});
+  onFilterChange(() => setViewLayer(state.viewLayer));
   semanticPlan=bindSemanticPlan({
     snapshot:()=>({assets:state.roomAssets,walls:state.twin.scene.walls,derived_context:state.twin.scene.derived_context,navigation:state.twin.navigation,scaleUnverified:state.scaleUnverified,
       robot:robotPosition(),journey:state.journey,selected:state.selectedAsset}),
     inspect:asset=>selectAsset(asset,true),
     navigate:dispatchRobotToAsset,
-    viewModel:()=>applyCameraPreset("bim"),
+    viewModel:()=>{ applyCameraPreset("aerial"); setViewLayer("bim"); },
   });
   document.getElementById("btn-semantic-plan").disabled=false;
   const resumeMission = () => dispatchRobotToAsset(state.assetsById.get(state.twin.target_asset_id));
@@ -2142,6 +2353,7 @@ function bindUIEvents() {
       takeApart.open(state.selectedAsset);
       return;
     }
+    if (key === "shift") walkKeys.add(key);
     if (movementKeys.includes(key) && state.navigationAvailable) {
       event.preventDefault();
       if (!state.manualWalk && event.repeat) return;
@@ -2219,9 +2431,11 @@ function bindUIEvents() {
     renderProposalList();
   });
 
-  for (const btn of document.querySelectorAll("[data-cam]")) {
-    btn.addEventListener("click", () => applyCameraPreset(btn.dataset.cam));
+  bindViewSwitch();
+  for (const btn of document.querySelectorAll("[data-layer]")) {
+    btn.addEventListener("click", () => { proposalReview?.close(); setViewLayer(btn.dataset.layer); });
   }
+  document.getElementById("ceiling-toggle").addEventListener("change", e => setCeilingCut(e.target.checked));
 
   for (const btn of document.querySelectorAll("[data-bmode]")) {
     btn.addEventListener("click", () => {

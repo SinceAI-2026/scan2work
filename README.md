@@ -1,10 +1,10 @@
 # Field Atlas — original scene and candidate review
 
-This fork includes [Wael’s upstream changes through 4286b4e](https://github.com/SinceAI-2026/Wael/tree/4286b4e47d7aa16be047558ba74ee357fc33d0f2). The main demo uses his supplied **504-object scene**, original photos, fitted equipment geometry, 30 procedural Excel bindings and walkthrough navigation. It preserves the original render buffers byte for byte.
+This fork includes [Wael’s upstream changes through 359530b](https://github.com/SinceAI-2026/Wael/tree/359530b305c67690b6ab8ef3b8e20098a09318ef), including the simplified sidebar, shared Scan/Coloured/BIM view controls and camera improvements. The main demo uses his supplied **504-object scene**, original photos, fitted equipment geometry, 30 procedural Excel bindings and walkthrough navigation. It preserves the original render buffers byte for byte.
 
 The expanded extraction contains **1,933 candidate regions**, including all **415 Linards regions**. It is a separate review layer, not a replacement for the original catalog. Exact source-row correspondence connects proposals to original objects without changing their identities, device bindings or navigation. The full imported scene remains available separately for isolation and export.
 
-Equipment records and fault scenarios come from Valmet’s **synthetic** Excel pack. The original archive also contains borrowed telemetry profiles for auxiliary objects; these remain demonstration data. Model labels and candidate boundaries need review; more assigned points do not establish better recognition accuracy. Physical scale is unverified.
+Equipment records and fault scenarios come from Valmet’s **synthetic** Excel pack. The original archive also contains borrowed telemetry profiles for auxiliary objects; these are preserved for provenance but suppressed by the current viewer and service API. Only canonical Excel-linked equipment receives workbook readings and diagnoses. Model labels and candidate boundaries need review; more assigned points do not establish better recognition accuracy. Physical scale is unverified.
 
 ## Get the data
 
@@ -137,4 +137,4 @@ Current limits:
 - The main demo restores Wael’s walkthrough-expanded navigation policy; the separate import keeps its conservative observed-floor grid. Neither policy proves real-world clearance or robot safety, and their assumed robot dimensions differ.
 - These prepared-data workflows run offline. The original `pipeline.run` and `scripts/check.sh` can invoke configured services and replace data; only the user runs them deliberately.
 
-Wael’s original setup and optional voice/refinement workflows remain available in the [upstream README](https://github.com/SinceAI-2026/Wael/blob/4286b4e47d7aa16be047558ba74ee357fc33d0f2/README.md). Use the explicit dataset launch commands above for this integration.
+Wael’s original setup and optional voice/refinement workflows remain available in the [upstream README](https://github.com/SinceAI-2026/Wael/blob/359530b305c67690b6ab8ef3b8e20098a09318ef/README.md). Use the explicit dataset launch commands above for this integration.
