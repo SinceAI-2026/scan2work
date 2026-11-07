@@ -15,7 +15,8 @@ import { createJourney, transitionJourney, journeyView } from "./journey.mjs";
 import { manualObstacles, manualStep } from "./manual-walk.mjs";
 import { withWalkthroughPassages } from "./walkthrough-navigation.mjs";
 import { indexRoomScan, fillRoomObject, traceRoomInstance, reviewedTrolleyParts } from "./room-fill.mjs";
-import { loadRoomPlacements, saveRoomPlacements, placedRoomAsset, roomBoundsOverlap, roomPlacementError, copyPlacedSplats } from "./room-placement.mjs";
+import { loadRoomPlacements, saveRoomPlacements, placedRoomAsset, roomBoundsOverlap, roomPlacementError, copyPlacedSplats,
+  loadRoomCopies, saveRoomCopies, roomCopyAsset, nextCopyId } from "./room-placement.mjs";
 import { navigationAfterRoomEdits } from "./room-edit-navigation.mjs";
 import { roomEditStore } from "./room-edits.mjs";
 import { TransformControls } from "three/addons/controls/TransformControls.js";
@@ -107,7 +108,8 @@ let updateFillSort;
 let sourceScan, indexedScan, originalNavigation, initialNavigation, walkPoses;
 let editStore, activeEdits = [], removedIds = new Set(), editsOffline = false, editBusy = false;
 let roomPlacements = new Map(), liveRoomAssets = new Map(), movePreview = null;
-let moveGizmo = null, moveAnchor = null, moveGizmoReleased = 0; // Move in room: translate arrows on the floor (TransformControls)
+let moveGizmo = null, moveAnchor = null, moveGizmoReleased = 0;
+let roomCopies = new Map(); // duplicate id -> its copy asset; placed like a moved object, from the source's splats // Move in room: translate arrows on the floor (TransformControls)
 let foldedRoomParts = new Map();
 const MAX_ROOM_CUTS = 32, CUT_PAD = 0.03, CUT_TO_FLOOR = 0.3; // updateRoomCuts
 const tracedFragments = new Map();
@@ -239,7 +241,9 @@ async function init() {
       }
     }});
   editStore = roomEditStore(id => canRemove(state.assetsByObj.get(id)),state.datasetId,{localOnly:isPublicDemo(twin.runtime)});
+  for (const [id, sourceId] of loadRoomCopies(state.datasetId)) registerRoomCopy(id, state.assetsByObj.get(sourceId));
   roomPlacements = loadRoomPlacements(state.assetsByObj, canRemove,state.datasetId);
+  for (const id of roomCopies.keys()) if (!roomPlacements.has(id)) unregisterRoomCopy(id);
   const savedEdits = await editStore.load();
   applyRoomEdits(savedEdits, true);
   buildRouteMap();
@@ -1002,8 +1006,11 @@ function instanceColor(id) {
 function buildAssetBoundingBoxes() {
   const hudContainer = document.getElementById("hud-overlay");
   hudContainer.innerHTML = "";
+  for (const asset of state.twin.assets) addAssetBox(asset, hudContainer);
+}
 
-  for (const asset of state.twin.assets) {
+function addAssetBox(asset, hudContainer = document.getElementById("hud-overlay")) {
+  {
     const [sx, sy, sz] = asset.size;
     const [cx, cy, cz] = asset.center;
     const hex = getAssetBoxColor(asset);
@@ -1930,7 +1937,7 @@ function cellAtPosition({x,z}, navigation=state.twin.navigation) {
 function prepareRoomEdits(edits, placements=roomPlacements, preview=null) {
   if (state.exactMembership) return prepareExactRoomEdits(edits, placements);
   const ids = new Set(edits.map(edit=>edit.id));
-  const affected = new Set([...ids,...placements.keys()].sort());
+  const affected = new Set([...ids,...placements.keys()].filter(id=>!roomCopies.has(id)).sort());
   const reviews = new Map(), parts = new Map();
   for (const id of affected) {
     const review = reviewedTrolleyParts(state.assetsByObj.get(id),state.assetsByObj);
@@ -1941,11 +1948,12 @@ function prepareRoomEdits(edits, placements=roomPlacements, preview=null) {
     reviews.set(id,{...review,railOwner});
   }
   const instances = new Set([...affected].map(id=>instancesById.get(id)));
-  const assets = state.twin.assets.filter(asset=>!ids.has(asset.id) && !parts.has(asset.id))
+  const assets = [...state.twin.assets,...roomCopies.values()].filter(asset=>!ids.has(asset.id) && !parts.has(asset.id))
+    .filter(asset=>!asset.copy_of || placements.has(asset.id))
     .map(asset=>placements.has(asset.id) ? placedRoomAsset(asset,placements.get(asset.id),reviews.get(asset.id)?.baseY) : asset);
   let navigation = initialNavigation;
   let fills = [], placed = [], owners = sourceScan?.[3];
-  if (affected.size) {
+  if (affected.size || assets.some(asset=>asset.copy_of)) {
     indexedScan ??= indexRoomScan(...sourceScan);
     owners = indexedScan.instances.slice();
     const added = new Map();
@@ -1975,7 +1983,7 @@ function prepareRoomEdits(edits, placements=roomPlacements, preview=null) {
       return [asset,cached];
     });
     placed = assets.filter(asset=>asset.transform).map(asset=>{
-      const owner = instancesById.get(asset.id);
+      const owner = instancesById.get(asset.copy_of ?? asset.id);
       const indices=[...indexedScan.owned.get(owner).filter(index=>owners[index]===owner),...(added.get(owner)||[])];
       return copyPlacedSplats(scan,indices,asset,owner);
     });
@@ -1989,15 +1997,16 @@ function prepareRoomEdits(edits, placements=roomPlacements, preview=null) {
 // Exact-membership datasets retain their original ownership. Semantic classes and navigation are independent.
 function prepareExactRoomEdits(edits, placements) {
   const ids = new Set(edits.map(edit => edit.id));
-  const affected = new Set([...ids, ...placements.keys()]);
+  const affected = new Set([...ids, ...placements.keys()].filter(id => !roomCopies.has(id)));
   const instances = new Set([...affected].map(id => instancesById.get(id)));
-  const assets = state.twin.assets.filter(a => !ids.has(a.id)).map(a => placements.has(a.id) ? placedRoomAsset(a, placements.get(a.id)) : a);
+  const assets = [...state.twin.assets, ...roomCopies.values()].filter(a => !ids.has(a.id) && (!a.copy_of || placements.has(a.id)))
+    .map(a => placements.has(a.id) ? placedRoomAsset(a, placements.get(a.id)) : a);
   let navigation = initialNavigation;
   const placed = [];
   if (placements.size) {
     indexedScan ??= indexRoomScan(...sourceScan);
     for (const asset of assets.filter(a => a.transform)) {
-      const owner = instancesById.get(asset.id);
+      const owner = instancesById.get(asset.copy_of ?? asset.id);
       const originalRows=indexedScan.owned.get(owner) || [];
       const rows=manualAnnotations?.withoutOwned(originalRows) || originalRows;
       placed.push(copyPlacedSplats(indexedScan, rows, asset, owner));
@@ -2050,6 +2059,7 @@ function updateRoomCuts() {
   const boxes = ai3d?.cutBoxes() ?? [];
   const dragged = movePreview?.dragged ? [movePreview.asset.id] : []; // its first drag: the old spot empties at once
   for (const id of new Set([...removedIds, ...roomPlacements.keys(), ...dragged])) {
+    if (roomCopies.has(id)) continue; // a duplicate's source stays where it is
     const a = state.assetsByObj.get(id), min = a?.aabb_min ?? a?.bbox_min, max = a?.aabb_max ?? a?.bbox_max;
     if (!min || !max) continue;
     const box = {min: min.map(v => v - CUT_PAD), max: max.map(v => v + CUT_PAD)};
@@ -2137,16 +2147,17 @@ function replanAfterRoomEdit(prior) {
 
 function renderRoomEditControls() {
   const count=document.getElementById('room-object-count');
-  const moved = [...roomPlacements.keys()].filter(id=>!removedIds.has(id));
-  count.textContent=`${state.twin.assets.length.toLocaleString()} ${state.imported ? "regions" : "objects"} · ${removedIds.size} removed${moved.length ? ` · ${moved.length} moved` : ''}`;
-  document.getElementById('room-change-count').textContent=String(removedIds.size+moved.length);
+  const placedIds = [...roomPlacements.keys()].filter(id=>!removedIds.has(id));
+  const moved = placedIds.filter(id=>!roomCopies.has(id)), copies = placedIds.filter(id=>roomCopies.has(id));
+  count.textContent=`${state.twin.assets.length.toLocaleString()} ${state.imported ? "regions" : "objects"} · ${removedIds.size} removed${moved.length ? ` · ${moved.length} moved` : ''}${copies.length ? ` · ${copies.length} ${copies.length === 1 ? "copy" : "copies"}` : ''}`;
+  document.getElementById('room-change-count').textContent=String(removedIds.size+placedIds.length);
   const status=document.getElementById('room-edit-status');
   status.textContent=[editsOffline && 'edits not saved to server',isPublicDemo(state.twin.runtime) && removedIds.size && 'Removals are saved in this browser.',moved.length && 'Moved positions are saved in this browser.'].filter(Boolean).join(' · ');
   status.hidden=!status.textContent;
   const asset=state.selectedAsset;
   const removed=removedIds.has(asset.id);
   const button=document.getElementById('btn-room-edit');
-  button.textContent=removed ? 'Restore' : 'Remove from room';
+  button.textContent=removed ? 'Restore' : asset.copy_of ? 'Delete copy' : 'Remove from room';
   button.disabled=editBusy || !canRemove(asset);
   const tooltip=asset.is_target || asset.asset_id===state.twin.target_asset_id ?
     `${asset.tag} is the current inspection target.` : !canRemove(asset) ? 'Scan membership is unavailable for this object.' : '';
@@ -2156,10 +2167,11 @@ function renderRoomEditControls() {
   const reset=document.getElementById('btn-reset-position');
   move.disabled=editBusy || removed || !canRemove(asset);
   move.title=tooltip;
-  reset.hidden=removed || !roomPlacements.has(asset.id);
+  reset.hidden=removed || !roomPlacements.has(asset.id) || !!asset.copy_of;
   reset.disabled=editBusy;
   const notice=document.getElementById('room-edit-notice');
   notice.textContent=removed ? (asset.mapped ? `${asset.tag} removed: its Excel record is no longer located in this room` : 'Removed from this room.') :
+    asset.copy_of ? `Copy of ${displayAssetTag(state.assetsByObj.get(asset.copy_of))}, at X ${asset.center[0].toFixed(2)}, Z ${asset.center[2].toFixed(2)}. Saved in this browser; it carries no workbook data.` :
     roomPlacements.has(asset.id) ? `Moved to X ${asset.center[0].toFixed(2)}, Z ${asset.center[2].toFixed(2)} ${state.scaleUnverified || state.imported ? "scan units (unverified)" : "m"}. The photo shows the original location.` : '';
   notice.hidden=!notice.textContent;
   const list=document.getElementById('room-edit-list');
@@ -2185,18 +2197,19 @@ function renderRoomEditControls() {
     row.append(name,time,restore);
     list.append(row);
   }
-  for (const id of moved) {
+  for (const id of placedIds) {
     const item=liveRoomAssets.get(id), row=document.createElement('div');
+    if (!item) continue;
     row.className='room-change-row';
     const name=document.createElement('button'), reset=document.createElement('button');
     name.type=reset.type='button';
     name.textContent=displayAssetTag(item);
     name.title=item.label;
     name.addEventListener('click',()=>selectAsset(item,true));
-    reset.textContent='Reset position';
-    reset.setAttribute('aria-label',`Reset position of ${displayAssetTag(item)}`);
+    reset.textContent=item.copy_of ? 'Delete copy' : 'Reset position';
+    reset.setAttribute('aria-label',`${reset.textContent} ${displayAssetTag(item)}`);
     reset.disabled=editBusy;
-    reset.addEventListener('click',()=>changePlacement(item,null));
+    reset.addEventListener('click',()=>item.copy_of ? deleteRoomCopy(item) : changePlacement(item,null));
     row.append(name,reset);
     list.append(row);
   }
@@ -2205,6 +2218,7 @@ function renderRoomEditControls() {
 async function changeRoom(action,asset) {
   manualAnnotations?.close();
   if (editBusy || !canRemove(asset)) return;
+  if (asset.copy_of) { if (action==='remove') deleteRoomCopy(asset); return; }
   closeMovePreview();
   editBusy=true;
   walkKeys.clear();
@@ -2274,7 +2288,7 @@ function beginMovePreview(asset) {
   walkKeys.clear();
   viewRoomLocation(asset);
   const source=state.assetsByObj.get(asset.id);
-  const review=state.exactMembership ? null : reviewedTrolleyParts(source,state.assetsByObj);
+  const review=state.exactMembership || source.copy_of ? null : reviewedTrolleyParts(source,state.assetsByObj);
   const [sx,sy,sz]=source.size;
   const baseY=review?.baseY ?? source.center[1]-sy/2;
   const box = new THREE.BoxGeometry(sx,source.center[1]+sy/2-baseY,sz);
@@ -2439,12 +2453,69 @@ function changePlacement(asset, placement, live=false) {
   }
 }
 
+function registerRoomCopy(id, source) {
+  if (!source || source.copy_of || !canRemove(source) || roomCopies.has(id) || state.assetsByObj.has(id)) return null;
+  const copy = roomCopyAsset(source, id);
+  roomCopies.set(id, copy);
+  state.assetsByObj.set(id, copy);
+  instanceSizes.set(id, instanceSizes.get(source.id));
+  addAssetBox(copy);
+  return copy;
+}
+
+function unregisterRoomCopy(id) {
+  const entry = boxMeshes.get(id);
+  if (entry) {
+    scene.remove(entry.group);
+    entry.group.traverse(object => { object.geometry?.dispose(); object.material?.dispose(); });
+    boxMeshes.delete(id);
+  }
+  hudElements.get(id)?.remove();
+  hudElements.delete(id);
+  roomCopies.delete(id);
+  state.assetsByObj.delete(id);
+  liveRoomAssets.delete(id);
+  instanceSizes.delete(id);
+}
+
+// Duplicate: a copy of the object's scan where the object stands now; the arrows then move the copy.
+function duplicateObject(asset) {
+  if (!asset || editBusy || removedIds.has(asset.id) || !canRemove(asset)) return;
+  const source = state.assetsByObj.get(asset.copy_of ?? asset.id);
+  const placement = roomPlacements.get(asset.id) ??
+    {center:[...source.center], yaw:source.yaw, source:[...source.center, source.yaw]};
+  const id = nextCopyId(source.id, new Set([...state.assetsByObj.keys()]));
+  const copy = registerRoomCopy(id, source);
+  if (!copy) return;
+  closeMovePreview();
+  if (!changePlacement(copy, {...placement, center:[...placement.center]}, true)) { unregisterRoomCopy(id); return; }
+  saveRoomCopies(roomCopies, state.datasetId);
+  selectAsset(copy, true);
+  beginMovePreview(state.selectedAsset);
+  document.getElementById('room-move-error').textContent = `${id} is a copy of ${displayAssetTag(source)}. Drag the arrows to move it out.`;
+}
+
+function deleteRoomCopy(copy) {
+  if (editBusy || !roomCopies.has(copy.id)) return;
+  const next = new Map(roomPlacements);
+  next.delete(copy.id);
+  const prepared = prepareRoomEdits(activeEdits, next);
+  closeMovePreview();
+  saveRoomPlacements(next, state.datasetId);
+  roomPlacements = next;
+  unregisterRoomCopy(copy.id);
+  saveRoomCopies(roomCopies, state.datasetId);
+  if (state.selectedAsset?.id === copy.id) state.selectedAsset = state.assetsByObj.get(copy.copy_of);
+  applyRoomEdits({removed:activeEdits, offline:editsOffline}, false, prepared);
+}
+
 function bindRoomEdits() {
   const dialog=document.getElementById('confirm-room-removal');
   let pendingAsset;
   document.getElementById('btn-room-edit').addEventListener('click',()=>{
     const asset=state.selectedAsset;
     if (!canRemove(asset) || editBusy) return;
+    if (asset.copy_of) { deleteRoomCopy(asset); return; }
     if (removedIds.has(asset.id)) { changeRoom('restore',asset); return; }
     pendingAsset=asset;
     dialog.returnValue='';
@@ -2460,6 +2531,7 @@ function bindRoomEdits() {
   document.getElementById('btn-reset-position').addEventListener('click',()=>changePlacement(state.selectedAsset,null));
   document.getElementById('btn-rotate-left').addEventListener('click',()=>turnMovePreview(-15));
   document.getElementById('btn-rotate-right').addEventListener('click',()=>turnMovePreview(15));
+  document.getElementById('btn-duplicate-object').addEventListener('click',()=>duplicateObject(state.selectedAsset));
   bindMoveGizmo();
   document.getElementById('room-move-form').addEventListener('submit',event=>{
     event.preventDefault();
@@ -2719,6 +2791,7 @@ function bindUIEvents() {
       const key=event.key.toLowerCase();
       if (event.key === 'Escape') closeMovePreview();
       else if (key === 'q' || key === 'e') { event.preventDefault(); turnMovePreview(key === 'q' ? -15 : 15); }
+      else if (key === 'd' && !event.repeat) { event.preventDefault(); duplicateObject(state.selectedAsset); }
       else if (event.key === 'Enter') { event.preventDefault(); closeMovePreview(); }
       return;
     }

@@ -60,7 +60,9 @@ The complete toolbar below is available in **Extended** mode. Simplified keeps t
   object. Drag an arrow, or the square between them, to slide it over the floor; its scan splats follow and the
   old spot empties. The move applies on release, as does a click on the floor or map and Q / E (turn 15°). A spot
   that overlaps another object, leaves the room or traps the technician snaps back with the reason. Routes are
-  rebuilt once per move. **Reset position** and **Room changes** undo moves and removals.
+  rebuilt once per move. **Duplicate** (or D) copies the object's scan in place as `<id>-copyN` and puts the arrows
+  on the copy. A copy carries no workbook data, is saved in this browser and is removed with **Delete copy**.
+  **Reset position** and **Room changes** undo moves and removals.
 
 ## Technician, hazards and guided demo
 
