@@ -4,7 +4,7 @@
 .simple-only{display:none}.inspection-destination{font-size:11px;line-height:1.5;color:#536650;margin:0 2px}.simple-intro{font-size:12px;line-height:1.5;color:#536650;margin:0 0 7px}
 html[data-information-mode=simple] .simple-only{display:block}
 html[data-information-mode=simple] [data-extended],
-html[data-information-mode=simple] :is(#room-object-count,#btn-review-proposals,.topbar-link,#sidebar-stats-text,#btn-room-tour,#asset-result-count,#room-changes,.nearby-panel,#aerial-tools,#display-switch,.layer-seg,#btn-ar-view,.fault-panel-switch,.room-filter-summary,#btn-drop-obstacle,#sim-dist-label,.technical-details,#detail-specs,#detail-id-status,#detail-health-pill,#btn-take-apart,#walk-summary,#detail-doc-id,#exec-summary-box,#triage-severity,.copilot-block .chip-row){display:none!important}
+html[data-information-mode=simple] :is(#room-object-count,#btn-review-proposals,#sidebar-stats-text,#btn-room-tour,#asset-result-count,#room-changes,.nearby-panel,#aerial-tools,#display-switch,.layer-seg,#btn-ar-view,.fault-panel-switch,.room-filter-summary,#btn-drop-obstacle,#sim-dist-label,.technical-details,#detail-specs,#detail-id-status,#detail-health-pill,#btn-take-apart,#walk-summary,#detail-doc-id,#exec-summary-box,#triage-severity,.copilot-block .chip-row){display:none!important}
 html[data-information-mode=simple] .mission-box #btn-go-target{order:-2}
 html[data-information-mode=simple] .inspection-destination{order:-1}
 html[data-information-mode=simple] .sidebar-header{margin-bottom:0}

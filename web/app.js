@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { mountGuidedTutorial } from "./guided-tutorial.mjs";
 import { parseLibraryCloneHash, libraryCloneIssue } from "./library-clone.mjs";
 import { makeTechnician, technicianCameraOffset } from "./technician-avatar.mjs";
 import { mountEquipmentMetrics } from "./equipment-metrics.mjs";
@@ -117,6 +118,8 @@ const tracedFragments = new Map();
 const instancesById = new Map();
 const instanceSizes = new Map();
 
+let tutorial;
+const tutorialEntryUrl=location.href;
 let information;
 information=mountInformationSettings({onChange:({mode})=>{
   updateInspectionAction(mode==='simple');
@@ -275,6 +278,18 @@ async function init() {
   selectAsset(targetAsset, false);
   applyCameraPreset("aerial");
   setupSceneContext(targetAsset);
+  tutorial=mountGuidedTutorial({url:tutorialEntryUrl,host:{
+    canStart:()=>!movePreview && !manualAnnotations?.isOpen && !takeApart?.isOpen && !roomParts?.isOpen && !proposalReview?.isOpen,
+    enter(){
+      const inspector=document.body.classList.contains('inspector-open'),collapsed=document.body.classList.contains('sidebar-collapsed');
+      const scrolls=[...document.querySelectorAll('.inspector-scroll,.left-sidebar')].map(el=>[el,el.scrollTop]);
+      const controlEnabled=controls.enabled;controls.enabled=false;walkKeys.clear();
+      return ()=>{setInspectorOpen(inspector);document.body.classList.toggle('sidebar-collapsed',collapsed);for(const [el,top] of scrolls)el.scrollTop=top;controls.enabled=controlEnabled;};
+    },
+    reveal(area){setInspectorOpen(area==='inspector');document.body.classList.toggle('sidebar-collapsed',area!=='sidebar');},
+    exit(){attract.lastActivity=performance.now();}
+  }});
+  document.getElementById('btn-replay-tutorial').disabled=false;
   const consumeLibraryClone = () => {
     if (!location.hash.startsWith('#clone=')) return;
     const id = parseLibraryCloneHash(location.hash);
@@ -299,10 +314,9 @@ async function init() {
     const dt = Math.min(0.08, (now - lastTs) / 1000);
     lastTs = now;
     updateAttractMode(now);
-    stepSimulation(dt, now * 0.001);
-    safetyDemo?.tick(dt);
+    if(!tutorial?.active){stepSimulation(dt, now * 0.001);safetyDemo?.tick(dt);}
     hazardLayer?.frame();
-    if(demoCameraGlide&&!safetyDemo?.state.paused){const g=demoCameraGlide;g.elapsed+=dt;const t=Math.min(1,g.elapsed/g.duration),k=t*t*(3-2*t);camera.position.lerpVectors(g.from,g.to,k);controls.target.lerpVectors(g.aimFrom,g.aimTo,k);controls.update();if(t===1)demoCameraGlide=null;}
+    if(demoCameraGlide&&!tutorial?.active&&!safetyDemo?.state.paused){const g=demoCameraGlide;g.elapsed+=dt;const t=Math.min(1,g.elapsed/g.duration),k=t*t*(3-2*t);camera.position.lerpVectors(g.from,g.to,k);controls.target.lerpVectors(g.aimFrom,g.aimTo,k);controls.update();if(t===1)demoCameraGlide=null;}
     takeApart.frame(boxMeshes);
     if (proposalReview?.isOpen || manualAnnotations?.isOpen) for (const entry of boxMeshes.values()) entry.group.visible=false;
     roomParts.frame(dt);
@@ -319,6 +333,7 @@ async function init() {
     updateHudLabels();
   }
   requestAnimationFrame(animate);
+  tutorial.ready();
 }
 
 function updateSidebarStats() {
@@ -2804,6 +2819,7 @@ function showMissionView({inspection=false}={}) {
 }
 
 function registerActivity() {
+  if(tutorial?.active)return;
   attract.lastActivity=performance.now();
   if (!attract.active) return;
   attract.active=false;
@@ -2812,6 +2828,7 @@ function registerActivity() {
 }
 
 function updateAttractMode(now) {
+  if(tutorial?.active)return;
   if (bimView?.active) return;
   if (movePreview) return;
   if (manualAnnotations?.isOpen || takeApart?.isOpen || roomParts?.isOpen || state.manualWalk || !attract.enabled || attract.active || document.hidden || now-attract.lastActivity < 20000) return;

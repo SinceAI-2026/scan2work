@@ -30,6 +30,8 @@ python3 -m venv .venv && .venv/bin/python -m pip install -r requirements.txt
 ```
 
 The viewer starts in **Simplified** mode: choose equipment, follow its route, then inspect the evidence and checklist.
+
+On the first visit, **Show tutorial** introduces the controls with step-by-step highlights. Skip it or replay it from **Settings → Show tutorial**. **Show welcome on next visit** controls the next welcome prompt; the choice stays in this browser. Add `?tutorial=0` to suppress the automatic welcome for presentations. Library clone and take-apart links also bypass it. The tutorial pauses movement without editing service records or room objects. **Inspection tour** is the separate route, hazards and evidence sequence.
 **Start inspection** names the selected destination; **Watch demo** runs the separate guided walkthrough.
 Open **Settings → Extended** for extraction, editing, BIM/AR and detailed data. Your information preference is saved
 in this browser; changing it preserves the selection, route and service records. [View guide](docs/features.md#simplified-and-extended-information).

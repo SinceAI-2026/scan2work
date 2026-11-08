@@ -28,7 +28,7 @@ export function mountInformationSettings({ document: doc = document, storage, on
     for (const radio of dialog.querySelectorAll('[name=information-mode]')) radio.checked = radio.value === preference.mode;
     doc.getElementById('simple-context-option').hidden = !simple;
     doc.getElementById('workspace-heading').textContent = simple ? 'Inspect equipment' : 'Explore the room';
-    doc.getElementById('btn-safety-demo').textContent = simple ? 'Watch demo' : 'Play demo';
+    doc.getElementById('btn-safety-demo').textContent = 'Inspection tour';
     doc.getElementById('btn-go-target').classList.toggle('primary', simple);
     doc.getElementById('btn-safety-demo').classList.toggle('primary', !simple);
     const map = doc.getElementById('btn-semantic-plan');
