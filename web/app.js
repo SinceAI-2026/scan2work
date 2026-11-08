@@ -5,6 +5,7 @@ import { makeTechnician, technicianCameraOffset } from "./technician-avatar.mjs"
 import { mountEquipmentMetrics } from "./equipment-metrics.mjs";
 import { withTechnicianProfile, TECHNICIAN_HEIGHT } from "./technician-navigation.mjs";
 import { createHazardLayer, energyDescription } from "./hazard-layer.mjs";
+import { bindArHazards } from "./ar-hazards.mjs";
 import { renderDeviceSummary } from "./device-summary.mjs";
 import { mountSafetyDemo } from "./safety-demo.mjs";
 import { createContextRefresh, applyContextStatus } from "./scene-context-refresh.mjs";
@@ -3043,6 +3044,8 @@ async function bindArView() {
   const excerpt = document.getElementById("btn-ar-target");
   const status = document.getElementById("ar-view-status");
   const targetTime = state.assetsById.get(state.twin.target_asset_id)?.photo_source?.video_t_s;
+  const hazardContext = bindArHazards({button:document.getElementById('btn-ar-hazards'), panel:document.getElementById('ar-hazard-context'),
+    asset:()=>state.assetsById.get(state.twin.target_asset_id), context:()=>sceneContext});
   try {
     // The public host disables directory listings. Probe the known optional video without downloading it.
     const clip = await fetch("./data/overlay_walk.mp4", {method:"HEAD",cache:"no-store"});
@@ -3053,6 +3056,7 @@ async function bindArView() {
 
   button.hidden = false;
   button.addEventListener("click", async () => {
+    hazardContext.render();
     dialog.showModal();
     if (!video.getAttribute("src")) {
       status.textContent = "Loading walkthrough…";

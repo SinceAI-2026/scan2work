@@ -291,10 +291,16 @@
   <dialog id="ar-view" class="ar-view" aria-labelledby="ar-view-title">
     <header class="ar-view-header">
       <h2 id="ar-view-title">AR walkthrough</h2>
-      <div class="vp-row"><button class="vp-btn" id="btn-ar-target" hidden>Target excerpt</button><button class="vp-btn" id="btn-close-ar">Close AR view</button></div>
+      <div class="vp-row"><button class="vp-btn" id="btn-ar-target" hidden>Target excerpt</button><button class="vp-btn" id="btn-ar-hazards" aria-pressed="true">Hide hazard context</button><button class="vp-btn" id="btn-close-ar">Close AR view</button></div>
     </header>
     <p id="ar-view-status" role="status" hidden></p>
-    <video controls playsinline preload="none" aria-label="Walkthrough video with equipment overlay"></video>
+    <div class="ar-stage"><video controls playsinline preload="none" aria-label="Walkthrough video with equipment overlay"></video>
+      <aside id="ar-hazard-context" class="ar-hazard-context" aria-label="Illustrative target hazard context">
+        <div class="ar-hazard-heading"><div class="ar-hazard-diagram" data-ar-diagram aria-hidden="true"><span>!</span></div><div><small>ILLUSTRATIVE TARGET CONTEXT</small><strong data-ar-title></strong></div></div>
+        <p data-ar-issue></p><p data-ar-reading></p><small data-ar-source></small><p data-ar-next></p>
+        <small>Diagram only · not aligned to video or a measured exclusion zone. No isolation confirmed.</small>
+      </aside>
+    </div>
   </dialog>
   <dialog id="confirm-room-removal" class="room-edit-dialog" aria-labelledby="room-remove-title">
     <form method="dialog">
