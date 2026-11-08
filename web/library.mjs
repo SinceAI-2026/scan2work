@@ -6,6 +6,8 @@ import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { loadGspl, createSplatObject } from "./splat-object.mjs";
 import { canWriteSharedData, installAction, mountDemoBanner, sharedWrite } from "./runtime-access.mjs";
 
+import { libraryCloneIssue } from "./library-clone.mjs";
+
 const LIB = "./data/library/";
 let TARGET_DEMO = "OBJ-206"; // CV-003, the faulty control valve of the Equipment Room scenario
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
@@ -21,6 +23,7 @@ function classColor(name) {
   return `hsl(${Math.round(((h * 0.618033988749895) % 1) * 360)} 55% 45%)`;
 }
 
+let roomSources = new Map();
 let saved = [], focusId = null, filterClass = null, showScan = false;
 let runtime = {shared_writes_enabled:false}; // Wait for the manifest before allowing mutations.
 
@@ -37,6 +40,7 @@ async function load() {
 async function main() {
   try {
     const twin = await fetch("./data/digital_twin.json").then(r => r.json());
+    roomSources = new Map((twin.assets || []).map(a => [a.id, a]));
     TARGET_DEMO = twin.target_object_id || TARGET_DEMO;
     runtime = twin.runtime || {};
     mountDemoBanner(runtime);
@@ -124,6 +128,7 @@ function focus(id) {
   if (id === decodeURIComponent(location.hash.slice(1))) el?.scrollIntoView({ block: "nearest", behavior: "smooth" });
   if (e.id !== focusId || !model.showing(e.id)) model.show(e);
   focusId = e.id;
+  const cloneIssue = libraryCloneIssue(roomSources.get(e.id));
   const size = e.bounds.max.map((v, k) => (v - e.bounds.min[k]).toFixed(2)).join(" × ");
   document.getElementById("focus").innerHTML = `
     <h3>${esc(e.label || className(e))}</h3>
@@ -146,8 +151,10 @@ function focus(id) {
       ${e.files.model_ply ? `<a class="btn" href="${LIB}${e.files.model_ply}" download>Model .ply</a>` : ""}
       ${e.files.glb ? `<a class="btn" href="${LIB}${e.files.glb}" download>.glb</a>` : ""}
       <a class="btn" href="./index.html#apart=${encodeURIComponent(e.id)}">In the room</a>
+      ${cloneIssue ? `<button class="btn" disabled title="${esc(cloneIssue)}">Clone and place</button>` : `<a class="btn primary" href="./index.html#clone=${encodeURIComponent(e.id)}">Clone and place</a>`}
       ${canWriteSharedData(runtime) ? `<button class="btn danger" data-remove="${esc(e.id)}">Remove</button>` : ""}
     </div>
+    ${cloneIssue ? `<p class="demo-install-note">${esc(cloneIssue)}</p>` : `<p class="demo-install-note">Place a scan copy in this room. Copies have no device telemetry; the saved library object stays unchanged.</p>`}
     ${canWriteSharedData(runtime) ? "" : `<p class="demo-install-note">Downloads are available. ${installAction(runtime)} to manage your own library.</p>`}`;
 }
 

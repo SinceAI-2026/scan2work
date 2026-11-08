@@ -126,7 +126,11 @@ export function saveRoomCopies(copies, datasetId = "") {
 
 // A copy shows the source's scan, not its workbook record: every status on screen must come from the Excel pack.
 export function roomCopyAsset(source, id) {
-  const {tag, asset_id, telemetry, alarms, maintenance_history, diagnostics, ...rest} = source;
+  const {tag, asset_id, telemetry, alarms, maintenance_history, diagnostics,
+    asset_class, area_id, area_name, process_context, criticality, health_score, issue_code, issue_summary,
+    urgency, recommended_next_check, model_confidence, mapping_confidence, effective_confidence, dq_penalty,
+    qr_id, nfc_id, installation_date, last_service_date, connectivity_profile, knowledge_doc_id,
+    knowledge_doc, rag_docs, data_quality_issues, matched_cases, ...rest} = source;
   return {...rest, id, copy_of: source.id, label: `${source.label} (copy)`, mapped: false, is_target: false,
     condition_state: source.movable ? "movable" : "not_instrumented"};
 }

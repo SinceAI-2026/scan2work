@@ -31,3 +31,6 @@ html[data-information-mode=simple] .navigation-hud{max-width:320px}
 
 #btn-settings{flex-shrink:0}
 @media(max-width:650px){.topbar-right{flex-wrap:wrap;justify-content:flex-end;gap:4px}.topbar{height:auto;min-height:52px;padding-block:7px}.topbar-right #btn-settings{order:-1}}
+
+/* Copies remain editable in Simple mode, including after a reload. */
+html[data-information-mode=simple] body.has-room-copies #room-changes{display:block!important}

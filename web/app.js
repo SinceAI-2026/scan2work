@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { parseLibraryCloneHash, libraryCloneIssue } from "./library-clone.mjs";
 import { makeTechnician, technicianCameraOffset } from "./technician-avatar.mjs";
 import { mountEquipmentMetrics } from "./equipment-metrics.mjs";
 import { withTechnicianProfile, TECHNICIAN_HEIGHT } from "./technician-navigation.mjs";
@@ -274,6 +275,14 @@ async function init() {
   selectAsset(targetAsset, false);
   applyCameraPreset("aerial");
   setupSceneContext(targetAsset);
+  const consumeLibraryClone = () => {
+    if (!location.hash.startsWith('#clone=')) return;
+    const id = parseLibraryCloneHash(location.hash);
+    history.replaceState(null, '', location.pathname + location.search);
+    startLibraryClone(id);
+  };
+  consumeLibraryClone();
+  window.addEventListener('hashchange', consumeLibraryClone);
   const apartHash = decodeURIComponent(location.hash).match(/^#apart=(.+)$/);
   if (apartHash && liveRoomAssets.has(apartHash[1])) {
     selectAsset(liveRoomAssets.get(apartHash[1]), false);
@@ -1919,7 +1928,7 @@ function dropDemoObstacle() {
 }
 
 function canRemove(asset) {
-  return !!asset && !asset.is_target && asset.asset_id !== state.twin.target_asset_id && !!instanceSizes.get(asset.id);
+  return !!asset && !asset.is_target && (!state.twin.target_asset_id || asset.asset_id !== state.twin.target_asset_id) && !!instanceSizes.get(asset.id);
 }
 
 function roomAsset(asset) {
@@ -2156,22 +2165,25 @@ function renderRoomEditControls() {
   status.hidden=!status.textContent;
   const asset=state.selectedAsset;
   const removed=removedIds.has(asset.id);
+  const draft=!!movePreview?.libraryDraft && movePreview.asset.id===asset.id;
+  document.body.classList.toggle('has-room-copies',copies.length>0);
   const button=document.getElementById('btn-room-edit');
   button.textContent=removed ? 'Restore' : asset.copy_of ? 'Delete copy' : 'Remove from room';
-  button.disabled=editBusy || !canRemove(asset);
-  const tooltip=asset.is_target || asset.asset_id===state.twin.target_asset_id ?
+  button.disabled=editBusy || draft || !canRemove(asset);
+  const tooltip=asset.is_target || (state.twin.target_asset_id && asset.asset_id===state.twin.target_asset_id) ?
     `${asset.tag} is the current inspection target.` : !canRemove(asset) ? 'Scan membership is unavailable for this object.' : '';
   button.title=tooltip;
   document.getElementById('room-edit-tooltip').title=tooltip;
   const move=document.getElementById('btn-move-object');
   const reset=document.getElementById('btn-reset-position');
-  move.disabled=editBusy || removed || !canRemove(asset);
+  move.disabled=editBusy || draft || removed || !canRemove(asset);
+  move.parentElement.toggleAttribute('data-extended',!asset.copy_of);
   move.title=tooltip;
   reset.hidden=removed || !roomPlacements.has(asset.id) || !!asset.copy_of;
   reset.disabled=editBusy;
   const notice=document.getElementById('room-edit-notice');
   notice.textContent=removed ? (asset.mapped ? `${asset.tag} removed: its Excel record is no longer located in this room` : 'Removed from this room.') :
-    asset.copy_of ? `Copy of ${displayAssetTag(state.assetsByObj.get(asset.copy_of))}, at X ${asset.center[0].toFixed(2)}, Z ${asset.center[2].toFixed(2)}. Saved in this browser; it carries no workbook data.` :
+    asset.copy_of ? (draft ? 'Preview only; choose Place to save in this browser. This copy carries no workbook data.' : `Copy of ${displayAssetTag(state.assetsByObj.get(asset.copy_of))}, at X ${asset.center[0].toFixed(2)}, Z ${asset.center[2].toFixed(2)}. Saved in this browser; it carries no workbook data.`) :
     roomPlacements.has(asset.id) ? `Moved to X ${asset.center[0].toFixed(2)}, Z ${asset.center[2].toFixed(2)} ${state.scaleUnverified || state.imported ? "scan units (unverified)" : "m"}. The photo shows the original location.` : '';
   notice.hidden=!notice.textContent;
   const list=document.getElementById('room-edit-list');
@@ -2282,7 +2294,7 @@ function viewRoomLocation(asset,{avoid=null}={}) {
   }
 }
 
-function beginMovePreview(asset) {
+function beginMovePreview(asset, libraryDraft=false) {
   if (editBusy || removedIds.has(asset.id) || !canRemove(asset)) return;
   closeMovePreview();
   walkKeys.clear();
@@ -2300,17 +2312,24 @@ function beginMovePreview(asset) {
   const [x,y,z]=asset.center;
   const height=Math.max(0,asset.transform ? y-asset.size[1]/2 : baseY), yaw=Math.round(asset.yaw*180/Math.PI);
   // committed: where the object is in the room now; the arrows, a floor or map click and Q / E move it from there
-  movePreview={asset:source,outline,review,x,z,height,yaw,committed:{x,z,yaw},fills:new Map()};
+  movePreview={asset:source,outline,review,x,z,height,yaw,libraryDraft,committed:{x,z,yaw},fills:new Map()};
   moveAnchor.position.set(x,height,z);
   moveGizmo.attach(moveAnchor);
   moveGizmo.getHelper().visible=true;
   document.body.classList.add('placing-object');
   document.getElementById('room-move-form').hidden=false;
+  document.getElementById('btn-done-move').textContent=libraryDraft ? 'Place' : 'Done';
+  document.getElementById('btn-cancel-library-clone').hidden=!libraryDraft;
+  document.getElementById('btn-duplicate-object').disabled=libraryDraft;
+  const hint=document.querySelector('#room-move-form > p');
+  hint.dataset.moveHint ||= hint.textContent;
+  hint.textContent=libraryDraft ? 'Drag the arrows or click the floor to position this copy. Q / E turn it. Place saves the copy; Cancel discards it.' : hint.dataset.moveHint;
   updateMovePreview();
 }
 
 function closeMovePreview() {
   if (!movePreview) return;
+  const draft=movePreview.libraryDraft ? movePreview.asset : null;
   scene.remove(movePreview.outline);
   movePreview.outline.geometry.dispose();
   movePreview.outline.material.dispose();
@@ -2319,6 +2338,12 @@ function closeMovePreview() {
   moveGizmo.getHelper().visible=false;
   document.body.classList.remove('placing-object','dragging-object');
   document.getElementById('room-move-form').hidden=true;
+  document.getElementById('btn-done-move').disabled=false;
+  if (draft) {
+    unregisterRoomCopy(draft.id);
+    if (state.selectedAsset?.id===draft.id) state.selectedAsset=state.assetsByObj.get(draft.copy_of);
+    applyRoomEdits({removed:activeEdits,offline:editsOffline});
+  }
 }
 
 function setMovePoint(point) {
@@ -2355,6 +2380,7 @@ function updateMovePreview() {
   if (!moveGizmo.dragging) moveAnchor.position.set(x,height,z);
   Object.assign(movePreview,{placement,error});
   document.getElementById('room-move-error').textContent=error;
+  document.getElementById('btn-done-move').disabled=!!movePreview.libraryDraft && !!error;
 }
 
 // While the arrows are dragged the object's own splats follow them (no navigation rebuild); see prepareRoomEdits.
@@ -2370,6 +2396,7 @@ function showPlacementSplats(placement) {
 function commitMovePreview() {
   if (!movePreview?.placement) return;
   const {asset,placement,error,committed}=movePreview;
+  if (movePreview.libraryDraft) { showPlacementSplats(placement); return; }
   if (!error && changePlacement(asset,placement,true)) {
     movePreview.committed={x:movePreview.x,z:movePreview.z,yaw:movePreview.yaw};
     movePreview.dragged=false;
@@ -2454,7 +2481,7 @@ function changePlacement(asset, placement, live=false) {
 }
 
 function registerRoomCopy(id, source) {
-  if (!source || source.copy_of || !canRemove(source) || roomCopies.has(id) || state.assetsByObj.has(id)) return null;
+  if (!source || source.copy_of || !instanceSizes.get(source.id) || roomCopies.has(id) || state.assetsByObj.has(id)) return null;
   const copy = roomCopyAsset(source, id);
   roomCopies.set(id, copy);
   state.assetsByObj.set(id, copy);
@@ -2478,9 +2505,46 @@ function unregisterRoomCopy(id) {
   instanceSizes.delete(id);
 }
 
+// A library copy is a draft until Place: leaving the view or reloading cannot save an overlapping copy.
+function startLibraryClone(id) {
+  closeMovePreview();
+  const source=state.assetsByObj.get(id);
+  const issue=libraryCloneIssue(source, !!instanceSizes.get(id));
+  if (issue || editBusy) {
+    setInspectorOpen(true);
+    const notice=document.getElementById('room-edit-notice');
+    notice.textContent=issue || 'Wait for the current room change to finish, then try again.';
+    notice.hidden=false;
+    return;
+  }
+  const copy=registerRoomCopy(nextCopyId(id,new Set(state.assetsByObj.keys())),source);
+  if (!copy) return;
+  selectAsset(copy,true);
+  beginMovePreview(copy,true);
+  renderRoomEditControls();
+  applyCameraPreset('aerial');
+}
+
+function finishMovePreview() {
+  if (!movePreview?.libraryDraft) { closeMovePreview(); return; }
+  updateMovePreview();
+  const {asset,placement,error}=movePreview;
+  if (error) return;
+  // Persist the source identity first. On a failed placement it is rolled back; reload ignores unplaced copies.
+  try { saveRoomCopies(roomCopies,state.datasetId); }
+  catch (error) { document.getElementById('room-move-error').textContent=`Could not save this copy: ${error.message}`; return; }
+  if (!changePlacement(asset,placement,true)) {
+    try { saveRoomCopies(new Map([...roomCopies].filter(([id])=>id!==asset.id)),state.datasetId); } catch {}
+    return;
+  }
+  movePreview.libraryDraft=false;
+  closeMovePreview();
+  renderRoomEditControls();
+}
+
 // Duplicate: a copy of the object's scan where the object stands now; the arrows then move the copy.
 function duplicateObject(asset) {
-  if (!asset || editBusy || removedIds.has(asset.id) || !canRemove(asset)) return;
+  if (!asset || editBusy || movePreview?.libraryDraft || removedIds.has(asset.id) || !canRemove(asset)) return;
   const source = state.assetsByObj.get(asset.copy_of ?? asset.id);
   const placement = roomPlacements.get(asset.id) ??
     {center:[...source.center], yaw:source.yaw, source:[...source.center, source.yaw]};
@@ -2533,9 +2597,10 @@ function bindRoomEdits() {
   document.getElementById('btn-rotate-right').addEventListener('click',()=>turnMovePreview(15));
   document.getElementById('btn-duplicate-object').addEventListener('click',()=>duplicateObject(state.selectedAsset));
   bindMoveGizmo();
+  document.getElementById('btn-cancel-library-clone').addEventListener('click',()=>closeMovePreview());
   document.getElementById('room-move-form').addEventListener('submit',event=>{
     event.preventDefault();
-    closeMovePreview();
+    finishMovePreview();
   });
   document.getElementById('room-fill-debug').addEventListener('change',event=>{
     splatMaterial.uniforms.uFillDebug.value=Number(event.target.checked);
@@ -2792,7 +2857,7 @@ function bindUIEvents() {
       if (event.key === 'Escape') closeMovePreview();
       else if (key === 'q' || key === 'e') { event.preventDefault(); turnMovePreview(key === 'q' ? -15 : 15); }
       else if (key === 'd' && !event.repeat) { event.preventDefault(); duplicateObject(state.selectedAsset); }
-      else if (event.key === 'Enter') { event.preventDefault(); closeMovePreview(); }
+      else if (event.key === 'Enter') { event.preventDefault(); finishMovePreview(); }
       return;
     }
     if (event.defaultPrevented || event.isComposing || event.altKey || event.ctrlKey || event.metaKey ||
