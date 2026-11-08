@@ -1,8 +1,20 @@
 import { manualObstacles } from "./manual-walk.mjs";
 import { reachableFloor } from "./navigation-view.mjs";
+import { refineWalkthroughGrid } from "./walkthrough-grid.mjs";
+
+// The scan occupancy remains at its source resolution. Finer planning resolves
+// real narrow gaps without shrinking the technician or the occupied squares.
+export function withWalkthroughPassages(navigation, assets, poses, edit = null, {planningRes=.025}={}) {
+  // Already refined grids may also contain temporary/dynamic blocks. Never
+  // reopen those cells or repeatedly subdivide the grid on profile re-entry.
+  if(navigation.walkthrough_refinement) return navigation;
+  const coarse=coarseWalkthroughPassages(navigation,assets,poses,edit);
+  if(!coarse || planningRes>=navigation.grid_meta.res || !poses.length) return coarse;
+  return refineWalkthroughGrid(navigation,coarse,assets,poses,edit,planningRes);
+}
 
 // Aligns with the walkthrough export. Its levelling transform only changes Y.
-export function withWalkthroughPassages(navigation, assets, poses, edit = null) {
+function coarseWalkthroughPassages(navigation, assets, poses, edit = null) {
   const m = navigation.grid_meta;
   const editFloor = edit?.floor;
   const radius = edit?.profile.robot_radius_m ?? .10;

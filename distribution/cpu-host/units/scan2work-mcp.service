@@ -1,0 +1,31 @@
+[Unit]
+Description=Scan2Work authenticated inspection MCP
+Wants=network-online.target
+After=network-online.target
+ConditionPathIsMountPoint=/var/lib/scan2work
+RequiresMountsFor=/var/lib/scan2work/data/baseline
+StartLimitIntervalSec=60
+StartLimitBurst=3
+
+[Service]
+Type=simple
+User=scan2work
+Group=scan2work
+WorkingDirectory=/opt/scan2work/current
+EnvironmentFile=/etc/scan2work/runtime.env
+ExecStartPre=/opt/scan2work/venv/bin/python /opt/scan2work/current/scripts/serve_public_demo.py --check --data-dir /var/lib/scan2work/data/baseline --install-url https://assets.scan2work.app/releases/0.1.1/index.html
+ExecStart=/bin/bash /opt/scan2work/current/distribution/cpu-host/run-service.sh mcp
+Restart=on-failure
+RestartSec=3
+TimeoutStopSec=20
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/scan2work/data/baseline
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

@@ -671,3 +671,45 @@ readings, all supplied series and timestamps; unmapped objects cannot borrow
 metrics; the latest-only position error gains no fabricated trend; removed
 objects cannot open device metrics; and the two scene bindings retain identical
 workbook records. The test reads prepared files and does not rewrite them.
+
+## Resolving the left narrow passage without reducing clearance
+
+The left passage near `X=-3.0, Z=0.3–0.7` remained blocked after the technician
+footprint repair. The unchanged 5 cm planning grid forced a 15.41-unit detour
+between two nearby points. Its whole-cell collision inflation closed the diagonal
+neck even though a continuous centre route exists with the same 0.10-unit radius
+and 0.01-unit margin. This was not an additional manual-walking rejection: all
+locally admitted cell centres passed the manual collision checks.
+
+Recorded camera poses traverse the area at 24–25 seconds. Source frames
+`walk_frames/f_0073.jpg` and `f_0076.jpg` show open floor around the pillar and blue
+tank, with a cable on the floor. The camera positions are not a calibrated
+clearance survey and partly intersect the conservative obstacle margins. They
+support the existing walkthrough floor-evidence policy; they do not justify
+deleting obstacle cells or equipment envelopes.
+
+`withWalkthroughPassages` now refines supported floor into a runtime 2.5 cm
+planning grid. Original occupied squares remain 5 cm wide, and both whole planning
+cells and equipment envelopes retain the unchanged clearance. `obstacle_cell_size`
+records the original square width; newly placed obstacle cells carry their own
+width. The stored navigation, source data and expanded extraction profile are not
+rewritten. A coarse-reference option remains available for comparison. Re-entering
+an already refined profile returns its existing grid so moved or temporary
+obstacles cannot be reopened by replaying camera evidence.
+
+The real baseline now has 29,783 reachable fine cells. All 28,900 children of the
+previously reachable 7,225 coarse cells remain admitted. For identical endpoints
+`[-3.0625, 0.1125]` and `[-2.7125, 1.6625]`, the route shortens from 15.412801 to
+1.627049 scene units. An independent continuous-segment audit measures minimum
+gaps of 0.131079 to the original occupied-cell squares and 0.147360 to exact
+oriented equipment boxes, both above the unchanged 0.11-unit requirement. All
+1,628 manual increments on that example route pass.
+
+The seven actual-data tests in `tests/test_runtime_navigation_compat.mjs` pass
+without skips. They retain the original coarse-route checks, verify complete
+previous world coverage and source immutability, audit the central/lower/target/
+tour routes against original occupied squares and equipment boxes, traverse the
+neck in both directions, and confirm a newly placed obstacle forces a detour
+that survives profile re-entry. The separate extraction grid remains unchanged.
+These are scan-space simulation checks; physical scale and real walking clearance
+remain unverified.

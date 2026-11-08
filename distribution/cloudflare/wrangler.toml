@@ -5,14 +5,15 @@ workers_dev = true
 routes = [{pattern = "scan2work.app", custom_domain = true}]
 
 [vars]
-ORIGIN = "http://v2202609409444511285.goodsrv.de:20229"
-# Separate encrypted MCP transport; update if its supervised quick tunnel restarts.
-MCP_ORIGIN = "https://student-leather-designing-recommended.trycloudflare.com"
+ORIGIN = "https://cpu.scan2work.app/main"
+STATIC_ORIGIN = "https://assets.scan2work.app/demo/0.1.1-cpu1/baseline"
+# Stable encrypted CPU origin; MCP credentials remain scoped to /mcp.
+MCP_ORIGIN = "https://cpu.scan2work.app"
 # Main demo explicitly enables shared jobs and the Arduino fault panel.
 # Keep these aligned with the baseline/MCP host flags; review remains read-only.
 ASSISTANT = "1"
 ARDUINO = "1"
-ARDUINO_ORIGIN = "https://protect-fill-hanging-important.trycloudflare.com"
+ARDUINO_ORIGIN = "https://cpu.scan2work.app/board"
 
 [env.review]
 name = "scan2work-review"
@@ -20,4 +21,5 @@ routes = [{pattern = "review.scan2work.app", custom_domain = true}]
 workers_dev = true
 
 [env.review.vars]
-ORIGIN = "http://v2202609409444511285.goodsrv.de:20250"
+ORIGIN = "https://cpu.scan2work.app/review"
+STATIC_ORIGIN = "https://assets.scan2work.app/demo/0.1.1-cpu1/extraction"

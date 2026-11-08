@@ -33,6 +33,7 @@ These versions were resolved and installed in a new Python 3.12 environment on m
 | `pipeline/asset_export.py` | selected object + exact source membership → native PLY/GSPL/row IDs and thumbnail | All native source files must match; exact-source mode needs no torch |
 | `pipeline/manual_annotations.py`, `pipeline/annotations/`, `web/manual-annotation*.mjs` | reviewed source-row annotation → searchable label, original-region export and browser-local visibility | NumPy and bundled Three.js; checks source/render identity; separate from canonical ownership and workbook bindings |
 | `pipeline/navigation.py`, `web/navigation*.mjs` | observed grid, boxes and destination → simulated route | Scan units/clearance assumptions; no robot controller |
+| `web/walkthrough-grid.mjs`, `web/walkthrough-navigation.mjs` | source occupancy, equipment bounds and recorded camera support → finer runtime passage grid | Preserves original obstacle-square sizes and capsule clearance; no dataset writes or learned geometry |
 | `pipeline/retrieval.py` | `rag_index.json` → TF-IDF grounded evidence | scikit-learn; no downloaded embedding model in offline mode |
 | `pipeline/asset_records.py`, `pipeline/field_service.py` | canonical workbook bindings → operational API, checklist and local job log | Synthetic workbook values; prevents borrowed health on unmapped objects |
 | `pipeline/scene_context.py`, `web/device-summary.mjs` | active twin → read-only operator context and compact device summary | Standard library backend; no workbook rebuild, model calls or generated records |

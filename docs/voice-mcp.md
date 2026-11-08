@@ -75,14 +75,14 @@ process and start the viewer with `--assistant`, using the same baseline data.
 That explicit mode exposes all ten tools and shares the inspection job log;
 write fields are limited to 1,000 characters. Enable Worker `ASSISTANT="1"` for
 browser job POSTs. Scene/library/hardware writes remain blocked. The supplied
-host wrappers read the same flag from `deploy/assistant.env` so both processes
+CPU wrappers read the same flag from `/etc/scan2work/runtime.env` so both processes
 agree. Normal installed MCP retains its existing ten-tool behavior. HTTP requests are bounded to 16 KiB,
 eight batch entries and four concurrent batches in public mode.
 
 The public site's Cloudflare Worker forwards `/mcp` only to `MCP_ORIGIN`, which
-must use HTTPS. The demo uses a separate supervised quick tunnel. Its hostname
-can change on restart, requiring a Worker configuration update; the public URL
-remains `https://scan2work.app/mcp`. Management services are separate.
+must use HTTPS. The current CPU host uses the stable `cpu.scan2work.app`
+origin; `/mcp` routes to the loopback MCP process. The public URL remains
+`https://scan2work.app/mcp`. No quick tunnel is needed. Management uses GCP IAP.
 
 ## Enable the widget
 
@@ -165,7 +165,7 @@ Post-deployment checks also passed for all 23 GLBs on both servers, retained
 routes (228 baseline / 187 review waypoints), AR video byte ranges, write
 denials and the original installation's full integrity/dependency check.
 
-See the [host deployment guide](../distribution/host/README.md#update-hosted-code-without-replacing-release-data)
+See the [CPU deployment guide](../distribution/cpu-host/README.md)
 for activation and rollback. The public agent ID is safe to expose; the MCP
 bearer credential remains private. The cloud agent's connection is controlled
 in Wael's ElevenLabs workspace and must be verified independently of the widget.
@@ -198,7 +198,7 @@ client uses `Scan2WorkArduino/0.1` to avoid default-client blocking at the edge.
 Validation: 58 focused backend tests, 48 frontend tests and nine edge tests
 passed. Both viewer patch scripts reported zero edits. The
 [Arduino setup guide](../arduino/README.md) explains the private board config;
-the [host guide](../distribution/host/README.md#public-arduino-connection)
+the [CPU host guide](../distribution/cpu-host/README.md)
 documents deployment flags, encrypted transport and rollback.
 
 Live browser verification also passed: in a fresh text conversation, Ilkka
@@ -212,3 +212,19 @@ shared log lock without removing other visitors' records.
 No application or ElevenLabs browser errors occurred.
 
 ![Live Ilkka job note and offline Arduino fault panel](screenshots/live-shared-jobs-arduino.png)
+
+
+## CPU recovery — 8 November 2026
+
+The destroyed GPU instance was replaced by a dedicated Google Cloud `e2-medium`.
+The main/review/MCP services run snapshot `a8a30f3`; public URLs, agent ID and
+existing private MCP/Arduino credentials were retained. The main widget is visible,
+all ten MCP tools are authenticated and `get_equipment_status(CV-003)` returns the
+workbook data. This recovery did not start a new ElevenLabs voice call.
+
+Both complete catalogs and all 30 workbook bindings remain available. The board
+still reports offline because it is not connected. Service restart and private
+job-log backup/restore passed. The previous shared job history had no verified
+recoverable backup; the replacement starts with an empty log. Browser-local edits
+and preferences survived. Earlier dated test records above describe the retired
+host, not recovered inspection history.

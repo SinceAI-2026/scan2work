@@ -60,6 +60,13 @@ Character appearance adds no further clearance pass or coarse-box expansion.
 The original scan, floor geometry and dataset remain unchanged. Temporary and
 moved-object obstacles still block routes, with no special demo exemption.
 
+A subsequent narrow-passage audit found a separate discretization problem: the
+original 0.05-unit planning cells closed a gap that a 0.025-unit grid could represent
+with the same 0.10-unit radius and 0.01-unit margin. Runtime walkthrough refinement
+preserves the original occupied-square sizes and equipment geometry. Recorded camera
+support proposes candidate floor; continuous collision checks still determine whether
+a route fits. These dimensions are scan units, not calibrated physical measurements.
+
 ## Hazard interpretation
 
 The class-to-energy rules and thresholds are generic demonstration assumptions.
@@ -80,6 +87,7 @@ Those existing workflows remain available for deliberate user interaction.
 
 - `pipeline.scene_context.build_scene_context(twin)` returns JSON-ready context without side effects. The server exposes it at `GET /api/scene-context`.
 - `makeTechnician(THREE, {height, footprintRadius})` returns the avatar root, fitted footprint and displacement-driven animation. `withTechnicianProfile(navigation, {height})` derives the visual profile without changing either walkable grid or the source clearance metadata. The earlier `withTechnicianClearance` name remains an alias.
+- `withWalkthroughPassages(navigation, assets, poses, edit, {planningRes})` uses `web/walkthrough-grid.mjs` to build the finer runtime grid. The default planning resolution is 0.025 scan units; 0.05 retains the coarse reference for regression checks. Original occupancy, floor support, edits and clearance metadata retain their coordinate meaning when resampled.
 - `summaryFor(asset, context)` produces the compact device view; `renderDeviceSummary(...)` renders it. `createContextRefresh(...)` follows existing fault-panel notifications, drops stale responses and clears unavailable readings without adding a polling loop.
 - `metricsFor(asset, context)` and `metricChartSvg(model, key)` prepare the equipment readings and selected trend; `mountEquipmentMetrics({button, document})` mounts the metrics dialog. It uses the active twin's workbook binding, labels scripted scenarios separately and treats gauge ranges as observed history rather than safety limits.
 - `createHazardLayer(THREE, host)` uses callbacks for the current objects, selection and position. Moving/removing an object updates its annotation.
@@ -111,10 +119,14 @@ above the original 0.10 radius plus 0.01 margin. See the [technical audit](techn
 and `tests/test_runtime_navigation_compat.mjs`. These checks establish consistency of the simulation with the
 prepared room data, not measured human clearance.
 
-The corrected viewer and prepared-data suite passed 72 tests. The animated vertex checks cover multiple heights
+At that stage, the corrected viewer and prepared-data suite passed 72 tests. The animated vertex checks cover multiple heights
 and source radii; the head, helmet and vest retain legible proportions within the compact capsule. Both viewer
 patch scripts report zero edits. Browser verification accepted the previously disconnected lower-left map point
 and drew the route around the right and bottom corridors.
+
+Those cell counts describe the original planning resolution. The later narrow-passage
+checks compare reachable world positions rather than raw cell counts across resolutions,
+and verify continuous clearance against the original occupied squares and equipment bounds.
 
 Automated checks cover gait/footprint, route restrictions and edits, moved/removed hazard anchors, demo interruption,
 canonical status, missing/non-finite readings, hot bearings, zero-current interpretation and scripted fault provenance.

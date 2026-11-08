@@ -14,7 +14,7 @@ export function blockBox(navigation, obstacle) {
     const distance = Math.hypot(dx, dz);
     clearance[x][z] = Math.min(clearance[x][z], distance);
     if (distance <= margin + m.res / Math.SQRT2) free[x][z] = 0;
-    if (dx === 0 && dz === 0) obstacleCells.push([cx,cz]);
+    if (dx === 0 && dz === 0) obstacleCells.push([cx,cz,m.res]);
   }
   return {...navigation, room_walkable_grid:free, walkable_grid:free,
     clearance_grid_m:clearance, obstacle_cells_xz:obstacleCells};

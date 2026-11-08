@@ -1,6 +1,6 @@
 # Publish downloads on Cloudflare R2
 
-Use `scan2work.app` for the product website and **`assets.scan2work.app`** for versioned downloads from R2. The browser demo runs a separate read-only Python backend behind Cloudflare Workers; R2 serves the downloadable installation and assets. See the [HTTPS edge](../distribution/cloudflare/README.md) and [host setup](../distribution/host/README.md).
+Use `scan2work.app` for the product website and **`assets.scan2work.app`** for versioned downloads from R2. The browser demo runs a separate Python backend (scene writes disabled; shared demo jobs enabled) behind Cloudflare Workers; R2 serves the downloadable installation and assets. See the [HTTPS edge](../distribution/cloudflare/README.md) and [CPU host setup](../distribution/cpu-host/README.md).
 
 ## One-time setup
 

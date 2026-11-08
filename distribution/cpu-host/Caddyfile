@@ -1,0 +1,25 @@
+# Replace this origin hostname before activation. Public app URLs stay on Workers.
+cpu.scan2work.app {
+    encode zstd gzip
+
+    # MCP remains bearer-authenticated by mcp_server.py. Preserve /mcp verbatim.
+    handle /mcp {
+        reverse_proxy 127.0.0.1:9090
+    }
+
+    # Credentialed Arduino requests travel to this origin over HTTPS.
+    handle /board/api/live/* {
+        uri strip_prefix /board
+        reverse_proxy 127.0.0.1:9080
+    }
+
+    handle_path /main/* {
+        reverse_proxy 127.0.0.1:9080
+    }
+    handle_path /review/* {
+        reverse_proxy 127.0.0.1:9081
+    }
+    handle {
+        respond "Unknown Scan2Work origin route" 404
+    }
+}

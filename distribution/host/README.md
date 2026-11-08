@@ -1,4 +1,9 @@
-# Isolated public deployment on the supplied Vast instance
+# Historical Vast deployment (retired)
+
+The supplied GPU instance was destroyed on 8 November 2026. These files are
+retained for reference and are **not the current installation instructions**.
+Use the [CPU runtime](../cpu-host/README.md), [Google Cloud setup](../gcp/README.md)
+and [Cloudflare routing](../cloudflare/README.md) for the live deployment.
 
 These templates serve the prepared 0.1.1 release. They contain no credentials and
 do not create DNS, public storage, tunnels or accounts. Read

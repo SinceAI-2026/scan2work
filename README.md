@@ -45,6 +45,28 @@ keeps voice off; these source updates do not overwrite its download archives. Lo
 scene changes and exact-source object exports. See
 [hosted operation](docs/public-demo.md) and [voice/MCP setup](docs/voice-mcp.md).
 
+## Hosting and recovery
+
+The public demo uses **Cloudflare Workers + R2 + one Google Cloud CPU server**.
+Workers route HTTPS traffic; R2 stores installers and versioned scan/media files;
+the CPU server runs Python APIs, MCP, the Arduino connection and shared inspection
+jobs. Browser-side rendering needs no server GPU. Workers alone do not run the
+Python backend.
+
+The dedicated `scan2work-2026-demo` project uses an `e2-medium` in Finland, a
+separate retained data disk and private nightly job-log backups. The initial
+planning estimate is **$35–45/month** continuously running, before traffic,
+backups, taxes and existing Cloudflare/voice services; this is not a bill or cap.
+The configured €45 budget sends alerts and does not stop spending.
+
+[CPU service installation](distribution/cpu-host/README.md) ·
+[Google Cloud provisioning, backups and recovery](distribution/gcp/README.md) ·
+[Cloudflare routing](distribution/cloudflare/README.md).
+
+The destroyed GPU host's latest shared inspection-job history had no verified
+recoverable backup. Restored scene assets do not restore those notes or checks.
+Browser-local room edits are separate and remain in the same browser.
+
 ## What it does
 
 | Feature | In short | More |
@@ -52,7 +74,7 @@ scene changes and exact-source object exports. See
 | Extraction | 504 framed objects in 24 classes in the release room; labels from real walkthrough photos, checked against a hand-labelled sample | [Pipeline](docs/pipeline.md) |
 | Two segmenters | Colour/geometry rules + Gemini labels (default), or SAM 2.1 + SigLIP 2/DINOv2 fully on-site | [Pipeline](docs/pipeline.md#two-segmenters) |
 | Workbook binding | All 30 Excel devices on distinct objects; status, telemetry and citations come from the workbook only | [Technical notes](docs/technical-notes.md) |
-| Navigation | A* with the original room clearances and a compact walking technician; follow, first-person and aerial views | [Technical notes](docs/technical-notes.md#navigation-and-collision-model) |
+| Navigation | A* with original clearances, finer routing through narrow passages and a compact technician; follow, first-person and aerial views | [Technical notes](docs/technical-notes.md#navigation-and-collision-model) |
 | Information levels | Simplified technician workspace by default; Settings restores the complete Extended toolset | [View guide](docs/features.md#simplified-and-extended-information) |
 | Guided demo and hazards | Rasmus’s walking service technician, interruptible walkthrough and optional energy illustrations | [Integration and reuse](docs/rasmus-integration.md) |
 | Device metrics | Canonical condition and next check, plus **Metrics & trends** for Excel readings, gauges and signal history in both information modes | [Metrics guide](docs/features.md#equipment-metrics-and-trends) |

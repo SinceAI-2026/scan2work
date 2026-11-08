@@ -3,6 +3,19 @@ const PUBLIC_POSTS = ['/api/copilot/diagnose', '/api/work-orders/draft'];
 const BOARD_READS = ['/api/live/board', '/api/live/board/events'];
 const BOARD_POSTS = ['/api/live/board/claim', '/api/live/board/heartbeat', '/api/live/board/action'];
 const BOARD_AUTH = ['/api/live/board/claim', '/api/live/board/heartbeat'];
+
+// Only immutable scene payloads belong on the public asset origin. Runtime
+// manifests, job logs, JSON records and every API remain on the CPU service.
+export function isScenePayload(pathname) {
+  let path;
+  try { path = decodeURIComponent(pathname); } catch { return false; }
+  if (path.includes('\\') || path.includes('\0') || path.split('/').some(p => p === '.' || p === '..')) return false;
+  if (new Set(['/data/boiler_room_points.bin','/data/splat_instance.bin','/data/splat_source_rows.npy',
+    '/data/source_members.npz','/data/floorplan_scan.png',
+    '/data/navigation_map_preview.png','/data/overlay_walk.mp4']).has(path)) return true;
+  return /^\/data\/(?:photos|walk_frames|take_apart|library)\/.+\.(?:jpg|jpeg|png|webp|mp4|webm|glb|ply|gspl)$/i.test(path);
+}
+
 export default {
   async fetch(request, env) {
     if (!['GET', 'HEAD', 'POST'].includes(request.method)) {
@@ -24,13 +37,19 @@ export default {
     if (request.method === 'POST' && !mcp && !board && !posts.includes(incoming.pathname)) {
       return Response.json({error: 'public_demo_read_only'}, {status: 403});
     }
-    const origin = new URL(mcp ? env.MCP_ORIGIN : board ? env.ARDUINO_ORIGIN : env.ORIGIN);
+    const staticPayload = ['GET','HEAD'].includes(request.method) && env.STATIC_ORIGIN && isScenePayload(incoming.pathname);
+    const configuredOrigin = mcp ? env.MCP_ORIGIN : board ? env.ARDUINO_ORIGIN : staticPayload ? env.STATIC_ORIGIN : env.ORIGIN;
+    let origin;
+    try { origin = new URL(configuredOrigin); } catch { return new Response('Service origin is not configured', {status:503}); }
     // The ordinary origin contains public scene data. MCP carries a private
     // workspace credential, so it must use its separate encrypted origin.
-    if ((mcp || board) && (origin.protocol !== 'https:' || origin.username || origin.password)) {
+    if ((mcp || board || staticPayload) && (origin.protocol !== 'https:' || origin.username || origin.password)) {
       return new Response('Credentialed services require a secure origin', {status: 503});
     }
-    origin.pathname = incoming.pathname;
+    if (!['http:','https:'].includes(origin.protocol) || origin.username || origin.password) return new Response('Invalid service origin', {status:503});
+    // A single stable HTTPS CPU origin can route /main, /review and /board to
+    // separate listeners. Preserve that configured prefix; visitors cannot set it.
+    origin.pathname = origin.pathname.replace(/\/$/, '') + incoming.pathname;
     origin.search = mcp || board ? '' : incoming.search;
     const headers = new Headers();
     if (mcp) {

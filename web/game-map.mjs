@@ -74,15 +74,26 @@ function contourPath(mask, height, scale, minimumArea, tolerance) {
   return path;
 }
 
+export function mapObstacleMask(navigation) {
+  const m=navigation.grid_meta;
+  const obstacles=Array.from({length:m.nx},()=>new Uint8Array(m.nz));
+  for(const [x,z,size=navigation.obstacle_cell_size??m.res] of navigation.obstacle_cells_xz){
+    // Source scan squares remain full-sized on a finer planning map. Optional
+    // third coordinates give temporary obstacle cells their own physical size.
+    const minX=Math.max(0,Math.floor((x-size/2-m.x_min)/m.res+1e-8));
+    const maxX=Math.min(m.nx-1,Math.ceil((x+size/2-m.x_min)/m.res-1e-8)-1);
+    const minZ=Math.max(0,Math.floor((z-size/2-m.z_min)/m.res+1e-8));
+    const maxZ=Math.min(m.nz-1,Math.ceil((z+size/2-m.z_min)/m.res-1e-8)-1);
+    for(let ix=minX;ix<=maxX;ix++)for(let iz=minZ;iz<=maxZ;iz++)obstacles[ix][iz]=1;
+  }
+  return obstacles;
+}
+
 export function createGameMap(navigation, reachable, assets=[]) {
   const m=navigation.grid_meta,scale=6;
   const canvas=document.createElement('canvas');canvas.width=m.nx*scale;canvas.height=m.nz*scale;
   const ctx=canvas.getContext('2d');
-  const obstacles=Array.from({length:m.nx},()=>new Uint8Array(m.nz));
-  for(const [x,z] of navigation.obstacle_cells_xz){
-    const ix=Math.round((x-m.x_min)/m.res-.5),iz=Math.round((z-m.z_min)/m.res-.5);
-    if(obstacles[ix]&&iz>=0&&iz<m.nz)obstacles[ix][iz]=1;
-  }
+  const obstacles=mapObstacleMask(navigation);
   const floor=Array.from({length:m.nx},()=>new Uint8Array(m.nz));
   for(const p of reachable){
     const x=Math.floor((p.x-m.x_min)/m.res),z=Math.floor((p.z-m.z_min)/m.res);

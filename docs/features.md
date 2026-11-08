@@ -71,6 +71,11 @@ use the same walkable floor, including the previously observed lower and central
 appearance does not add another obstacle margin. Walls and temporary/moved obstacles still block travel; physical
 scale remains unverified.
 
+The runtime walkthrough planner uses finer cells where the source grid was too coarse to represent a narrow
+passage. It preserves the original occupied-cell squares and equipment boundaries, with the same technician
+radius and margin. Camera-supported floor supplies candidate routes; it does not override collision checks.
+The source dataset is unchanged, and map clicks, manual walking and room-edit rebuilding use the same refined grid.
+
 **Watch demo** (**Play demo** in Extended) walks to the faulty device, illustrates potential energy, then shows its source evidence. The service
 technician is adapted from Rasmus's procedural character. Pause/resume, Next, Stop and ordinary room interaction
 keep the walkthrough under the user's control. It does not complete inspection checks or change jobs or sensor state.

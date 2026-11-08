@@ -4,6 +4,12 @@ The hosted preview uses a separate prepared release installation. It does not
 expose the author's workstation, editing session, model services or credentials.
 The full installation remains writable; hosted mode is explicit and opt-in.
 
+Hosting uses a Google Cloud CPU VM behind Cloudflare Workers, with large scene
+media and downloads in R2. The VM owns the Python processes and persistent shared
+job state; it is required even though the browser renders the 3D scene. See the
+[CPU deployment](../distribution/cpu-host/README.md) and
+[provisioning/recovery guide](../distribution/gcp/README.md). No GPU is needed.
+
 The main site receives source updates separately from the immutable 0.1.1 downloads,
 with shared inspection jobs, Ilkka and the Arduino panel explicitly enabled. The separate extraction review
 keeps those features off. The default invocation below remains read-only; see
@@ -104,5 +110,5 @@ The board is not connected yet: the live panel correctly reports offline and
 no heartbeat. It displays synthetic workbook plant signals; a connected Arduino
 supplies real touch/button input. Optional Tiger Data and Snowflake stores are
 unconfigured. See [board setup](../arduino/README.md) and the
-[host guide](../distribution/host/README.md#public-arduino-connection) for the
+[CPU host guide](../distribution/cpu-host/README.md) for the
 private device config and dedicated encrypted transport.

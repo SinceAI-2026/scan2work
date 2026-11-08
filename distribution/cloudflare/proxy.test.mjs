@@ -1,7 +1,36 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import worker from './proxy.mjs';
+import worker, {isScenePayload} from './proxy.mjs';
 const env = {ORIGIN:'http://192.0.2.10:20229'};
+test('stable CPU path prefixes route each service without changing credential scope',async()=>{
+ const original=globalThis.fetch;let got;
+ globalThis.fetch=async(url,init)=>{got={url:String(url),init};return Response.json({ok:true});};
+ try {
+  const cpu={ORIGIN:'https://cpu.example/main/',MCP_ORIGIN:'https://cpu.example',ARDUINO:'1',ARDUINO_ORIGIN:'https://cpu.example/board'};
+  await worker.fetch(new Request('https://scan2work.app/data/digital_twin.json?x=1',{headers:{Authorization:'Bearer private'}}),cpu);
+  assert.equal(got.url,'https://cpu.example/main/data/digital_twin.json?x=1');assert.equal(got.init.headers.get('authorization'),null);
+  await worker.fetch(new Request('https://scan2work.app/mcp',{method:'POST',headers:{Authorization:'Bearer private'},body:'{}'}),cpu);
+  assert.equal(got.url,'https://cpu.example/mcp');assert.equal(got.init.headers.get('authorization'),'Bearer private');
+  await worker.fetch(new Request('https://scan2work.app/api/live/board/heartbeat',{method:'POST',headers:{'X-Live-Token':'board'},body:'{}'}),cpu);
+  assert.equal(got.url,'https://cpu.example/board/api/live/board/heartbeat');assert.equal(got.init.headers.get('x-live-token'),'board');
+ } finally {globalThis.fetch=original;}
+});
+test('large scene payloads use the versioned R2 origin; runtime and private state do not',async()=>{
+ const original=globalThis.fetch;let got;
+ globalThis.fetch=async(url,init)=>{got={url:String(url),init};return new Response(init.method==='HEAD'?null:'data',{status:200});};
+ const configured={ORIGIN:'https://cpu.example/main',STATIC_ORIGIN:'https://assets.example/demo/rev/baseline'};
+ try {
+  for(const path of ['/data/boiler_room_points.bin','/data/photos/OBJ-008.jpg','/data/take_apart/A207.glb']){
+   await worker.fetch(new Request('https://scan2work.app'+path,{headers:{Range:'bytes=0-99',Authorization:'Bearer private',Cookie:'visitor'}}),configured);
+   assert.equal(got.url,'https://assets.example/demo/rev/baseline'+path);assert.equal(got.init.headers.get('range'),'bytes=0-99');
+   assert.equal(got.init.headers.get('authorization'),null);assert.equal(got.init.headers.get('cookie'),null);
+  }
+  for(const path of ['/data/digital_twin.json','/data/field_log.json','/data/take_apart/index.json','/api/assets']){
+   await worker.fetch(new Request('https://scan2work.app'+path),configured);assert.equal(got.url,'https://cpu.example/main'+path);
+  }
+  for(const path of ['/data/photos/../field_log.json','/data/photos/%2e%2e%2fprivate.png','/data/photos/secret.env','/data/photos/%00.jpg'])assert.equal(isScenePayload(path),false,path);
+ } finally {globalThis.fetch=original;}
+});
 test('streams ranges to a fixed origin and drops visitor credentials',async()=>{
  const original=globalThis.fetch;
  let got;
