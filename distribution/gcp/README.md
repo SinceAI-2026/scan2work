@@ -58,7 +58,7 @@ account defaults:
 
 ```sh
 bash distribution/gcp/provision.sh \
-  --project scan2work-2026-demo \
+  --project YOUR_DEDICATED_PROJECT \
   --operator user:YOUR_EMAIL \
   --create-project --link-billing --billing-account YOUR_BILLING_ACCOUNT \
   --budget-amount 45 --budget-currency EUR

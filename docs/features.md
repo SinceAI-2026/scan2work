@@ -15,7 +15,7 @@ changes presentation only: it does not edit scene objects, start/close jobs, or 
 | Understand its condition | Issue, relevant recorded reading, timestamp, next check, **Metrics & trends** and expandable evidence | Same, plus specifications, confidence and extraction details |
 | Do the inspection | Source photo, checklist, safety prerequisites, notes and assistant | Same workflow |
 | Show the prototype | Clearly separate guided demo entry; pause/stop/take over | Same walkthrough |
-| Analyse or edit the room | Keep the main room focused | Candidate review, library, BIM/AR, editing and render controls |
+| Analyse or edit the room | Asset library and placed-copy controls | Same, plus candidate review, BIM/AR, original-object editing and render controls |
 
 The technician flow is **choose equipment → follow the route → inspect the evidence and checklist**.
 The guided demo illustrates the flow without completing work. Recorded/synthetic data labels, unavailable-data
@@ -40,6 +40,29 @@ Local browser checks covered first-visit Simplified, Extended after reload, a se
 without interrupting that route, Escape/focus return, the complete guided demo, and Settings/demo at 500 px width.
 The update retains the newer drag-to-move and scan-remnant removal behavior from the shared repository. When a removed item is requested in Simplified, the message points to Settings → Extended → Room changes. No backend changes, model runs or job/device writes are part of this update.
 
+## First-visit tutorial and project background
+
+The welcome offers **Show tutorial** or **Explore on my own**. The tutorial highlights the actual equipment,
+route, map, diagnostics, checklist, library and Settings controls without completing work or creating objects.
+Use Back, Next, Skip or Escape; the previous sidebar state is restored. Replay it from **Settings → Show tutorial**.
+**Show welcome on next visit** offers it once again. Preferences are local to this browser; `?tutorial=0` suppresses
+the welcome for capture, and library-clone/take-apart deep links bypass it.
+
+**Project & team** opens the project background, Valmet challenge and five team profiles without replacing the
+interactive viewer. The asset library and project link are accessible in both information modes.
+
+## Clone and place a library object
+
+In **Asset library**, select a saved object and choose **Clone and place**. A matching source and scan membership
+must exist in the active room. Use the move arrows or floor/map, and Q / E to rotate the preview. **Place** saves
+it; **Cancel**, Escape or leaving the preview discards it. Invalid placements show their reason and cannot be saved.
+
+Each placed copy has a unique identity, retains the source geometry and has no workbook tag, telemetry, diagnosis
+or service record. It can be moved or deleted using its panel or **Room changes**, including in Simplified mode.
+Copies and placements survive reload in the same browser and dataset; they are not shared server edits. Cloning
+from a removed source does not restore that source. Removing a saved library entry is separate from deleting a
+placed copy. The source data is not modified by cloning.
+
 ## Room controls
 
 The complete toolbar below is available in **Extended** mode. Simplified keeps the camera, map and optional hazard controls.
@@ -56,7 +79,7 @@ The complete toolbar below is available in **Extended** mode. Simplified keeps t
 - **Arduino panel** (chip icon): the fault panel's live state, see [arduino/README.md](../arduino/README.md).
 - **Find equipment** and **To inspect** in the left sidebar. Selecting an item keeps the camera; **Take apart**, **Navigate here** and **Isolate item** are explicit actions. **Inspect faulty device** and **Tour the room** start
   the technician.
-- **Move in room** and **Remove from room** (object panel, Extended only): Move shows red and blue arrows on the
+- **Move in room** and **Remove from room** (original-object panel in Extended; copy controls also appear in Simplified): Move shows red and blue arrows on the
   object. Drag an arrow, or the square between them, to slide it over the floor; its scan splats follow and the
   old spot empties. The move applies on release, as does a click on the floor or map and Q / E (turn 15°). A spot
   that overlaps another object, leaves the room or traps the technician snaps back with the reason. Routes are
@@ -64,7 +87,7 @@ The complete toolbar below is available in **Extended** mode. Simplified keeps t
   on the copy. A copy carries no workbook data, is saved in this browser and is removed with **Delete copy**.
   **Reset position** and **Room changes** undo moves and removals.
 
-## Technician, hazards and guided demo
+## Technician, hazards and inspection tour
 
 The technician is sized to the room's original navigation profile. The map, planned routes and manual walking
 use the same walkable floor, including the previously observed lower and central passages. Changing the character's
@@ -76,7 +99,7 @@ passage. It preserves the original occupied-cell squares and equipment boundarie
 radius and margin. Camera-supported floor supplies candidate routes; it does not override collision checks.
 The source dataset is unchanged, and map clicks, manual walking and room-edit rebuilding use the same refined grid.
 
-**Watch demo** (**Play demo** in Extended) walks to the faulty device, illustrates potential energy, then shows its source evidence. The service
+**Inspection tour** walks to the faulty device, illustrates potential energy, then shows its source evidence. The service
 technician is adapted from Rasmus's procedural character. Pause/resume, Next, Stop and ordinary room interaction
 keep the walkthrough under the user's control. It does not complete inspection checks or change jobs or sensor state.
 

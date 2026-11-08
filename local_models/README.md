@@ -3,13 +3,18 @@
 Semantic extraction from Valmet's boiler-room Gaussian splat. Everything runs locally on open models: SAM 2.1,
 SigLIP 2, DINOv2 and OWLv2, with open weights downloaded from Hugging Face. No API key is needed.
 
-The twin uses these objects when it is built with `VALMET_SEGMENTER=local` (see docs/pipeline.md, "Two segmenters").
+The twin uses these objects when it is built with `VALMET_SEGMENTER=local` (see [Two segmenters](../docs/pipeline.md#two-segmenters)).
 `pipeline/local_objects.py` reads `data/pipeline/objects.json` and `objects.npz`, which are committed here so
 the twin can be built on them without re-running anything below.
 
 ## Setup
 
+This is an optional authoring environment, separate from the prepared demo. Run the following from the
+repository root; all later commands on this page assume the `local_models/` directory. Model weights require
+initial downloads and their own licenses and hardware requirements apply.
+
 ```sh
+cd local_models
 uv venv --python 3.12 && uv pip install -r requirements.txt
 ```
 

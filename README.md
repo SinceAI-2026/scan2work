@@ -22,52 +22,45 @@ The room opens at `http://127.0.0.1:8766/`, the optional 1,933-region extraction
 `python3.12 ~/scan2work-0.1.1/start.py --open`, check with `--doctor`. Details:
 [installation](docs/installation.md), [hosted preview](docs/public-demo.md).
 
-**From source** (needs generated data in `web/data/`, see [Rebuild](#rebuild-the-scene-data)):
+**Latest source with prepared data** (Python 3.12; install the prepared release above first):
 
 ```sh
-python3 -m venv .venv && .venv/bin/python -m pip install -r requirements.txt
-.venv/bin/python server.py 8765          # http://127.0.0.1:8765/  (add --lan for an Arduino on the same network)
+git clone https://github.com/SinceAI-2026/scan2work.git
+cd scan2work
+python3.12 -m venv .venv
+.venv/bin/python -m pip install --only-binary=:all: -r requirements-demo.lock.txt
+mkdir "$HOME/scan2work-source-data"
+cp -R "$HOME/scan2work-0.1.1/data/baseline" "$HOME/scan2work-source-data/baseline"
+VALMET_OFFLINE=1 VALMET_DATA_DIR="$HOME/scan2work-source-data/baseline" .venv/bin/python server.py 8765
 ```
+
+Open `http://127.0.0.1:8765/`. Use a new data directory for this checkout: scene changes, saved objects and
+inspection notes can be written there. Copy the complete dataset, including native source and membership files.
+A code clone alone does not contain the generated room. These commands reuse prepared data and do not run the
+extraction pipeline or paid model services. The immutable release contains its original code; the checkout adds
+newer features without replacing that installation.
 
 The viewer starts in **Simplified** mode: choose equipment, follow its route, then inspect the evidence and checklist.
 
 On the first visit, **Show tutorial** introduces the controls with step-by-step highlights. Skip it or replay it from **Settings → Show tutorial**. **Show welcome on next visit** controls the next welcome prompt; the choice stays in this browser. Add `?tutorial=0` to suppress the automatic welcome for presentations. Library clone and take-apart links also bypass it. The tutorial pauses movement without editing service records or room objects. **Inspection tour** is the separate route, hazards and evidence sequence.
-**Start inspection** names the selected destination; **Watch demo** runs the separate guided walkthrough.
+**Start inspection** names the selected destination; **Inspection tour** runs the separate guided walkthrough.
 Open **Settings → Extended** for extraction, editing, BIM/AR and detailed data. Your information preference is saved
 in this browser; changing it preserves the selection, route and service records. [View guide](docs/features.md#simplified-and-extended-information).
 
 **Hazards** toggles potential-energy annotations. Pause, Stop or manual room interaction interrupts the guided demo;
 watching it never completes jobs, changes Arduino readings or certifies safe work.
 
-The hosted main room enables Ilkka, shared synthetic inspection jobs and the Arduino panel; the board is currently
-not connected. Visitors can start jobs, record checks and notes, and close jobs; their progress is visible to other
-visitors. Scene edits remain
-browser-local, and the separate extraction review stays read-only with voice disabled. The immutable 0.1.1 installer
-keeps voice off; these source updates do not overwrite its download archives. Local installations can also save
-scene changes and exact-source object exports. See
-[hosted operation](docs/public-demo.md) and [voice/MCP setup](docs/voice-mcp.md).
+Hosted voice, shared synthetic jobs and Arduino access depend on the deployment configuration. When shared jobs
+are enabled, visitors can see each other’s progress. Local prepared-data operation keeps external model calls off;
+voice and hardware integrations are optional. See [hosted operation](docs/public-demo.md) and
+[voice/MCP setup](docs/voice-mcp.md).
 
-## Hosting and recovery
+## Hosting
 
-The public demo uses **Cloudflare Workers + R2 + one Google Cloud CPU server**.
-Workers route HTTPS traffic; R2 stores installers and versioned scan/media files;
-the CPU server runs Python APIs, MCP, the Arduino connection and shared inspection
-jobs. Browser-side rendering needs no server GPU. Workers alone do not run the
-Python backend.
-
-The dedicated `scan2work-2026-demo` project uses an `e2-medium` in Finland, a
-separate retained data disk and private nightly job-log backups. The initial
-planning estimate is **$35–45/month** continuously running, before traffic,
-backups, taxes and existing Cloudflare/voice services; this is not a bill or cap.
-The configured €45 budget sends alerts and does not stop spending.
-
-[CPU service installation](distribution/cpu-host/README.md) ·
-[Google Cloud provisioning, backups and recovery](distribution/gcp/README.md) ·
-[Cloudflare routing](distribution/cloudflare/README.md).
-
-The destroyed GPU host's latest shared inspection-job history had no verified
-recoverable backup. Restored scene assets do not restore those notes or checks.
-Browser-local room edits are separate and remain in the same browser.
+The deployment examples support a Python CPU server behind Cloudflare Workers, with R2 for versioned assets.
+Browser rendering needs no server GPU; Workers alone do not run the Python backend. Configure your own accounts,
+credentials and backups before deployment. See [CPU hosting](distribution/cpu-host/README.md),
+[Google Cloud](distribution/gcp/README.md), and [Cloudflare](distribution/cloudflare/README.md).
 
 ## What it does
 
@@ -78,9 +71,11 @@ Browser-local room edits are separate and remain in the same browser.
 | Workbook binding | All 30 Excel devices on distinct objects; status, telemetry and citations come from the workbook only | [Technical notes](docs/technical-notes.md) |
 | Navigation | A* with original clearances, finer routing through narrow passages and a compact technician; follow, first-person and aerial views | [Technical notes](docs/technical-notes.md#navigation-and-collision-model) |
 | Information levels | Simplified technician workspace by default; Settings restores the complete Extended toolset | [View guide](docs/features.md#simplified-and-extended-information) |
-| Guided demo and hazards | Rasmus’s walking service technician, interruptible walkthrough and optional energy illustrations | [Integration and reuse](docs/rasmus-integration.md) |
+| Inspection tour and hazards | Rasmus’s walking service technician, interruptible walkthrough and optional energy illustrations | [Integration and reuse](docs/rasmus-integration.md) |
 | Device metrics | Canonical condition and next check, plus **Metrics & trends** for Excel readings, gauges and signal history in both information modes | [Metrics guide](docs/features.md#equipment-metrics-and-trends) |
 | Manual object label | Find the washing machine, inspect its original scan region and test browser-local removal/restoration | [Manual washer](docs/features.md#manually-identified-washing-machine) |
+| Asset library and copies | **Clone and place** previews a saved object; Place saves a browser-local copy, Cancel discards it. Copies have no borrowed device readings | [Library guide](docs/features.md#clone-and-place-a-library-object) |
+| Tutorial and project | Optional first-visit tutorial, Settings replay, and **Project & team** background page | [Project & team](web/about.html) |
 | Room layers | Scan / Coloured by class / BIM masks of the same view, explode, Show in room filters, floor plan and IFC export | [Features](docs/features.md#room-controls) |
 | AI diagnosis | Grounded triage and LOTO-first verification steps; tested blind on the 13 faulty devices | [Technical notes](docs/technical-notes.md#diagnostics-and-optional-ai) |
 | Technician jobs | **To inspect** queue, checklist with safety-first rules, notes, **Mark done** | [Features](docs/features.md#voice-assistant-elevenlabs-agent-ilkka) |
@@ -143,8 +138,10 @@ node tests/test_navigation_view.mjs && node tests/test_journey.mjs && node tests
 
 ## Rebuild the scene data
 
-Generated data is not in git. A fresh clone builds it in about 5 minutes; cached answers in
-`web/data/decisions_cache.json` make it reproducible without API keys.
+The complete generated dataset is not in git. Rebuilding is an optional developer workflow, not a setup step.
+It requires the challenge inputs and additional dependencies from `requirements.txt`. It can overwrite generated
+data and call paid AI services. Cached answers avoid calls only when the required cache entries are present; a
+fresh clone does not guarantee a complete cache. Use the prepared-data quick start to explore the app.
 
 1. Put the challenge files next to the repo (paths in `pipeline/config.py`): `../Equipment Room.ply`, and in
    `../Valmet_SinceAI2026 _1_/` the walkthrough video and the builder workbook.
@@ -164,6 +161,8 @@ a model ran ([generated artifact status](docs/technical-notes.md#generated-artif
 
 ## Docs
 
+- [Contributing](CONTRIBUTING.md) · [Security reporting](SECURITY.md)
+
 - [Technical note (brief)](docs/technical-note.md) · [Pipeline](docs/pipeline.md) · [Features in detail](docs/features.md) · [Technical notes (full)](docs/technical-notes.md)
 - [Installation](docs/installation.md) · [Dependencies](docs/dependencies.md) · [Hosted preview](docs/public-demo.md) · [R2 publishing](docs/cloudflare-r2.md)
 - [Voice and MCP](docs/voice-mcp.md) · [Arduino fault panel](arduino/README.md) · [Local segmenter](local_models/README.md)
@@ -171,3 +170,26 @@ a model ran ([generated artifact status](docs/technical-notes.md#generated-artif
 - [Asset import](docs/asset-import-guide.md) · [Original-data audit](docs/original-data-audit.md)
 - Releases: [0.1.1](docs/release-0.1.1.md), [0.1.0](docs/release-0.1.0.md), [packaging audit](docs/packaging-audit.md)
 - Submission: [slides (PDF, 8 slides)](docs/slides/scan2work-slides.pdf) · [demo recording script](docs/demo-sequence.md)
+
+## Team and attribution
+
+Five people, one shared challenge. Meet the team that came together to explore what industrial spatial intelligence could become.
+
+- [Perttu Isotalo](https://www.linkedin.com/in/isotalo/)
+- [Rasmus Mäkinen](https://www.linkedin.com/in/rasmusmakinen/)
+- [Wael Al-Abbasi](https://www.linkedin.com/in/wael-al-abbasi-398b2126a/)
+- [Linards Liepenieks](https://www.linkedin.com/in/linards-liepenieks/)
+- [Mikael Lehtonen](https://www.linkedin.com/in/mikael-lehtonen-07a130361/)
+
+Built at [Since AI 2026](https://sinceai.ai/hackathon), 6–8 November in Turku, Finland, for Valmet Automation’s
+challenge. This public repository preserves the development history of the team’s original
+[SinceAI-2026/Wael repository](https://github.com/SinceAI-2026/Wael), which may require access. Component provenance,
+including scan2service and Rasmus’s contributions, remains documented in the feature and integration guides.
+
+## License and attribution
+
+This repository currently grants **no project-wide open-source license**. Public visibility does not grant a
+blanket license to reuse or redistribute the project. Obtain permission from the relevant rights holders where
+required. Existing third-party license notices remain applicable to their respective components; see
+[dependencies](docs/dependencies.md). Challenge scans, workbook data, media and generated assets have separate
+provenance and permissions and are not relicensed by this publication.

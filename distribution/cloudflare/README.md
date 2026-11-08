@@ -11,12 +11,14 @@ field-job POST route, but the backend must separately enable `--assistant`. The 
 visitor-supplied URL. Each prepared release runs in its own environment; the edge
 uses no model keys.
 
-Cloudflare account: `ee189a77308f43cac6e888da636d3604` (the account hosting
-`scan2work.app`). After an authorized `wrangler login`, from this directory:
+For your own deployment, copy `wrangler.toml` and replace the worker names,
+custom domains and origin URLs with resources you control. The checked-in file
+describes the team demo; it is not a ready-to-deploy configuration for another
+account. After `wrangler login`, use your account ID from this directory:
 
 ```sh
-CLOUDFLARE_ACCOUNT_ID=ee189a77308f43cac6e888da636d3604 wrangler deploy
-CLOUDFLARE_ACCOUNT_ID=ee189a77308f43cac6e888da636d3604 wrangler deploy --env review
+CLOUDFLARE_ACCOUNT_ID=YOUR_CLOUDFLARE_ACCOUNT_ID wrangler deploy
+CLOUDFLARE_ACCOUNT_ID=YOUR_CLOUDFLARE_ACCOUNT_ID wrangler deploy --env review
 ```
 
 The stable HTTPS origin is `cpu.scan2work.app`, hosted by the dedicated Google
@@ -51,7 +53,7 @@ an explicitly selected Wrangler login (`wrangler whoami` refreshes it first):
 python3 distribution/publish_demo_assets.py \
   --baseline /absolute/path/data/baseline \
   --extraction /absolute/path/data/extraction \
-  --version 0.1.1-cpu1 --account-id ee189a77308f43cac6e888da636d3604 \
+  --version 0.1.1-cpu1 --account-id YOUR_CLOUDFLARE_ACCOUNT_ID \
   --wrangler-config ~/.wrangler/config/default.toml
 ```
 

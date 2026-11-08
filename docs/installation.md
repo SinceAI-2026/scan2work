@@ -40,11 +40,13 @@ The candidate link follows the selected review port. With no optional extraction
 
 ## Browser preview or local installation
 
-The browser preview at `https://scan2work.app/` uses an isolated dataset
-with shared writes disabled. It retains room browsing, navigation, inspection,
-AR evidence, BIM/IFC and existing library downloads. Its move/remove actions are
-browser-local simulations. It does not save technician notes, create shared
-library exports or enable an external voice agent.
+The browser preview at `https://scan2work.app/` uses prepared synthetic data.
+The main room enables shared inspection jobs and the optional voice assistant;
+visitor checks and notes are visible to other visitors. The separate extraction
+review remains read-only with voice disabled. Scene movement, cloning and removal
+stay in each browser. The hosted preview does not allow shared library exports.
+The immutable 0.1.1 installer has its own earlier code snapshot and keeps voice
+off by default. Use this repository with its prepared data to try newer features.
 
 Install locally to save jobs and scene changes or export additional objects from
 their exact native source rows. Local operation does not require a server

@@ -17,3 +17,16 @@ web/data/*
 # the voice assistant MCP token: never commit
 .mcp_token
 web/data/field_log.json.lock
+
+# Local credentials and developer tooling (keep checked-in examples)
+.env.*
+!.env.example
+board.env
+*.pem
+*.key
+.gcp/
+.wrangler/
+node_modules/
+# Local scanner reports may contain sensitive findings
+*secret-scan*.json
+*gitleaks*.json

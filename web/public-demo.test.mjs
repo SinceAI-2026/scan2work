@@ -122,11 +122,18 @@ test("AR discovery works without directory listings and only probes optional vid
   for(const available of [true,false]) {
     const calls=[],button={hidden:true,addEventListener(){}},video={addEventListener(){}};
     const dialog={querySelector:()=>video,addEventListener(){}},control={addEventListener(){}};
-    const context={state:{assetsById:new Map(),twin:{}},
+    const bindings=[];
+    const context={state:{assetsById:new Map(),twin:{}},sceneContext:null,
+      bindArHazards:options=>{bindings.push(options);return {render(){}};},
       document:{getElementById:id=>id==="btn-ar-view"?button:id==="ar-view"?dialog:control},
       fetch:async(url,options)=>{calls.push({url,options});return {ok:available};}};
     vm.runInNewContext(`${source}\nglobalThis.ready=bindArView();`,context);
     await context.ready;
+    assert.equal(bindings.length,1);
+    assert.equal(bindings[0].button,control);
+    assert.equal(bindings[0].panel,control);
+    assert.equal(bindings[0].asset(),undefined);
+    assert.equal(bindings[0].context(),null);
     assert.equal(button.hidden,!available);
     assert.equal(calls.length,1);
     assert.equal(calls[0].url,"./data/overlay_walk.mp4");
