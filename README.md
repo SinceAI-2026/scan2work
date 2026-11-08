@@ -1,5 +1,7 @@
 # Scan2Work
 
+[![Browser module checks](https://github.com/SinceAI-2026/scan2work/actions/workflows/checks.yml/badge.svg)](https://github.com/SinceAI-2026/scan2work/actions/workflows/checks.yml)
+
 Scan2Work turns a Gaussian-splat scan of an industrial room (`Equipment Room.ply`) and the Valmet synthetic builder
 workbook into an inspection twin. Equipment is extracted and framed in 3D, bound to the workbook's device data, and a
 robot walks a collision-checked route to the faulty device, where a grounded AI diagnosis and a LOTO-first job
